@@ -210,22 +210,42 @@ void WorkerCoroutine::sleep(void *co) {
 
 //调度器
 int WorkerCoroutine::scheduler() {
-	size_t size;
-	//uv_loop_t *loop = uv_default_loop();
-	WorkerG.poll.epollfd = epoll_create(512); //创建一个epollfd，然后保存在全局变量
-	WorkerG.poll.ncap = WM_MAXEVENTS; //有16个event
-	size = sizeof(struct epoll_event) * WorkerG.poll.ncap;
-	WorkerG.poll.events = (struct epoll_event *) malloc(size);
-	memset(WorkerG.poll.events, 0, size);
+	//初始化epoll
+	if (!WorkerG.poll) {
+		init_wmPoll();
+	}
 
 	long mic_time;
-	while (WorkerG.timer.num > 0) {
-		epoll_wait(WorkerG.poll.epollfd, WorkerG.poll.events, WorkerG.poll.ncap,
-				1);
-		//一秒过去了
-		wmGetMilliTime(&mic_time);
-		timerwheel_update(&WorkerG.timer, mic_time);
+	//这里应该改成死循环了
+	while (1) {
+		int n;
+		//毫秒级定时器，必须是1
+		int timeout = 1;
+		epoll_event *events;
+		events = WorkerG.poll->events;
+		n = epoll_wait(WorkerG.poll->epollfd, events, WorkerG.poll->ncap,
+				timeout);
+		//循环处理epoll请求
+		for (int i = 0; i < n; i++) {
+			int fd;
+			int id;
+			struct epoll_event *p = &events[i];
+			uint64_t u64 = p->data.u64;
+			Coroutine *co;
+			//解析出来fd和id
+			fromuint64(u64, &fd, &id);
+			co = Coroutine::get_by_cid(id);
+			co->resume();
+		}
+		//有定时器才更新
+		if (WorkerG.timer.num > 0) {
+			//获取毫秒
+			wmGetMilliTime(&mic_time);
+			timerwheel_update(&WorkerG.timer, mic_time);
+		}
+
 	}
+	free_wmPoll();
 
 //	StudyG.poll.epollfd = epoll_create(256);
 //	StudyG.poll.ncap = 16;

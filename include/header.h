@@ -62,14 +62,14 @@
 #include "timer.h"
 
 //定义一些全局方法
-inline zval *wm_zend_read_property(zend_class_entry *class_ptr, zval *obj,
-		const char *s, int len, int silent) {
+static inline zval *wm_zend_read_property(zend_class_entry *class_ptr,
+		zval *obj, const char *s, int len, int silent) {
 	zval rv;
 	return zend_read_property(class_ptr, obj, s, len, silent, &rv);
 }
 
 //获取当前时间
-inline void wmGetTime(long *seconds, long *microseconds) {
+static inline void wmGetTime(long *seconds, long *microseconds) {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	*seconds = tv.tv_sec;
@@ -77,17 +77,30 @@ inline void wmGetTime(long *seconds, long *microseconds) {
 }
 
 //只获取毫秒
-inline void wmGetMilliTime(long *microseconds) {
+static inline void wmGetMilliTime(long *microseconds) {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
-	*microseconds = tv.tv_sec*1000 + (long)tv.tv_usec/1000;
+	*microseconds = tv.tv_sec * 1000 + (long) tv.tv_usec / 1000;
 }
 
 //只获取微妙
-inline void wmGetMicroTime(long *microseconds) {
+static inline void wmGetMicroTime(long *microseconds) {
 	struct timeval tv;
 	gettimeofday(&tv, NULL);
 	*microseconds = tv.tv_usec;
+}
+
+static inline uint64_t touint64(int fd, int id) {
+	uint64_t ret = 0;
+	ret |= ((uint64_t) fd) << 32;
+	ret |= ((uint64_t) id);
+
+	return ret;
+}
+
+static inline void fromuint64(uint64_t v, int *fd, int *id) {
+	*fd = (int) (v >> 32);
+	*id = (int) (v & 0xffffffff);
 }
 
 //初始化base相关
@@ -107,9 +120,14 @@ typedef struct {
 } wmPoll_t;
 
 typedef struct {
-	wmPoll_t poll;
+	wmPoll_t *poll;
 	timerwheel_t timer; //核心定时器
 } wmGlobal_t;
+
+//初始化wmPoll_t
+void init_wmPoll();
+//释放
+void free_wmPoll();
 
 //定义的全局变量，在base.cc中
 extern wmGlobal_t WorkerG;

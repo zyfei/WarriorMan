@@ -41,7 +41,7 @@ PHP_METHOD(workerman_server, __construct) {
 				Z_PARAM_LONG(zport)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 	//创建套接字
-	sock = wmSocket_create(WM_SOCK_TCP);
+	sock = wmSocket_create(AF_INET,SOCK_STREAM,0);
 	//bind套接字
 	wmSocket_bind(sock, WM_SOCK_TCP, Z_STRVAL_P(zhost), zport);
 	wmSocket_listen(sock); // 修改的地方
@@ -84,6 +84,7 @@ PHP_METHOD(workerman_server, recv) {
 
 	zend_string *buf = zend_string_alloc(length, 0); //申请地址空间。这个申请的长度是length+1 预留了\0的位置
 	ret = wmSocket_recv(fd, ZSTR_VAL(buf), length, 0);
+	//客户端已关闭
 	if (ret == 0) {
 		zend_update_property_long(workerman_server_ce_ptr, getThis(),
 				ZEND_STRL("errCode"), WM_ERROR_SESSION_CLOSED_BY_CLIENT);
@@ -100,6 +101,7 @@ PHP_METHOD(workerman_server, recv) {
 		php_error_docref(NULL, E_WARNING, "recv error");
 		RETURN_FALSE
 	}
+	buf->len = ret;
 	ZSTR_VAL(buf)[ret] = '\0'; //适当的位置加上结束符,但是php还是会打出来全部
 	RETURN_STR(buf);
 }

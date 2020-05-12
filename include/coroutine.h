@@ -46,7 +46,15 @@ public:
 	static long create(coroutine_func_t fn, void* args = nullptr);
 	//获取当前协程
 	static void* get_current_task();
+
+	/**
+	 * 返回当前协程类
+	 */
 	static Coroutine* get_current();
+
+	//通过id获取协程
+	static Coroutine* get_by_cid(long _cid);
+
 	//设置自身协程
 	void set_task(void *_task);
 	//获取自身协程

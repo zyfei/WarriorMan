@@ -46,6 +46,14 @@ Coroutine* Coroutine::get_current() {
 	return current;
 }
 
+/**
+ * 通过cid获取协程
+ */
+Coroutine* Coroutine::get_by_cid(long _cid) {
+	Coroutine* _co = (Coroutine*)swHashMap_find_int(coroutines,_cid);
+	return _co;
+}
+
 void Coroutine::set_on_close(st_coro_on_swap_t func) {
 	on_close = func;
 }

@@ -1,4 +1,5 @@
 <?php
+
 // 超出最大限制，会导致双向链表出错，限制一下就可以了。做一个警告
 $t1 = time();
 $cid = worker_go(function () {
@@ -24,9 +25,6 @@ return;
 
 $serv = new worker_server("127.0.0.1", 8080);
 var_dump($serv);
-$sock = $serv->accept();
-var_dump($sock);
-
 while (1) {
 	$connfd = $serv->accept();
 	while (1) {
@@ -34,12 +32,9 @@ while (1) {
 		if ($buf == false) {
 			break;
 		}
-		$serv->send($connfd, "hello");
+		$serv->send($connfd, $buf);
 	}
 }
-return;
-
-worker_coroutine::sleep(1);
 return;
 
 function deferFunc1() {

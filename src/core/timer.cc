@@ -49,9 +49,7 @@ void timerwheel_node_init(timernode_t *node, timer_cb_t cb, void *ud) {
 static void _timerwheel_add(timerwheel_t *tw, timernode_t *node) {
 	uint32_t expire = node->expire;	//过期时间
 	uint32_t idx = expire - tw->currtick; //还有多少滴答超时
-	clinknode_t *head; //链表头
-	//如果滴答间隔，小于第一个轮盘的间隔，那么放入第一个轮盘中
-	bool is_long = true;
+	clinknode_t *head = NULL; //链表头
 	//idx < 256
 	if (idx < TVR_SIZE) {
 		//获取这个轮盘中，相应的刻度链表头 ,第一个轮盘共有TVR_SIZE个刻度  从+0开始
@@ -59,7 +57,6 @@ static void _timerwheel_add(timerwheel_t *tw, timernode_t *node) {
 		//理论就是expire超过8位以后的值，肯定是可以被256整除的。然后取1111 1111的& 取与，就相当于把剩下的保存下来了 .
 		//！！！ 这个取余个人认为完全多余。能满足条件说明就在这一轮了啊
 		head = tw->tvroot.vec + FIRST_INDEX(expire);
-		is_long = false;
 	} else {		//第一个表盘无法满足需求
 		int i;
 		uint64_t sz;
@@ -76,12 +73,11 @@ static void _timerwheel_add(timerwheel_t *tw, timernode_t *node) {
 				//!!!这个取余个人认为完全多余。能满足条件说明就在这一轮了啊
 				idx = NTH_INDEX(expire, i);
 				head = tw->tv[i].vec + idx;
-				is_long = false;
 				break;
 			}
 		}
 	}
-	if (!is_long) {
+	if (head != NULL) {
 		//最后把这个节点，加入到对应表盘的对应刻度中。因为是双向循环链表，其实是加在head的上面
 		clinklist_add_back(head, (clinknode_t*) node);
 	} else { //下面是超长节点

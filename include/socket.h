@@ -10,7 +10,9 @@ enum wmSocket_type {
 /**
  * 创建套接字
  */
-int wmSocket_create(int type);
+int wmSocket_create(int domain, int type, int protocol);
+
+int wmSocket_set_nonblock(int sock);
 
 int wmSocket_listen(int sock);
 
@@ -32,6 +34,6 @@ ssize_t wmSocket_recv(int sock, void *buf, size_t len, int flag);
 /**
  * 发送数据
  */
-ssize_t wmSocket_send(int sock, void *buf, size_t len, int flag);
+ssize_t wmSocket_send(int sock, const void *buf, size_t len, int flag);
 
 #endif

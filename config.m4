@@ -59,6 +59,7 @@ if test "$PHP_WM" != "no"; then
     	src/core/timer.cc
     	src/workerman/model/Context.cc \
     	src/workerman/model/Coroutine.cc \
+    	src/workerman/model/Socket.cc \
     	src/workerman/WorkerCoroutine.cc \
     	src/php_coroutine.cc \
         src/php_workerman.cc \

@@ -3,20 +3,33 @@
 /**
  * 创建套接字
  */
-int wmSocket_create(int type) {
-	int _domain;
-	int _type;
-	//判断类型
-	if (type == WM_SOCK_TCP) {
-		_domain = AF_INET;
-		_type = SOCK_STREAM;
-	} else if (type == WM_SOCK_UDP) {
-		_domain = AF_INET;
-		_type = SOCK_DGRAM;
-	} else {
+int wmSocket_create(int domain, int type, int protocol) {
+	int sock;
+	sock = socket(domain, type, protocol);
+	if (sock < 0) {
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+	}
+	return sock;
+}
+
+/**
+ * 设置为非阻塞模式
+ */
+int wmSocket_set_nonblock(int sock) {
+	int flags;
+	//用来获取这个socket原来的一些属性。
+	flags = fcntl(sock, F_GETFL, 0);
+	if (flags < 0) {
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 		return -1;
 	}
-	return socket(_domain, _type, 0);
+	//在原来的属性上加上非阻塞的属性。
+	flags = fcntl(sock, F_SETFL, flags | O_NONBLOCK);
+	if (flags < 0) {
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		return -1;
+	}
+	return 0;
 }
 
 /**
@@ -85,7 +98,7 @@ ssize_t wmSocket_recv(int sock, void *buf, size_t len, int flag) {
 	return ret;
 }
 
-ssize_t wmSocket_send(int sock, void *buf, size_t len, int flag) {
+ssize_t wmSocket_send(int sock, const void *buf, size_t len, int flag) {
 	ssize_t ret;
 
 	ret = send(sock, buf, len, flag);
