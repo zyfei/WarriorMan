@@ -1,0 +1,7 @@
+ARG_ENABLE('workerman', 'workerman support', 'no');
+
+if (PHP_WORKERMAN != 'no') {
+	AC_DEFINE('HAVE_WORKERMAN', 1, 'workerman support enabled');
+
+	EXTENSION('workerman', 'workerman.c', null, '/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1');
+}
