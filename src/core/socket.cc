@@ -76,6 +76,10 @@ int wmSocket_accept(int sock) {
 
 	len = sizeof(sa);
 	connfd = accept(sock, (struct sockaddr *) &sa, &len);
+	//errno != EAGAIN  不能再读了
+	if (connfd < 0 && errno != EAGAIN) {
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+	}
 	return connfd;
 }
 
@@ -92,7 +96,7 @@ ssize_t wmSocket_recv(int sock, void *buf, size_t len, int flag) {
 	 * 指定MSG_OOB 表示带外数据
 	 */
 	ret = recv(sock, buf, len, flag);
-	if (ret < 0) {
+	if (ret < 0 && errno != EAGAIN) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 	}
 	return ret;
@@ -102,6 +106,16 @@ ssize_t wmSocket_send(int sock, const void *buf, size_t len, int flag) {
 	ssize_t ret;
 
 	ret = send(sock, buf, len, flag);
+	if (ret < 0 && errno != EAGAIN) {
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+	}
+	return ret;
+}
+
+int wmSocket_close(int fd) {
+	int ret;
+
+	ret = close(fd);
 	if (ret < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 	}

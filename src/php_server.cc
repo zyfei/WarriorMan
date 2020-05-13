@@ -32,23 +32,28 @@ ZEND_ARG_INFO(0, data)
 ZEND_END_ARG_INFO()
 
 PHP_METHOD(workerman_server, __construct) {
-	int sock;
 	zval *zhost;
 	zend_long zport;
+	zval zsock;
+
 	//声明参数获取
 	ZEND_PARSE_PARAMETERS_START(2, 2)
 				Z_PARAM_ZVAL(zhost)
 				Z_PARAM_LONG(zport)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-	//创建套接字
-	sock = wmSocket_create(AF_INET,SOCK_STREAM,0);
-	//bind套接字
-	wmSocket_bind(sock, WM_SOCK_TCP, Z_STRVAL_P(zhost), zport);
-	wmSocket_listen(sock); // 修改的地方
 
-	//然后把sock、host、port保存下来作为server对象的属性。
-	zend_update_property_long(workerman_server_ce_ptr, getThis(),
-			ZEND_STRL("sock"), sock);
+	wmCoroutionSocket *sock;
+	sock = (wmCoroutionSocket *) malloc(sizeof(wmCoroutionSocket));
+
+	wm_coroution_socket_init(sock, AF_INET, SOCK_STREAM, 0);
+	wm_coroution_socket_bind(sock, WM_SOCK_TCP, Z_STRVAL_P(zhost), zport);
+	wm_coroution_socket_listen(sock);
+
+	//把创建出来的sock结构体放进了zsock这个zval容器里面
+	ZVAL_PTR(&zsock, sock);
+
+	zend_update_property(workerman_server_ce_ptr, getThis(), ZEND_STRL("zsock"),
+			&zsock);
 	zend_update_property_string(workerman_server_ce_ptr, getThis(),
 			ZEND_STRL("host"), Z_STRVAL_P(zhost));
 	zend_update_property_long(workerman_server_ce_ptr, getThis(),
@@ -60,11 +65,14 @@ PHP_METHOD(workerman_server, __construct) {
  */
 PHP_METHOD(workerman_server, accept) {
 	zval *zsock;
+	wmCoroutionSocket *sock;
 	int connfd;
 	//读取socket,最后0是采用默认模式，如果没有只警告
 	zsock = wm_zend_read_property(workerman_server_ce_ptr, getThis(),
-			ZEND_STRL("sock"), 0);
-	connfd = wmSocket_accept(Z_LVAL_P(zsock));
+			ZEND_STRL("zsock"), 0);
+	sock = (wmCoroutionSocket *) Z_PTR_P(zsock); // 修改的一行
+	//开始接客
+	connfd = wm_coroution_socket_accept(sock);
 	RETURN_LONG(connfd);
 }
 
@@ -72,7 +80,7 @@ PHP_METHOD(workerman_server, accept) {
  * 接收数据
  */
 PHP_METHOD(workerman_server, recv) {
-	int ret;
+	ssize_t ret;
 	zend_long fd;
 	zend_long length = 65536; //代表的是字符串的长度 , 不包括字符串结束符号\0
 
@@ -83,18 +91,24 @@ PHP_METHOD(workerman_server, recv) {
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
 	zend_string *buf = zend_string_alloc(length, 0); //申请地址空间。这个申请的长度是length+1 预留了\0的位置
-	ret = wmSocket_recv(fd, ZSTR_VAL(buf), length, 0);
+	//为这个连接申请内存
+	wmCoroutionSocket *conn = (wmCoroutionSocket *) malloc(
+			sizeof(wmCoroutionSocket));
+	wm_coroution_socket_init_by_fd(conn, fd);
+	ret = wm_coroution_socket_recv(conn, ZSTR_VAL(buf), length);
+
 	//客户端已关闭
 	if (ret == 0) {
 		zend_update_property_long(workerman_server_ce_ptr, getThis(),
 				ZEND_STRL("errCode"), WM_ERROR_SESSION_CLOSED_BY_CLIENT);
 
 		zend_update_property_string(workerman_server_ce_ptr,
-				getThis(), ZEND_STRL("errMsg"),
+		getThis(), ZEND_STRL("errMsg"),
 				wm_strerror(WM_ERROR_SESSION_CLOSED_BY_CLIENT));
 
 		//释放掉申请的内存
 		zend_string_efree(buf);
+		wm_coroution_socket_close(conn);
 		RETURN_FALSE
 	}
 	if (ret < 0) {
@@ -108,7 +122,7 @@ PHP_METHOD(workerman_server, recv) {
 
 //发送数据
 PHP_METHOD(workerman_server, send) {
-	ssize_t retval;
+	ssize_t ret;
 	zend_long fd;
 	char *data;
 	size_t length;
@@ -117,13 +131,18 @@ PHP_METHOD(workerman_server, send) {
 				Z_PARAM_LONG(fd)
 				Z_PARAM_STRING(data, length)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-
-	retval = wmSocket_send(fd, data, length, 0);
-	if (retval < 0) {
+	//为这个连接申请内存
+	wmCoroutionSocket *conn = (wmCoroutionSocket *) malloc(
+			sizeof(wmCoroutionSocket));
+	wm_coroution_socket_init_by_fd(conn, fd);
+	ret = wm_coroution_socket_send(conn, data, length);
+	if (ret < 0) {
 		php_error_docref(NULL, E_WARNING, "send error");
+		//释放掉申请的内存
+		wm_coroution_socket_close(conn);
 		RETURN_FALSE
 	}
-	RETURN_LONG(retval);
+	RETURN_LONG(ret);
 }
 
 static const zend_function_entry workerman_server_methods[] = { //
@@ -148,7 +167,8 @@ void workerman_server_init() {
 	zend_register_class_alias("worker_server", workerman_server_ce_ptr);
 
 	//类进行初始化的时候设置变量
-	zend_declare_property_long(workerman_server_ce_ptr, ZEND_STRL("sock"), -1,
+	zval *zsock = (zval *) malloc(sizeof(zval));
+	zend_declare_property(workerman_server_ce_ptr, ZEND_STRL("zsock"), zsock,
 	ZEND_ACC_PUBLIC);
 	zend_declare_property_string(workerman_server_ce_ptr, ZEND_STRL("host"), "",
 	ZEND_ACC_PUBLIC);
@@ -157,7 +177,7 @@ void workerman_server_init() {
 
 	//注册变量和初始值
 	zend_declare_property_long(workerman_server_ce_ptr, ZEND_STRL("errCode"), 0,
-			ZEND_ACC_PUBLIC);
+	ZEND_ACC_PUBLIC);
 	zend_declare_property_string(workerman_server_ce_ptr, ZEND_STRL("errMsg"),
 			"", ZEND_ACC_PUBLIC);
 

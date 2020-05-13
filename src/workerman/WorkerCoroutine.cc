@@ -230,10 +230,13 @@ int WorkerCoroutine::scheduler() {
 			int fd;
 			int id;
 			struct epoll_event *p = &events[i];
+			//if(p->events & EPOLLIN)
+
 			uint64_t u64 = p->data.u64;
 			Coroutine *co;
 			//解析出来fd和id
 			fromuint64(u64, &fd, &id);
+
 			co = Coroutine::get_by_cid(id);
 			co->resume();
 		}

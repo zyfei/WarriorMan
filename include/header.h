@@ -25,6 +25,7 @@
 #include <time.h>
 #include <sys/timeb.h>
 
+
 //c++才有这个 , 所以不用这个了，用自己写的stack.h实现
 //#include <stack>
 
@@ -60,6 +61,13 @@
 #include "hashmap.h"
 #include "socket.h"
 #include "timer.h"
+#include "wm_string.h"
+#include "coroutine_socket.h"
+
+//int转字符串
+int wm_itoa(char *buf, long value);
+//随机
+int wm_rand(int min, int max);
 
 //定义一些全局方法
 static inline zval *wm_zend_read_property(zend_class_entry *class_ptr,

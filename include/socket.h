@@ -36,4 +36,9 @@ ssize_t wmSocket_recv(int sock, void *buf, size_t len, int flag);
  */
 ssize_t wmSocket_send(int sock, const void *buf, size_t len, int flag);
 
+/**
+ * 关闭
+ */
+int wmSocket_close(int fd);
+
 #endif

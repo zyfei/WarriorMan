@@ -1,5 +1,26 @@
 <?php
+$cid = worker_go(function () {
+	$serv = new worker_server("127.0.0.1", 8080);
+	var_dump($serv);
+	while (1) {
+		$connfd = $serv->accept();
+		worker_go(function () use ($serv, $connfd) {
+			var_dump($connfd);
+			while (1) {
+				$msg = $serv->recv($connfd);
+				if ($msg == false) {
+					var_dump("close connfd $connfd");
+					break;
+				}
+				$serv->send($connfd, $msg);
+			}
+		});
+	}
+});
 
+worker_coroutine::scheduler();
+
+return;
 // 超出最大限制，会导致双向链表出错，限制一下就可以了。做一个警告
 $t1 = time();
 $cid = worker_go(function () {

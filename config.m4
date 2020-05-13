@@ -57,6 +57,7 @@ if test "$PHP_WM" != "no"; then
     	src/core/hashmap.cc
     	src/core/error.cc
     	src/core/timer.cc
+    	src/core/wm_string.cc
     	src/workerman/model/Context.cc \
     	src/workerman/model/Coroutine.cc \
     	src/workerman/model/Socket.cc \
