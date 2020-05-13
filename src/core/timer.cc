@@ -1,5 +1,4 @@
-#include "header.h"
-#include "../include/timer.h"
+#include "timer.h"
 
 #define FIRST_INDEX(v) ((v) & TVR_MASK)
 #define NTH_INDEX(v, n) (((v) >> (TVR_BITS + (n) * TVN_BITS)) & TVN_MASK)

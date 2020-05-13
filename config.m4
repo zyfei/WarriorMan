@@ -51,13 +51,13 @@ if test "$PHP_WM" != "no"; then
 
     dnl 把我们需要编译的所有文件已字符串的方式存入到变量workerman_source_file里面。
     workerman_source_file="\
-    	src/core/base.cc
-    	src/core/log.cc
-    	src/core/socket.cc
-    	src/core/hashmap.cc
-    	src/core/error.cc
-    	src/core/timer.cc
-    	src/core/wm_string.cc
+    	src/core/base.cc \
+    	src/core/log.cc \
+    	src/core/socket.cc \
+    	src/core/hashmap.cc \
+    	src/core/error.cc \
+    	src/core/timer.cc \
+    	src/core/wm_string.cc \
     	src/workerman/model/Context.cc \
     	src/workerman/model/Coroutine.cc \
     	src/workerman/model/Socket.cc \

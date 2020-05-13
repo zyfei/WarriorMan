@@ -1,5 +1,6 @@
 /* workerman extension for PHP */
 #include "workerman.h"
+#include "bash.h"
 
 //创建协程接口方法声明
 PHP_FUNCTION(workerman_coroutine_create);

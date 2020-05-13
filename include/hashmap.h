@@ -13,9 +13,11 @@
   | Author: Tianfeng Han  <mikan.tenny@gmail.com>                        |
   +----------------------------------------------------------------------+
 */
-
 #ifndef __SW_HASHMAP_H
 #define __SW_HASHMAP_H
+
+#include "header.h"
+#include "log.h"
 
 #ifdef __cplusplus
 extern "C" {

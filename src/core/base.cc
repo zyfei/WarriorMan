@@ -1,4 +1,4 @@
-#include "header.h"
+#include "bash.h"
 
 wmGlobal_t WorkerG;
 

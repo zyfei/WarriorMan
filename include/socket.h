@@ -2,6 +2,7 @@
 #define _SOCKET_H
 
 #include "header.h"
+#include "log.h"
 
 enum wmSocket_type {
 	WM_SOCK_TCP = 1, WM_SOCK_UDP = 2,

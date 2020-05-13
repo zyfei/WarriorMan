@@ -1,8 +1,8 @@
 /**
  * server入口文件
  */
-#include "workerman.h"
 #include "server.h"
+#include "bash.h"
 
 PHP_METHOD(workerman_server, __construct);
 PHP_METHOD(workerman_server, accept);

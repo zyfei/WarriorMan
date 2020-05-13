@@ -3,6 +3,7 @@
 
 #include "header.h"
 #include "asm_context.h"
+#include "bash.h"
 
 //默认的PHP栈页大小
 #define DEFAULT_PHP_STACK_PAGE_SIZE       8192
