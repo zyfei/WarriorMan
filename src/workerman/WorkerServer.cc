@@ -1,3 +1,3 @@
 #include "server.h"
+#include "bash.h"
 
-using namespace std;

@@ -7,6 +7,7 @@ void workerman_base_init() {
 	long now_time;
 	wmGetMilliTime(&now_time);
 	timerwheel_init(&WorkerG.timer, 1, now_time);
+	WorkerG.is_running = false;
 }
 
 //初始化epoll

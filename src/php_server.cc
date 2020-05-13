@@ -3,6 +3,7 @@
  */
 #include "server.h"
 #include "bash.h"
+#include "coroutine_socket.h"
 
 PHP_METHOD(workerman_server, __construct);
 PHP_METHOD(workerman_server, accept);
@@ -42,10 +43,7 @@ PHP_METHOD(workerman_server, __construct) {
 				Z_PARAM_LONG(zport)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	wmCoroutionSocket *sock;
-	sock = (wmCoroutionSocket *) malloc(sizeof(wmCoroutionSocket));
-
-	wm_coroution_socket_init(sock, AF_INET, SOCK_STREAM, 0);
+	wmCoroutionSocket *sock = wm_coroution_socket_init(AF_INET, SOCK_STREAM, 0);
 	wm_coroution_socket_bind(sock, WM_SOCK_TCP, Z_STRVAL_P(zhost), zport);
 	wm_coroution_socket_listen(sock);
 
@@ -91,10 +89,13 @@ PHP_METHOD(workerman_server, recv) {
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
 	zend_string *buf = zend_string_alloc(length, 0); //申请地址空间。这个申请的长度是length+1 预留了\0的位置
-	//为这个连接申请内存
-	wmCoroutionSocket *conn = (wmCoroutionSocket *) malloc(
-			sizeof(wmCoroutionSocket));
-	wm_coroution_socket_init_by_fd(conn, fd);
+
+	//在这里初始化这根客户端管道
+	wmCoroutionSocket *conn = wm_coroution_socket_find_by_fd(fd);
+	if (conn == NULL) {
+		conn = wm_coroution_socket_init_by_fd(fd);
+	}
+
 	ret = wm_coroution_socket_recv(conn, ZSTR_VAL(buf), length);
 
 	//客户端已关闭
@@ -131,10 +132,11 @@ PHP_METHOD(workerman_server, send) {
 				Z_PARAM_LONG(fd)
 				Z_PARAM_STRING(data, length)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-	//为这个连接申请内存
-	wmCoroutionSocket *conn = (wmCoroutionSocket *) malloc(
-			sizeof(wmCoroutionSocket));
-	wm_coroution_socket_init_by_fd(conn, fd);
+	//在这里初始化这根客户端管道
+	wmCoroutionSocket *conn = wm_coroution_socket_find_by_fd(fd);
+	if (conn == NULL) {
+		conn = wm_coroution_socket_init_by_fd(fd);
+	}
 	ret = wm_coroution_socket_send(conn, data, length);
 	if (ret < 0) {
 		php_error_docref(NULL, E_WARNING, "send error");

@@ -11,5 +11,6 @@ enum wmEvent_type {
 };
 
 #define WM_MAXEVENTS            1024
+#define WM_BUFFER_SIZE_BIG         65536
 
 #endif /* WM_CONFIG_H_ */
