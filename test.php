@@ -1,26 +1,4 @@
 <?php
-while (1) {
-	worker_go(function () {
-		var_dump(worker_coroutine::getCid());
-	});
-	worker_event_wait();
-}
-return;
-worker_go(function () {
-	var_dump(1);
-	worker_coroutine::sleep(1);
-	var_dump(2);
-});
-
-worker_go(function () {
-	var_dump(3);
-	worker_coroutine::sleep(1);
-	var_dump(4);
-});
-
-worker_event_wait();
-return;
-
 $cid = worker_go(function () {
 	$serv = new worker_server("127.0.0.1", 8080);
 	while (1) {
@@ -36,8 +14,7 @@ $cid = worker_go(function () {
 		});
 	}
 });
-
-worker_coroutine::scheduler();
+worker_event_wait();
 
 return;
 // 超出最大限制，会导致双向链表出错，限制一下就可以了。做一个警告

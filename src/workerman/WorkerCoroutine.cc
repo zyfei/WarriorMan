@@ -166,7 +166,9 @@ void WorkerCoroutine::on_yield(void *arg) {
 void WorkerCoroutine::on_resume(void *arg) {
 	php_coro_task *task = (php_coro_task *) arg;
 	php_coro_task *current_task = get_task();
+	//保存当前的协程
 	save_task(current_task);
+	//恢复指定的task
 	restore_task(task);
 }
 
@@ -208,6 +210,5 @@ void WorkerCoroutine::defer(php_fci_fcc *defer_fci_fcc) {
  * sleep的回调函数
  */
 void WorkerCoroutine::sleep(void *co) {
-	php_printf("~~ \n");
 	((Coroutine *) co)->resume();
 }
