@@ -160,7 +160,6 @@ public:
 	}
 	static void defer(php_fci_fcc *defer_fci_fcc);
 	static void sleep(void * co);
-	static int scheduler();	//调度器
 protected:
 	//主协程
 	static php_coro_task main_task;

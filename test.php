@@ -1,11 +1,24 @@
 <?php
-
-while (true) {
+while (1) {
 	worker_go(function () {
-		$cid = worker_coroutine::getCid();
-		var_dump($cid);
+		var_dump(worker_coroutine::getCid());
 	});
+	worker_event_wait();
 }
+return;
+worker_go(function () {
+	var_dump(1);
+	worker_coroutine::sleep(1);
+	var_dump(2);
+});
+
+worker_go(function () {
+	var_dump(3);
+	worker_coroutine::sleep(1);
+	var_dump(4);
+});
+
+worker_event_wait();
 return;
 
 $cid = worker_go(function () {

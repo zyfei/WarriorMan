@@ -14,7 +14,6 @@ static PHP_METHOD(workerman_coroutine, resume);
 static PHP_METHOD(workerman_coroutine, getCid);
 static PHP_METHOD(workerman_coroutine, defer);
 static PHP_METHOD(workerman_coroutine, sleep);
-static PHP_METHOD(workerman_coroutine, scheduler);
 
 //创建协程接口参数声明
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_coroutine_create, 0, 0, 1) //
@@ -166,16 +165,6 @@ PHP_METHOD(workerman_coroutine, sleep) {
 }
 
 /**
- * 调度器
- */
-PHP_METHOD(workerman_coroutine, scheduler) {
-	if (WorkerCoroutine::scheduler() < 0) {
-		RETURN_FALSE
-	}
-	RETURN_TRUE
-}
-
-/**
  * 我们需要对这个方法进行收集，放在变量 workerman_coroutine_methods里面
  */
 const zend_function_entry workerman_coroutine_methods[] = { //
@@ -189,7 +178,6 @@ const zend_function_entry workerman_coroutine_methods[] = { //
 						PHP_ME(workerman_coroutine, isExist, arginfo_workerman_coroutine_isExist, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 						PHP_ME(workerman_coroutine, defer, arginfo_workerman_coroutine_defer, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 						PHP_ME(workerman_coroutine, sleep, arginfo_workerman_coroutine_sleep, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
-						PHP_ME(workerman_coroutine, scheduler, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 				PHP_FE_END //
 				};
 
