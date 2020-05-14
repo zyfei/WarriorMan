@@ -9,6 +9,7 @@ PHP_METHOD(workerman_server, __construct);
 PHP_METHOD(workerman_server, accept);
 PHP_METHOD(workerman_server, recv);
 PHP_METHOD(workerman_server, send);
+PHP_METHOD(workerman_server, close);
 
 //构造函数
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_server_construct, 0, 0, 2) //
@@ -30,6 +31,10 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_server_send, 0, 0, 2) //
 ZEND_ARG_INFO(0, fd)
 ZEND_ARG_INFO(0, data)
+ZEND_END_ARG_INFO()
+
+//连接关闭
+ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_server_close, 0, 0, 1) ZEND_ARG_INFO(0, fd)
 ZEND_END_ARG_INFO()
 
 PHP_METHOD(workerman_server, __construct) {
@@ -80,7 +85,7 @@ PHP_METHOD(workerman_server, accept) {
 PHP_METHOD(workerman_server, recv) {
 	ssize_t ret;
 	zend_long fd;
-	zend_long length = 65536; //代表的是字符串的长度 , 不包括字符串结束符号\0
+	zend_long length = WM_BUFFER_SIZE_BIG;
 
 	ZEND_PARSE_PARAMETERS_START(1, 2)
 				Z_PARAM_LONG(fd)
@@ -88,15 +93,14 @@ PHP_METHOD(workerman_server, recv) {
 				Z_PARAM_LONG(length)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	zend_string *buf = zend_string_alloc(length, 0); //申请地址空间。这个申请的长度是length+1 预留了\0的位置
-
 	//在这里初始化这根客户端管道
 	wmCoroutionSocket *conn = wm_coroution_socket_find_by_fd(fd);
 	if (conn == NULL) {
 		conn = wm_coroution_socket_init_by_fd(fd);
 	}
 
-	ret = wm_coroution_socket_recv(conn, ZSTR_VAL(buf), length);
+	wm_coroution_socket_recv(conn, length);
+	ret = conn->read_buffer->length;
 
 	//客户端已关闭
 	if (ret == 0) {
@@ -107,8 +111,6 @@ PHP_METHOD(workerman_server, recv) {
 		getThis(), ZEND_STRL("errMsg"),
 				wm_strerror(WM_ERROR_SESSION_CLOSED_BY_CLIENT));
 
-		//释放掉申请的内存
-		zend_string_efree(buf);
 		wm_coroution_socket_close(conn);
 		RETURN_FALSE
 	}
@@ -116,9 +118,10 @@ PHP_METHOD(workerman_server, recv) {
 		php_error_docref(NULL, E_WARNING, "recv error");
 		RETURN_FALSE
 	}
-	buf->len = ret;
-	ZSTR_VAL(buf)[ret] = '\0'; //适当的位置加上结束符,但是php还是会打出来全部
-	RETURN_STR(buf);
+
+	//计数重新开始
+	conn->read_buffer->length = 0;
+	RETURN_STRINGL(conn->read_buffer->str, ret);
 }
 
 //发送数据
@@ -137,6 +140,7 @@ PHP_METHOD(workerman_server, send) {
 	if (conn == NULL) {
 		conn = wm_coroution_socket_init_by_fd(fd);
 	}
+
 	ret = wm_coroution_socket_send(conn, data, length);
 	if (ret < 0) {
 		php_error_docref(NULL, E_WARNING, "send error");
@@ -147,11 +151,30 @@ PHP_METHOD(workerman_server, send) {
 	RETURN_LONG(ret);
 }
 
+PHP_METHOD(workerman_server, close) {
+	int ret;
+	zend_long fd;
+
+	ZEND_PARSE_PARAMETERS_START(1, 1)
+				Z_PARAM_LONG(fd)
+			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
+	wmCoroutionSocket *conn = wm_coroution_socket_find_by_fd(fd);
+	if (conn != NULL) {
+		ret = wm_coroution_socket_close(conn);
+	}
+	if (ret < 0) {
+		php_error_docref(NULL, E_WARNING, "close error");
+		RETURN_FALSE
+	}
+	RETURN_LONG(ret);
+}
+
 static const zend_function_entry workerman_server_methods[] = { //
 						PHP_ME(workerman_server, __construct, arginfo_workerman_server_construct, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR) //
 						PHP_ME(workerman_server, accept, arginfo_workerman_server_void, ZEND_ACC_PUBLIC) //
 						PHP_ME(workerman_server, recv, arginfo_workerman_server_recv, ZEND_ACC_PUBLIC) //
 						PHP_ME(workerman_server, send, arginfo_workerman_server_send, ZEND_ACC_PUBLIC) //
+						PHP_ME(workerman_server, close, arginfo_workerman_server_close, ZEND_ACC_PUBLIC) //
 				PHP_FE_END };
 
 /**

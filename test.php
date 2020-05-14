@@ -12,7 +12,10 @@ $cid = worker_go(function () {
 					var_dump("close connfd $connfd");
 					break;
 				}
+				var_dump($msg);
 				$serv->send($connfd, $msg);
+				$serv->close($connfd);
+				break;
 			}
 		});
 	}
