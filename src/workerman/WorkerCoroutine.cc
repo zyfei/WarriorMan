@@ -128,6 +128,9 @@ void WorkerCoroutine::create_func(void *arg) {
 		wmStack_destroy(defer_tasks);
 		task->defer_tasks = nullptr;
 	}
+	//PHP执行完了，释放PHP栈
+	zend_vm_stack php_stack = EG(vm_stack);
+	efree(php_stack);
 	//释放
 	zval_ptr_dtor(retval);
 }

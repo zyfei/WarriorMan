@@ -1,22 +1,25 @@
 <?php
+
+while (true) {
+	worker_go(function () {
+		$cid = worker_coroutine::getCid();
+		var_dump($cid);
+	});
+}
+return;
+
 $cid = worker_go(function () {
 	$serv = new worker_server("127.0.0.1", 8080);
-	var_dump($serv);
 	while (1) {
 		$connfd = $serv->accept();
 		worker_go(function () use ($serv, $connfd) {
-			var_dump($connfd);
-			while (1) {
-				$msg = $serv->recv($connfd);
-				if ($msg == false) {
-					var_dump("close connfd $connfd");
-					break;
-				}
-				var_dump($msg);
-				$serv->send($connfd, $msg);
-				$serv->close($connfd);
-				break;
+			$msg = $serv->recv($connfd);
+			if ($msg == false) {
+				return;
 			}
+			$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nContent-Length: 11\r\n\r\nhello world\r\n";
+			$serv->send($connfd, $responseStr);
+			$serv->close($connfd);
 		});
 	}
 });
