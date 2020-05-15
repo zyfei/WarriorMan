@@ -35,6 +35,7 @@ typedef struct timernode {
 	void *userdata;               // 用户数据
 	timer_cb_t callback;          // 回调函数
 	uint32_t expire;              // 到期时间 , 这个不是当前时间戳，是定时器滴答总数+传入的时间间隔产生的
+	unsigned long id;              //定时器ID
 } timernode_t;
 
 // 第1个轮
@@ -65,6 +66,9 @@ void timerwheel_init(timerwheel_t *tw, uint16_t interval, uint64_t currtime);
 void timerwheel_node_init(timernode_t *node, timer_cb_t cb, void *ud);
 // 增加时间结点，ticks为触发间隔(注意是以interval为单位)
 void timerwheel_add(timerwheel_t *tw, timernode_t *node, uint32_t ticks);
+// 快速添加
+void timerwheel_add_quick(timerwheel_t *tw, timer_cb_t cb, void *ud,
+		uint32_t ticks);
 // 删除结点
 //int timerwheel_del(timerwheel_t *tw, timernode_t *node);
 // 更新时间轮

@@ -1,4 +1,27 @@
 <?php
+$chan = new worker_channel(1);
+
+worker_go(function () use ($chan) {
+	$ret = $chan->pop();
+	var_dump($ret);
+});
+
+worker_go(function () use ($chan) {
+	$ret = $chan->push("hello world");
+	var_dump($ret);
+});
+
+worker_event_wait();
+
+return;
+worker_go(function () {
+	while (1) {
+		echo "-";
+		worker_coroutine::sleep(0.01);
+	}
+});
+worker_event_wait();
+return;
 $cid = worker_go(function () {
 	$cid = Workerman::getCid();
 	echo "coroutine [$cid] create" . PHP_EOL;

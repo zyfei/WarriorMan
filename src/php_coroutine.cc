@@ -156,9 +156,7 @@ PHP_METHOD(workerman_coroutine, sleep) {
 	}
 
 	Coroutine* co = Coroutine::get_current();
-	timernode_t node1;
-	timerwheel_node_init(&node1, WorkerCoroutine::sleep, (void*) co);
-	timerwheel_add(&WorkerG.timer, &node1, seconds * 1000);
+	timerwheel_add_quick(&WorkerG.timer,WorkerCoroutine::sleep, (void*) co, seconds * 1000);
 
 	co->yield();
 	RETURN_TRUE

@@ -94,6 +94,15 @@ void timerwheel_add(timerwheel_t *tw, timernode_t *node, uint32_t ticks) {
 	tw->num++;
 }
 
+//快速的添加
+void timerwheel_add_quick(timerwheel_t *tw, timer_cb_t cb, void *ud,
+		uint32_t ticks) {
+	timernode_t *node1 = (timernode_t *) malloc(sizeof(timernode_t));
+	bzero(node1, sizeof(timernode_t));
+	timerwheel_node_init(node1, cb, ud);
+	timerwheel_add(tw, node1, ticks);
+}
+
 // 删除结点
 //int timerwheel_del(timerwheel_t *tw, timernode_t *node) {
 //	if (!clinklist_is_empty((clinknode_t*) node)) {
@@ -169,10 +178,13 @@ void _timerwheel_tick(timerwheel_t *tw) {
 		timernode_t *node = (timernode_t*) head.next;
 		//拿出这个节点
 		clinklist_remote(head.next);
+
 		tw->num--;
 		if (node->callback) {
 			//执行回调
 			node->callback(node->userdata);
+			//释放申请的节点
+			free(node);
 		}
 	}
 }
