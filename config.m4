@@ -58,9 +58,10 @@ if test "$PHP_WM" != "no"; then
     	src/core/error.cc \
     	src/core/timer.cc \
     	src/core/wm_string.cc \
+    	src/core/channel.cc \
+    	src/core/coroutine_socket.cc \
     	src/workerman/model/Context.cc \
     	src/workerman/model/Coroutine.cc \
-    	src/workerman/model/Socket.cc \
     	src/workerman/WorkerCoroutine.cc \
     	src/php_coroutine.cc \
         src/php_workerman.cc \
