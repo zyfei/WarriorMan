@@ -1,5 +1,7 @@
 <?php
 $cid = worker_go(function () {
+	$cid = Workerman::getCid();
+	echo "coroutine [$cid] create" . PHP_EOL;
 	$serv = new worker_server("127.0.0.1", 8081);
 	while (1) {
 		$connfd = $serv->accept();

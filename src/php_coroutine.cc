@@ -194,7 +194,7 @@ zend_class_entry *workerman_coroutine_ce_ptr;
 void workerman_coroutine_init() {
 	WorkerCoroutine::init();
 //定义好一个类
-	INIT_NS_CLASS_ENTRY(workerman_coroutine_ce, "Workerman", "Coroutine",
+	INIT_CLASS_ENTRY(workerman_coroutine_ce, "Workerman",
 			workerman_coroutine_methods);
 //在zedn中注册类
 	workerman_coroutine_ce_ptr = zend_register_internal_class(
