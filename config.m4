@@ -65,6 +65,7 @@ if test "$PHP_WM" != "no"; then
     	src/php_coroutine.cc \
         src/php_workerman.cc \
         src/php_server.cc \
+        src/php_channel.cc \
         ${WM_ASM_DIR}make_${WM_CONTEXT_ASM_FILE} \
         ${WM_ASM_DIR}jump_${WM_CONTEXT_ASM_FILE}
     "

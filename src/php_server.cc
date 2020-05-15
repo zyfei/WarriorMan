@@ -1,15 +1,21 @@
 /**
  * server入口文件
  */
-#include "server.h"
 #include "bash.h"
 #include "coroutine_socket.h"
+
+/**
+ * 定义 zend class entry
+ */
+zend_class_entry workerman_server_ce;
+zend_class_entry *workerman_server_ce_ptr;
 
 PHP_METHOD(workerman_server, __construct);
 PHP_METHOD(workerman_server, accept);
 PHP_METHOD(workerman_server, recv);
 PHP_METHOD(workerman_server, send);
 PHP_METHOD(workerman_server, close);
+
 
 //构造函数
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_server_construct, 0, 0, 2) //

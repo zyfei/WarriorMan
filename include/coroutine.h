@@ -154,6 +154,7 @@ public:
 	static void init();
 	static long create(zend_fcall_info_cache *fci_cache, uint32_t argc,
 			zval *argv);
+	//获取上一个任务的task结构。
 	static inline php_coro_task* get_origin_task(php_coro_task *task) {
 		Coroutine *co = task->co->get_origin();
 		return co ? (php_coro_task *) co->get_task() : &main_task;
@@ -174,11 +175,16 @@ protected:
 	//初始化协程栈
 	static void vm_stack_init(void);
 
+	//会在协程被yield的时候，去调用保存PHP栈、加载PHP栈的方法。
 	static void on_yield(void *arg);
+	//会在协程被resume的时候，去调用保存PHP栈、加载PHP栈的方法。
 	static void on_resume(void *arg);
 	static void on_close(void *arg);
+	static void vm_stack_destroy();
 
 	static inline void restore_task(php_coro_task *task);
+
+	//用来重新加载PHP栈。
 	static inline void restore_vm_stack(php_coro_task *task);
 };
 }

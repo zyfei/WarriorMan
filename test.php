@@ -1,6 +1,6 @@
 <?php
 $cid = worker_go(function () {
-	$serv = new worker_server("127.0.0.1", 8080);
+	$serv = new worker_server("127.0.0.1", 8081);
 	while (1) {
 		$connfd = $serv->accept();
 		worker_go(function () use ($serv, $connfd) {

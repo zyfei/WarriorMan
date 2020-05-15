@@ -24,6 +24,8 @@ PHP_MINIT_FUNCTION(workerman) {
 	workerman_coroutine_init();
 	//初始化server相关
 	workerman_server_init();
+	//初始化channel
+	workerman_channel_init();
 	return SUCCESS;
 }
 

@@ -128,9 +128,6 @@ void WorkerCoroutine::create_func(void *arg) {
 		wmStack_destroy(defer_tasks);
 		task->defer_tasks = nullptr;
 	}
-	//PHP执行完了，释放PHP栈
-	zend_vm_stack php_stack = EG(vm_stack);
-	efree(php_stack);
 	//释放
 	zval_ptr_dtor(retval);
 }
@@ -172,11 +169,23 @@ void WorkerCoroutine::on_resume(void *arg) {
 	restore_task(task);
 }
 
+void WorkerCoroutine::vm_stack_destroy(void) {
+	zend_vm_stack stack = EG(vm_stack);
+
+	while (stack != NULL) {
+		zend_vm_stack p = stack->prev;
+		//php_printf("%p\n", stack);
+		//内存叶读取出问题，好像重复释放了
+		efree(stack);
+		stack = p;
+	}
+}
+
 void WorkerCoroutine::on_close(void *arg) {
 	php_coro_task *task = (php_coro_task *) arg;
 	php_coro_task *origin_task = get_origin_task(task);
-	zend_vm_stack stack = EG(vm_stack);
-	efree(stack);
+	vm_stack_destroy();
+
 	restore_task(origin_task);
 }
 

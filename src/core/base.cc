@@ -95,7 +95,6 @@ int wm_event_wait() {
 			Coroutine *co;
 			//解析出来fd和id
 			fromuint64(u64, &fd, &id);
-
 			co = Coroutine::get_by_cid(id);
 			co->resume();
 		}
