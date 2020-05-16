@@ -1,13 +1,35 @@
 <?php
-$chan = new worker_channel(1);
+$cid = worker_go(function () {
+	$cid = Workerman::getCid();
+	echo "coroutine [$cid] create" . PHP_EOL;
+	$socket = new worker_socket("127.0.0.1", 8081);
+	while (1) {
+		$connfd = $socket->accept();
+		worker_go(function () use ($socket, $connfd) {
+			$msg = $socket->recv($connfd);
+			if ($msg == false) {
+				return;
+			}
+			$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nContent-Length: 11\r\n\r\nhello world\r\n";
+			$socket->send($connfd, $responseStr);
+			$socket->close($connfd);
+		});
+	}
+});
+worker_event_wait();
+return;
 
+$chan = new worker_channel(1);
+var_dump($chan);
 worker_go(function () use ($chan) {
-	$ret = $chan->pop();
+	var_dump("push start");
+	$ret = $chan->push("hello world");
 	var_dump($ret);
 });
 
 worker_go(function () use ($chan) {
-	$ret = $chan->push("hello world");
+	var_dump("push pop");
+	$ret = $chan->pop();
 	var_dump($ret);
 });
 
