@@ -35,34 +35,29 @@ int wmSocket_set_nonblock(int sock) {
 /**
  * 对bind()函数进行了封装
  */
-int wmSocket_bind(int sock, int type, char *host, int port) {
+int wmSocket_bind(int sock,char *host, int port) {
 	int ret;
 	struct sockaddr_in servaddr;
 
-	//如果是TCP
-	if (type == WM_SOCK_TCP) {
-		//初始化servaddr
-		bzero(&servaddr, sizeof(servaddr));
-		//将host转换为网络结构体sockaddr_in
-		inet_aton(host, &(servaddr.sin_addr));
-		servaddr.sin_family = AF_INET;
-		servaddr.sin_port = htons(port);
-		//把socket和地址，端口绑定
-		ret = bind(sock, (struct sockaddr *) &servaddr, sizeof(servaddr));
-		if (ret < 0) {
-			return -1;
-		}
-	} else {
+	//初始化servaddr
+	bzero(&servaddr, sizeof(servaddr));
+	//将host转换为网络结构体sockaddr_in
+	inet_aton(host, &(servaddr.sin_addr));
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_port = htons(port);
+	//把socket和地址，端口绑定
+	ret = bind(sock, (struct sockaddr *) &servaddr, sizeof(servaddr));
+	if (ret < 0) {
 		return -1;
 	}
 
 	return ret;
 }
 
-int wmSocket_listen(int sock) {
+int wmSocket_listen(int sock,int backlog) {
 	int ret;
 
-	ret = listen(sock, 512);
+	ret = listen(sock, backlog);
 	if (ret < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 	}

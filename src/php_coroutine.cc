@@ -9,11 +9,11 @@ using workerman::Coroutine;
 static swHashMap *user_yield_coros = swHashMap_new(NULL);
 
 //声明方法
-static PHP_METHOD(workerman_coroutine, yield);
-static PHP_METHOD(workerman_coroutine, resume);
-static PHP_METHOD(workerman_coroutine, getCid);
-static PHP_METHOD(workerman_coroutine, defer);
-static PHP_METHOD(workerman_coroutine, sleep);
+//static PHP_METHOD(workerman_coroutine, yield);
+//static PHP_METHOD(workerman_coroutine, resume);
+//static PHP_METHOD(workerman_coroutine, getCid);
+//static PHP_METHOD(workerman_coroutine, defer);
+//static PHP_METHOD(workerman_coroutine, sleep);
 
 //创建协程接口参数声明
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_coroutine_create, 0, 0, 1) //

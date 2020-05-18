@@ -15,12 +15,12 @@ int wmSocket_create(int domain, int type, int protocol);
 
 int wmSocket_set_nonblock(int sock);
 
-int wmSocket_listen(int sock);
+int wmSocket_listen(int sock,int backlog);
 
 /**
  * 对bind()函数进行了封装
  */
-int wmSocket_bind(int sock, int type, char *host, int port);
+int wmSocket_bind(int sock, char *host, int port);
 
 /**
  * 获取客户端连接

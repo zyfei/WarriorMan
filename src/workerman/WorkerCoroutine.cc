@@ -174,7 +174,6 @@ void WorkerCoroutine::vm_stack_destroy(void) {
 
 	while (stack != NULL) {
 		zend_vm_stack p = stack->prev;
-		//php_printf("%p\n", stack);
 		//内存叶读取出问题，好像重复释放了
 		efree(stack);
 		stack = p;
