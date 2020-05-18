@@ -97,7 +97,7 @@ void timerwheel_add(timerwheel_t *tw, timernode_t *node, uint32_t ticks) {
 //快速的添加
 void timerwheel_add_quick(timerwheel_t *tw, timer_cb_t cb, void *ud,
 		uint32_t ticks) {
-	timernode_t *node1 = (timernode_t *) malloc(sizeof(timernode_t));
+	timernode_t *node1 = (timernode_t *) wm_malloc(sizeof(timernode_t));
 	bzero(node1, sizeof(timernode_t));
 	timerwheel_node_init(node1, cb, ud);
 	timerwheel_add(tw, node1, ticks);
@@ -184,7 +184,7 @@ void _timerwheel_tick(timerwheel_t *tw) {
 			//执行回调
 			node->callback(node->userdata);
 			//释放申请的节点
-			free(node);
+			wm_free(node);
 		}
 	}
 }

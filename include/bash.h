@@ -3,6 +3,7 @@
 
 //只引入自己做的基础库
 #include "header.h"
+#include "workerman_config.h"
 #include "hashmap.h"
 #include "timer.h"
 #include "socket.h"

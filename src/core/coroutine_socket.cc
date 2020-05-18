@@ -13,7 +13,7 @@ swHashMap *wm_connections = swHashMap_new(NULL);
  */
 wmCoroutionSocket * wm_coroution_socket_init(int domain, int type,
 		int protocol) {
-	wmCoroutionSocket *socket = (wmCoroutionSocket *) malloc(
+	wmCoroutionSocket *socket = (wmCoroutionSocket *) wm_malloc(
 			sizeof(wmCoroutionSocket));
 
 	bzero(socket, sizeof(wmCoroutionSocket));
@@ -34,7 +34,7 @@ wmCoroutionSocket * wm_coroution_socket_init(int domain, int type,
 
 wmCoroutionSocket * wm_coroution_socket_init_by_fd(int fd) {
 	swHashMap_del_int(wm_connections, fd);
-	wmCoroutionSocket *socket = (wmCoroutionSocket *) malloc(
+	wmCoroutionSocket *socket = (wmCoroutionSocket *) wm_malloc(
 			sizeof(wmCoroutionSocket));
 	socket->sockfd = fd;
 	socket->read_buffer = NULL;
@@ -178,9 +178,9 @@ int wm_coroution_socket_free(wmCoroutionSocket *socket) {
 		return ret;
 	}
 	swHashMap_del_int(wm_connections, socket->sockfd);
-	free(socket->read_buffer);
-	free(socket->write_buffer);
-	free(socket);
+	wm_free(socket->read_buffer);
+	wm_free(socket->write_buffer);
+	wm_free(socket);
 	socket = NULL;
 	return ret;
 }

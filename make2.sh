@@ -1,4 +1,4 @@
 #!/bin/sh
 make clean
-make
+make -j4
 make install

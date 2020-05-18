@@ -141,6 +141,7 @@ int swHashMap_add_int(swHashMap *hmap, uint64_t key, void *data) {
 	node->data = data;
 	node->key_str = NULL;
 	HASH_ADD_INT(root, key_int, node);
+
 	return SW_OK;
 }
 

@@ -52,9 +52,7 @@ static void wm_channel_free_object(zend_object *object) {
 			object);
 	wmChannel *chan = chan_t->chan;
 	if (chan) {
-		wm_channel_clear(chan);
-		free(chan);
-		chan = NULL;
+		wm_channel_free(chan);
 	}
 	//销毁zend_object，析构函数
 	zend_object_std_dtor(&chan_t->std);

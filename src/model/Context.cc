@@ -8,7 +8,7 @@ Context::Context(size_t stack_size, coroutine_func_t fn, void* private_data) :
 	swap_ctx_ = nullptr;
 
 	//是创建一个C栈（实际上是从堆中分配的内存）。
-	stack_ = (char*) malloc(stack_size_);
+	stack_ = (char*) wm_malloc(stack_size_);
 
 	//代码是把堆模拟成栈的行为。与之前PHP栈的操作类似。
 	void* sp = (void*) ((char*) stack_ + stack_size_);
@@ -22,7 +22,7 @@ Context::Context(size_t stack_size, coroutine_func_t fn, void* private_data) :
 Context::~Context() {
 	if (stack_) {
 		//施放内存
-		free(stack_);
+		wm_free(stack_);
 		stack_ = NULL;
 	}
 }

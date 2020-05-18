@@ -5,22 +5,24 @@
  * server的头文件咯
  */
 #include "bash.h"
-
+#include "coroutine_socket.h"
 
 typedef struct {
-	uint32_t capacity; //容量
-} wmChannel;
+	wmCoroutionSocket *socket;
+	php_fci_fcc *handler; //接收到客户端连接之后，会回调的函数。
+	bool running; //服务器是否正在运行中
+} wmServer;
 
+wmServer* wm_server_create(char *host, int port);
 
-wmChannel* wm_channel_create(uint32_t _capacity);
+void wm_server_destroy(wmServer* server); //销毁server
 
-//插入
-bool wm_channel_push(wmChannel* channel, void *data, double timeout);
+bool wm_server_run(wmServer* server); //启动服务器
 
-//弹出
-void* wm_channel_pop(wmChannel* channel, double timeout);
+bool wm_server_stop(wmServer* server); //关闭服务器
 
-//超时回调
-void wm_channel_sleep_timeout(void *param);
+void wm_server_set_handler(php_fci_fcc *_handler);
+
+php_fci_fcc* wm_server_get_handler();
 
 #endif

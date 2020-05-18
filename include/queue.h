@@ -1,6 +1,7 @@
 #ifndef _WM_QUEUE_H
 #define _WM_QUEUE_H
 
+#include "workerman_config.h"
 #include "list.h"
 
 // 定时器结点
@@ -18,8 +19,9 @@ typedef struct {
 
 // 初始化队列
 static inline wmQueue* wm_queue_create() {
-	wmQueue* queue = (wmQueue *) malloc(sizeof(wmQueue));
+	wmQueue* queue = (wmQueue *) wm_malloc(sizeof(wmQueue));
 	bzero(queue, sizeof(wmQueue));
+
 	queue->num = 0;
 	clinklist_init((clinknode_t *) &queue->head);
 	return queue;
@@ -27,7 +29,7 @@ static inline wmQueue* wm_queue_create() {
 
 // push
 static inline void wm_queue_push(wmQueue* queue, void *data) {
-	wmQueueNode* node = (wmQueueNode *) malloc(sizeof(wmQueueNode));
+	wmQueueNode* node = (wmQueueNode *) wm_malloc(sizeof(wmQueueNode));
 	bzero(node, sizeof(wmQueueNode));
 	clinklist_init((clinknode_t *) node);
 	//保存用户数据
@@ -46,7 +48,7 @@ static inline void * wm_queue_pop(wmQueue* queue) {
 	clinknode_t* next = queue->head.next;
 	clinklist_remote(next);
 	//释放
-	free(((wmQueueNode*) next));
+	wm_free(((wmQueueNode*) next));
 	//减少记数
 	queue->num--;
 	return ((wmQueueNode*) next)->data;
@@ -66,7 +68,7 @@ static inline void wm_queue_clear(wmQueue* queue) {
 	while (!clinklist_is_empty(head)) {
 		wmQueueNode* _wqn = (wmQueueNode*) head->next;
 		clinklist_remote(head->next);
-		free(_wqn);
+		wm_free(_wqn);
 	}
 	queue->num = 0;
 }
@@ -74,7 +76,7 @@ static inline void wm_queue_clear(wmQueue* queue) {
 //销毁
 static inline void wm_queue_destroy(wmQueue* queue) {
 	wm_queue_clear(queue);
-	free(queue);
+	wm_free(queue);
 	queue = NULL;
 }
 

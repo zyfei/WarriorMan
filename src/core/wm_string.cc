@@ -4,20 +4,20 @@
  * new一个string
  */
 wmString* wmString_new(size_t size) {
-	wmString *str = (wmString*) malloc(sizeof(wmString));
+	wmString *str = (wmString*) wm_malloc(sizeof(wmString));
 	if (str == NULL) {
-		wmWarn("malloc[1] failed");
+		wmWarn("wm_malloc[1] failed");
 		return NULL;
 	}
 
 	str->length = 0;
 	str->size = size;
 	str->offset = 0;
-	str->str = (char*) malloc(size);
+	str->str = (char*) wm_malloc(size);
 
 	if (str->str == NULL) {
-		wmWarn("malloc[2](%ld) failed", size);
-		free(str);
+		wmWarn("wm_malloc[2](%ld) failed", size);
+		wm_free(str);
 		return NULL;
 	}
 	return str;

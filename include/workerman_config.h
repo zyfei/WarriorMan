@@ -1,6 +1,11 @@
 #ifndef WM_CONFIG_H_
 #define WM_CONFIG_H_
 
+#define wm_malloc              emalloc
+#define wm_free                efree
+#define wm_calloc              ecalloc
+#define wm_realloc             erealloc
+
 enum wmEvent_type {
 	WM_EVENT_NULL = 0,
 	WM_EVENT_DEAULT = 1u << 8,

@@ -1,6 +1,8 @@
 #ifndef _STACK_H
 #define _STACK_H
 
+#include "workerman_config.h"
+
 #define WM_STACK_INIT_LEN 10
 #define WM_STACK_CRE 2
 
@@ -22,15 +24,15 @@ typedef struct _wmStack {
 static inline wmStack* wmStack_create() {
 	long i = 0;
 	wmStack* s = NULL;
-	s = (wmStack*) malloc(sizeof(wmStack));
+	s = (wmStack*) wm_malloc(sizeof(wmStack));
 	if (s == NULL) {
 		return s;
 	}
 	//分配栈空间
-	s->node = (wmStack_Node *) malloc(WM_STACK_INIT_LEN * sizeof(wmStack_Node));
+	s->node = (wmStack_Node *) wm_malloc(WM_STACK_INIT_LEN * sizeof(wmStack_Node));
 	//判断是否分配空间
 	if (s->node == NULL) {
-		free(s);
+		wm_free(s);
 		//php_error_docref(NULL, E_WARNING, "wmStack_create error");
 		printf("wmStack_create error \n");
 		s = NULL;
@@ -111,9 +113,9 @@ static inline void wmStack_destroy(wmStack *stack) {
 	if (stack == NULL)
 		return;
 	if (stack->node != NULL) {
-		free(stack->node);
+		wm_free(stack->node);
 	}
-	free(stack);
+	wm_free(stack);
 }
 
 #endif
