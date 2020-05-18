@@ -60,13 +60,13 @@ if test "$PHP_WM" != "no"; then
     	src/core/wm_string.cc \
     	src/core/channel.cc \
     	src/core/coroutine_socket.cc \
-    	src/workerman/model/Context.cc \
-    	src/workerman/model/Coroutine.cc \
-    	src/workerman/WorkerCoroutine.cc \
-    	src/php_coroutine.cc \
-        src/php_workerman.cc \
-        src/php_socket.cc \
-        src/php_channel.cc \
+    	src/model/Context.cc \
+    	src/model/Coroutine.cc \
+    	src/WorkerCoroutine.cc \
+    	php_coroutine.cc \
+        php_workerman.cc \
+        php_socket.cc \
+        php_channel.cc \
         ${WM_ASM_DIR}make_${WM_CONTEXT_ASM_FILE} \
         ${WM_ASM_DIR}jump_${WM_CONTEXT_ASM_FILE}
     "
