@@ -28,6 +28,8 @@ PHP_MINIT_FUNCTION(workerman) {
 	workerman_server_init();
 	//初始化channel
 	workerman_channel_init();
+	//初始化runtime
+	workerman_runtime_init();
 	return SUCCESS;
 }
 

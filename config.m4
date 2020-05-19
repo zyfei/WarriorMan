@@ -69,6 +69,7 @@ if test "$PHP_WM" != "no"; then
         php_socket.cc \
         php_channel.cc \
         php_server.cc \
+        php_runtime.cc \
         ${WM_ASM_DIR}make_${WM_CONTEXT_ASM_FILE} \
         ${WM_ASM_DIR}jump_${WM_CONTEXT_ASM_FILE}
     "

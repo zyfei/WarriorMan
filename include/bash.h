@@ -114,6 +114,8 @@ void workerman_socket_init();
 void workerman_server_init();
 //channel注册方法
 void workerman_channel_init();
+//runtime注册方法
+void workerman_runtime_init();
 
 //定义的一些结构体
 typedef struct {
