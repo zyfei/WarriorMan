@@ -34,4 +34,5 @@ tests/*/*.log
 tests/*/*.sh
 test*.php
 test*.c
-test/*
+test/*.*
+test/*/*.*
