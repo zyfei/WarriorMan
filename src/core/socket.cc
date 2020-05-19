@@ -35,7 +35,7 @@ int wmSocket_set_nonblock(int sock) {
 /**
  * 对bind()函数进行了封装
  */
-int wmSocket_bind(int sock,char *host, int port) {
+int wmSocket_bind(int sock, char *host, int port) {
 	int ret;
 	struct sockaddr_in servaddr;
 
@@ -54,7 +54,7 @@ int wmSocket_bind(int sock,char *host, int port) {
 	return ret;
 }
 
-int wmSocket_listen(int sock,int backlog) {
+int wmSocket_listen(int sock, int backlog) {
 	int ret;
 
 	ret = listen(sock, backlog);
@@ -102,7 +102,8 @@ ssize_t wmSocket_send(int sock, const void *buf, size_t len, int flag) {
 
 	ret = send(sock, buf, len, flag);
 	if (ret < 0 && errno != EAGAIN) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		wmWarn("Error has occurred: (fd=%d,errno %d) %s", sock, errno,
+				strerror(errno));
 	}
 	return ret;
 }
@@ -112,7 +113,8 @@ int wmSocket_close(int fd) {
 
 	ret = close(fd);
 	if (ret < 0) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		wmWarn("Error has occurred: (fd=%d,errno %d) %s", fd, errno,
+				strerror(errno));
 	}
 	return ret;
 }

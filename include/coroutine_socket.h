@@ -1,5 +1,6 @@
 #ifndef _COROUTINE_SOCKET_H
 #define _COROUTINE_SOCKET_H
+
 /**
  * 协程化socket
  */
@@ -17,6 +18,9 @@ typedef struct {
 	wmString *read_buffer; //读缓冲区
 	wmString *write_buffer; //写缓冲区
 } wmCoroutionSocket;
+
+//初始化一个自定义的PHP对象，并且让zsocket这个容器指向自定义对象里面的std对象
+void php_wm_init_socket_object(zval *zsocket, wmCoroutionSocket *socket);
 
 //保存了所有的连接，fd为key,wmCoroutionSocket为value , int的时候填进去，close的时候移出
 extern swHashMap *wm_connections;

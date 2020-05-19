@@ -3,7 +3,7 @@
 
 #include "bash.h"
 
-typedef struct _wmString {
+typedef struct {
 	size_t length; //当前字符串长度
 	size_t size; //为字符串申请总空间大小
 	off_t offset;

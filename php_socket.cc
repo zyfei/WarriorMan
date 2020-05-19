@@ -4,15 +4,12 @@
 #include "bash.h"
 #include "coroutine_socket.h"
 
-/**
- * 定义 zend class entry
- */
 zend_class_entry workerman_socket_ce;
 zend_class_entry *workerman_socket_ce_ptr;
 
 //为了通过php对象，找到上面的c++对象
 typedef struct {
-	wmCoroutionSocket *chan; //c对象 这个是create产生的
+	wmCoroutionSocket *socket; //c对象 这个是create产生的
 	zend_object std; //php对象
 } wmCoroutionSocketObject;
 
@@ -49,11 +46,22 @@ static void wm_socket_free_object(zend_object *object) {
 			(wmCoroutionSocketObject *) wm_socket_fetch_object(object);
 
 	//这里需要判断，这个socket是不是被人继续用了。
-	if (sock->chan && sock->chan != NULL) {
+	if (sock->socket && sock->socket != NULL) {
 		//现在有这个时候，把别的正常的fd关闭的情况
-		wm_coroution_socket_free(sock->chan);
+		wm_coroution_socket_free(sock->socket);
 	}
+	//free_obj
 	zend_object_std_dtor(&sock->std);
+}
+
+//初始化一个自定义的PHP对象，并且让zsocket这个容器指向自定义对象里面的std对象
+void php_wm_init_socket_object(zval *zsocket, wmCoroutionSocket *socket) {
+	zend_object *object = wm_socket_create_object(workerman_socket_ce_ptr);
+
+	wmCoroutionSocketObject *socket_t =
+			(wmCoroutionSocketObject *) wm_socket_fetch_object(object);
+	socket_t->socket = socket;
+	ZVAL_OBJ(zsocket, object);
 }
 
 //构造函数
@@ -105,10 +113,10 @@ PHP_METHOD(workerman_socket, __construct) {
 
 	socket_object = (wmCoroutionSocketObject *) wm_socket_fetch_object(
 			Z_OBJ_P(getThis()));
-	socket_object->chan = wm_coroution_socket_init(domain, type, protocol);
+	socket_object->socket = wm_coroution_socket_init(domain, type, protocol);
 
 	zend_update_property_long(workerman_socket_ce_ptr, getThis(),
-			ZEND_STRL("fd"), socket_object->chan->sockfd);
+			ZEND_STRL("fd"), socket_object->socket->sockfd);
 }
 
 PHP_METHOD(workerman_socket, bind) {
@@ -125,8 +133,8 @@ PHP_METHOD(workerman_socket, bind) {
 	socket_object = (wmCoroutionSocketObject *) wm_socket_fetch_object(
 			Z_OBJ_P(getThis()));
 
-	if (wm_coroution_socket_bind(socket_object->chan, Z_STRVAL_P(zhost), zport)
-			< 0) {
+	if (wm_coroution_socket_bind(socket_object->socket, Z_STRVAL_P(zhost),
+			zport) < 0) {
 		RETURN_FALSE
 	}
 	RETURN_TRUE
@@ -145,7 +153,7 @@ PHP_METHOD(workerman_socket, listen) {
 	socket_object = (wmCoroutionSocketObject *) wm_socket_fetch_object(
 			Z_OBJ_P(getThis()));
 
-	if (wm_coroution_socket_listen(socket_object->chan, backlog) < 0) {
+	if (wm_coroution_socket_listen(socket_object->socket, backlog) < 0) {
 		RETURN_FALSE
 	}
 	RETURN_TRUE
@@ -165,17 +173,17 @@ PHP_METHOD(workerman_socket, accept) {
 	socket_object2 = (wmCoroutionSocketObject *) wm_socket_fetch_object(obj);
 
 	//接客
-	socket_object2->chan = wm_coroution_socket_accept(socket_object->chan);
+	socket_object2->socket = wm_coroution_socket_accept(socket_object->socket);
 
 //	zval obj_zval;
 //	ZVAL_OBJ(&obj_zval, &(socket_object2->std));
 //	zend_update_property_long(workerman_socket_ce_ptr, &obj_zval,
-//				ZEND_STRL("fd"), socket_object2->chan->sockfd);
+//				ZEND_STRL("fd"), socket_object2->socket->sockfd);
 //	*return_value = obj_zval;
 
 	ZVAL_OBJ(return_value, &(socket_object2->std));
 	zend_update_property_long(workerman_socket_ce_ptr, return_value,
-			ZEND_STRL("fd"), socket_object2->chan->sockfd);
+			ZEND_STRL("fd"), socket_object2->socket->sockfd);
 }
 
 /**
@@ -194,7 +202,7 @@ PHP_METHOD(workerman_socket, recv) {
 
 	socket_object = (wmCoroutionSocketObject *) wm_socket_fetch_object(
 			Z_OBJ_P(getThis()));
-	conn = socket_object->chan;
+	conn = socket_object->socket;
 
 	if (conn == NULL) {
 		php_error_docref(NULL, E_WARNING, "recv error");
@@ -246,7 +254,7 @@ PHP_METHOD(workerman_socket, send) {
 
 	socket_object = (wmCoroutionSocketObject *) wm_socket_fetch_object(
 			Z_OBJ_P(getThis()));
-	conn = socket_object->chan;
+	conn = socket_object->socket;
 	if (conn == NULL) {
 		php_error_docref(NULL, E_WARNING, "send error");
 		RETURN_FALSE
@@ -267,7 +275,7 @@ PHP_METHOD(workerman_socket, close) {
 	int ret = 0;
 	socket_object = (wmCoroutionSocketObject *) wm_socket_fetch_object(
 			Z_OBJ_P(getThis()));
-	ret = wm_coroution_socket_close(socket_object->chan);
+	ret = wm_coroution_socket_close(socket_object->socket);
 	if (ret < 0) {
 		php_error_docref(NULL, E_WARNING, "close error");
 		RETURN_FALSE

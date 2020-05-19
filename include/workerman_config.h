@@ -1,10 +1,10 @@
 #ifndef WM_CONFIG_H_
 #define WM_CONFIG_H_
 
-#define wm_malloc              emalloc
-#define wm_free                efree
-#define wm_calloc              ecalloc
-#define wm_realloc             erealloc
+#define wm_malloc              malloc
+#define wm_free                free
+#define wm_calloc              calloc
+#define wm_realloc             realloc
 
 enum wmEvent_type {
 	WM_EVENT_NULL = 0,

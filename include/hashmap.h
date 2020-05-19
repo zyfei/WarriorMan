@@ -18,6 +18,8 @@
 
 #include "header.h"
 #include "log.h"
+#include "uthash.h"
+#include "hash.h"
 
 #ifdef __cplusplus
 extern "C" {

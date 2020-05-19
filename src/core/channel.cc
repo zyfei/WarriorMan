@@ -1,4 +1,5 @@
 #include "channel.h"
+#include "coroutine.h"
 
 using workerman::Coroutine;
 

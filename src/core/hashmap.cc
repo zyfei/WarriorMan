@@ -15,8 +15,6 @@
  */
 
 #include "hashmap.h"
-#include "../include/uthash.h"
-#include "../include/hash.h"
 
 typedef struct swHashMap_node {
 	uint64_t key_int;

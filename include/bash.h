@@ -10,14 +10,18 @@
 #include "stack.h"
 #include "error.h"
 #include "log.h"
-#include "wm_string.h"
-#include "coroutine.h"
 #include "queue.h"
+#include "wm_string.h"
 
-//int转字符串
-int wm_itoa(char *buf, long value);
-//随机
-int wm_rand(int min, int max);
+//php库
+#include "zend_closures.h"
+
+/**
+ * Socket类
+ */
+extern zend_class_entry workerman_socket_ce;
+extern zend_class_entry *workerman_socket_ce_ptr;
+
 
 //定义一些全局方法
 static inline zval *wm_zend_read_property(zend_class_entry *class_ptr,
@@ -71,6 +75,32 @@ inline zval* wm_zval_dup(zval *val) {
 	return dup;
 }
 
+//zend_fcall_info_cache 引用加一
+static inline void wm_zend_fci_cache_persist(zend_fcall_info_cache *fci_cache) {
+	if (fci_cache->object) {
+		GC_ADDREF(fci_cache->object);
+	}
+	if (fci_cache->function_handler->op_array.fn_flags & ZEND_ACC_CLOSURE) {
+		GC_ADDREF(ZEND_CLOSURE_OBJECT(fci_cache->function_handler));
+	}
+}
+
+//zend_fcall_info_cache 引用减一
+static inline void wm_zend_fci_cache_discard(zend_fcall_info_cache *fci_cache) {
+	if (fci_cache->object) {
+		OBJ_RELEASE(fci_cache->object);
+	}
+	if (fci_cache->function_handler->op_array.fn_flags & ZEND_ACC_CLOSURE) {
+		OBJ_RELEASE(ZEND_CLOSURE_OBJECT(fci_cache->function_handler));
+	}
+}
+
+/* use void* to match some C callback function pointers */
+static inline void wm_zend_fci_cache_free(void* fci_cache) {
+	wm_zend_fci_cache_discard((zend_fcall_info_cache *) fci_cache);
+	efree((zend_fcall_info_cache * ) fci_cache);
+}
+
 //初始化base相关
 void workerman_base_init();
 //定义协程注册方法
@@ -79,6 +109,7 @@ void workerman_coroutine_init();
 long worker_go();
 //socket注册方法
 void workerman_socket_init();
+
 //server注册方法
 void workerman_server_init();
 //channel注册方法

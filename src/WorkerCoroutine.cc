@@ -185,7 +185,6 @@ void WorkerCoroutine::on_close(void *arg) {
 	php_coro_task *origin_task = get_origin_task(task);
 	task->co = NULL;
 	vm_stack_destroy();
-
 	restore_task(origin_task);
 }
 

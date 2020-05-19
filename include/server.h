@@ -5,6 +5,7 @@
  * server的头文件咯
  */
 #include "bash.h"
+#include "coroutine.h"
 #include "coroutine_socket.h"
 
 typedef struct {
@@ -15,14 +16,16 @@ typedef struct {
 
 wmServer* wm_server_create(char *host, int port);
 
-void wm_server_destroy(wmServer* server); //销毁server
-
 bool wm_server_run(wmServer* server); //启动服务器
 
 bool wm_server_stop(wmServer* server); //关闭服务器
 
-void wm_server_set_handler(php_fci_fcc *_handler);
+void wm_server_set_handler(wmServer* server, php_fci_fcc *_handler);
 
 php_fci_fcc* wm_server_get_handler();
+
+php_fci_fcc* wm_server_get_handler(wmServer* server);
+
+void wm_server_free(wmServer* server);
 
 #endif
