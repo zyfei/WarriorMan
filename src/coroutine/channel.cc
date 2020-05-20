@@ -1,8 +1,6 @@
 #include "channel.h"
 #include "coroutine.h"
 
-using workerman::Coroutine;
-
 //协程map表
 swHashMap *wm_channels = NULL;
 
@@ -25,7 +23,7 @@ wmChannel* wm_channel_create(uint32_t _capacity) {
 //插入
 bool wm_channel_push(wmChannel* channel, void *data, double timeout) {
 	//获取当前协程
-	Coroutine *co = Coroutine::get_current();
+	Coroutine *co = wmCoroutine_get_current();
 	//如果当前channel内容，已到channel上限
 	if (channel->data_queue->num == channel->capacity) {
 		WmChannelCoroutineType* wct = NULL;
@@ -42,7 +40,7 @@ bool wm_channel_push(wmChannel* channel, void *data, double timeout) {
 		//把当前协程，加入生产者协程等待队列中
 		wm_queue_push(channel->producer_queue, co);
 		//协程暂时yield，等待定时器超时时间结束，或者消费者通知
-		co->yield();
+		wmCoroutine_yield(co);
 		//协程已经醒了，就不需要被唤醒了
 		if (wct) {
 			wct->type = false;
@@ -71,7 +69,7 @@ bool wm_channel_push(wmChannel* channel, void *data, double timeout) {
 		if (!co) {
 			continue;
 		}
-		co->resume();
+		wmCoroutine_resume(co);
 		break;
 	}
 	//消费者协程退出控制权的话，那么这边也返回
@@ -81,7 +79,7 @@ bool wm_channel_push(wmChannel* channel, void *data, double timeout) {
 //弹出
 void* wm_channel_pop(wmChannel* channel, double timeout) {
 	//获取当前协程
-	Coroutine *co = Coroutine::get_current();
+	Coroutine *co = wmCoroutine_get_current();
 	//准备接受pop的数据
 	void *data;
 
@@ -101,7 +99,7 @@ void* wm_channel_pop(wmChannel* channel, double timeout) {
 		//加入消费者等待队列中
 		wm_queue_push(channel->consumer_queue, co);
 		//协程暂时yield，等待定时器超时时间结束
-		co->yield();
+		wmCoroutine_yield(co);
 		//协程已经醒了，就不需要被定时器唤醒了
 		if (wct) {
 			wct->type = false;
@@ -127,7 +125,7 @@ void* wm_channel_pop(wmChannel* channel, double timeout) {
 		if (!co) {
 			continue;
 		}
-		co->resume();
+		wmCoroutine_resume(co);
 		break;
 	}
 	return data;
@@ -159,14 +157,14 @@ void wm_channel_free(wmChannel* channel) {
 		if (!co) {
 			continue;
 		}
-		co->resume();
+		wmCoroutine_resume(co);
 	}
 	while (channel->producer_queue->num > 0) {
 		co = (Coroutine*) wm_queue_pop(channel->producer_queue);
 		if (!co) {
 			continue;
 		}
-		co->resume();
+		wmCoroutine_resume(co);
 	}
 	wm_free(channel->data_queue);
 	wm_free(channel->consumer_queue);
@@ -187,7 +185,7 @@ void wm_channel_sleep_timeout(void *param) {
 	//是否需要被唤醒
 	if (type) {
 		//让协程恢复原来的执行状态
-		co->resume();
+		wmCoroutine_resume(co);
 	}
 }
 

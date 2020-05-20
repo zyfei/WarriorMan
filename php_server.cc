@@ -3,8 +3,6 @@
  */
 #include "server.h"
 
-using workerman::WorkerCoroutine;
-
 zend_class_entry workerman_server_ce;
 zend_class_entry *workerman_server_ce_ptr;
 

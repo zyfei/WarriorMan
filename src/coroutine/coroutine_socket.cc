@@ -1,8 +1,6 @@
 #include "coroutine.h"
 #include "coroutine_socket.h"
 
-using workerman::Coroutine;
-
 long wm_coroutine_socket_last_id = 0;
 
 //
@@ -81,32 +79,33 @@ bool wm_coroution_socket_wait_event(wmCoroutionSocket *socket, int event) {
 	Coroutine* co;
 	epoll_event *ev;
 
-//初始化epoll
+	//初始化epoll
 	if (!WorkerG.poll) {
 		init_wmPoll();
 	}
 
-//获取当前协程
-	co = Coroutine::get_current();
-//协程ID
-	id = co->get_cid();
+	//获取当前协程
+	co = wmCoroutine_get_current();
+	//协程ID
+
+	id = co->cid;
 
 	ev = WorkerG.poll->events;
 
-//用来判断这个协程需要等待那种类型的事件，目前是支持READ和WRITE。
+	//用来判断这个协程需要等待那种类型的事件，目前是支持READ和WRITE。
 	ev->events = (event == WM_EVENT_READ ? EPOLLIN : EPOLLOUT);
-//将sockfd和协程id打包
+	//将sockfd和协程id打包
 	ev->data.u64 = touint64(socket->sockfd, id);
 
-//注册到全局的epollfd上面。
+	//注册到全局的epollfd上面。
 	epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_ADD, socket->sockfd, ev);
 
 	(WorkerG.poll->event_num)++; // 事件数量+1
 
-//切换协程
-	co->yield();
+	//切换协程
+	wmCoroutine_yield(co);
 
-//程序到这里，说明已经执行完毕了。那么应该减去这个事件
+	//程序到这里，说明已经执行完毕了。那么应该减去这个事件
 	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, socket->sockfd, NULL)
 			< 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));

@@ -3,9 +3,6 @@
  */
 #include "coroutine.h"
 
-using workerman::WorkerCoroutine;
-using workerman::Coroutine;
-
 static swHashMap *user_yield_coros = swHashMap_new(NULL);
 
 //声明方法
@@ -65,17 +62,16 @@ PHP_FUNCTION(workerman_coroutine_create) {
 	//		return;
 	//	}
 	//	*return_value = result;
-	long cid = WorkerCoroutine::create(&fcc, fci.param_count, fci.params);
+	long cid = wmCoroutine_create(&fcc, fci.param_count, fci.params);
 	RETURN_LONG(cid);
 }
 
 //协程yield
 PHP_METHOD(workerman_coroutine, yield) {
-	Coroutine* co = Coroutine::get_current();
+	Coroutine* co = wmCoroutine_get_current();
 
-	swHashMap_add_int(user_yield_coros, co->get_cid(), co);
-
-	co->yield();
+	swHashMap_add_int(user_yield_coros, co->cid, co);
+	wmCoroutine_yield(co);
 	RETURN_TRUE
 }
 
@@ -94,17 +90,17 @@ PHP_METHOD(workerman_coroutine, resume) {
 	}
 	swHashMap_del_int(user_yield_coros, cid);
 
-	co->resume();
+	wmCoroutine_resume(co);
 	RETURN_TRUE
 }
 
 //获取协程cid
 PHP_METHOD(workerman_coroutine, getCid) {
-	Coroutine* co = Coroutine::get_current();
+	Coroutine* co = wmCoroutine_get_current();
 	if (co == nullptr) {
 		RETURN_LONG(-1);
 	}
-	RETURN_LONG(co->get_cid());
+	RETURN_LONG(co->cid);
 }
 
 //判断协程是否存在
@@ -116,7 +112,7 @@ PHP_METHOD(workerman_coroutine, isExist) {
 				Z_PARAM_LONG(cid)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	Coroutine* co = (Coroutine*) swHashMap_find_int(Coroutine::coroutines, cid);
+	Coroutine* co = (Coroutine*) swHashMap_find_int(coroutines, cid);
 	is_exist = (co != NULL);
 
 	RETURN_BOOL(is_exist);
@@ -136,7 +132,7 @@ PHP_METHOD(workerman_coroutine, defer) {
 	defer_fci_fcc->fci = fci;
 	defer_fci_fcc->fcc = fcc;
 
-	WorkerCoroutine::defer(defer_fci_fcc);
+	wmCoroutine_defer(defer_fci_fcc);
 }
 
 /**
@@ -155,10 +151,10 @@ PHP_METHOD(workerman_coroutine, sleep) {
 		RETURN_FALSE
 	}
 
-	Coroutine* co = Coroutine::get_current();
-	timerwheel_add_quick(&WorkerG.timer,WorkerCoroutine::sleep, (void*) co, seconds * 1000);
+	Coroutine* co = wmCoroutine_get_current();
+	timerwheel_add_quick(&WorkerG.timer,wmCoroutine_resume2, (void*) co, seconds * 1000);
 
-	co->yield();
+	wmCoroutine_yield(co);
 	RETURN_TRUE
 }
 
@@ -190,7 +186,6 @@ zend_class_entry *workerman_coroutine_ce_ptr;
  * 考虑到以后我们会有许多的类，我们不在MINIT里面直接写注册的代码，而是让study_coroutine_util.cc提供一个函数，我们在这个函数里面实现注册功能：
  */
 void workerman_coroutine_init() {
-	WorkerCoroutine::init();
 //定义好一个类
 	INIT_CLASS_ENTRY(workerman_coroutine_ce, "Workerman",
 			workerman_coroutine_methods);

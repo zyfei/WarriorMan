@@ -1,192 +1,49 @@
-#ifndef COROUTINE_H
-#define COROUTINE_H
+#ifndef WM_COROUTINE_H
+#define WM_COROUTINE_H
 
-#include "header.h"
-#include "asm_context.h"
 #include "bash.h"
-
-//默认的PHP栈页大小
-#define DEFAULT_PHP_STACK_PAGE_SIZE       8192
-#define PHP_CORO_TASK_SLOT ((int)((ZEND_MM_ALIGNED_SIZE(sizeof(php_coro_task)) + ZEND_MM_ALIGNED_SIZE(sizeof(zval)) - 1) / ZEND_MM_ALIGNED_SIZE(sizeof(zval))))
-#define DEFAULT_C_STACK_SIZE          (2 *1024 * 1024)
-
-typedef fcontext_t coroutine_context_t;
-typedef void (*coroutine_func_t)(void*);
-typedef void (*st_coro_on_swap_t)(void*);
-
-namespace workerman {
-class Context {
-public:
-	Context(size_t stack_size, coroutine_func_t fn, void* private_data);
-	~Context();  // 这是析构函数声明
-	//执行创建php协程，并且切换上下文
-	static void context_func(void* arg); // coroutine entry function
-	//让出上下文
-	bool swap_out();
-	//加载上下文ctx
-	bool swap_in();
-	inline bool is_end() {
-		return end_;
-	}
-protected:
-	coroutine_func_t fn_;
-	uint32_t stack_size_;
-	void *private_data_;
-	char* stack_;
-	//指向汇编
-	coroutine_context_t ctx_;
-	coroutine_context_t swap_ctx_;
-	bool end_ = false;
-};
-
-class Coroutine {
-public:
-	//保存所有协程
-	static swHashMap *coroutines;
-	//创建协程
-	static long create(coroutine_func_t fn, void* args = nullptr);
-	//获取当前协程
-	static void* get_current_task();
-
-	/**
-	 * 返回当前协程类
-	 */
-	static Coroutine* get_current();
-
-	//通过id获取协程
-	static Coroutine* get_by_cid(long _cid);
-
-	//设置自身协程
-	void set_task(void *_task);
-	//获取自身协程
-	void* get_task();
-
-	static void set_on_yield(st_coro_on_swap_t func);
-	static void set_on_resume(st_coro_on_swap_t func);
-	static void set_on_close(st_coro_on_swap_t func);
-
-	inline Coroutine* get_origin() {
-		return origin;
-	}
-	inline long get_cid() {
-		return cid;
-	}
-	void yield();
-	void resume();
-protected:
-	//造方法
-	Coroutine(coroutine_func_t fn, void *private_data) :
-			ctx(stack_size, fn, private_data) {
-		cid = ++last_cid;
-		swHashMap_add_int(coroutines, cid, this);
-	}
-	long run() {
-		long cid = this->cid;
-		origin = current;
-		current = this;
-		ctx.swap_in();
-		//如果这个ctx已经运行完毕
-
-		//我觉得是在这里，两个同样的ctx
-		//在这里执行很重要的出栈操作
-		if (ctx.is_end()) {
-			assert(current == this);
-			on_close(task);
-			current = origin;
-			swHashMap_del_int(coroutines, cid);
-			delete this;
-		}
-		return cid;
-	}
-	//临时保存Coroutine信息
-	static Coroutine* current;
-	//自增id
-	static long last_cid;
-	//栈大小
-	static size_t stack_size;
-	//临时保存自身协程信息
-	void *task = nullptr;
-	Context ctx;
-	//协程类ID
-	long cid;
-	Coroutine *origin = nullptr;
-
-	static st_coro_on_swap_t on_yield;
-	static st_coro_on_swap_t on_resume;
-	static st_coro_on_swap_t on_close; /* before close */
-};
-}
+#include "context.h"
 
 //defer用到
-struct php_fci_fcc {
+typedef struct {
 	zend_fcall_info fci;
 	zend_fcall_info_cache fcc;
-};
+} php_fci_fcc;
 
 //协程参数结构体
-struct php_coro_args {
+typedef struct {
 	zend_fcall_info_cache *fci_cache;
 	zval *argv;
 	uint32_t argc;
-};
+} php_coro_args;
 
 // 协程状态信息结构体
-struct php_coro_task {
+typedef struct _Coroutine {
+	//格式不可以动
 	zval *vm_stack_top; // 是协程栈栈顶
 	zval *vm_stack_end; // 是协程栈栈底。
 	zend_vm_stack vm_stack; // 是协程栈指针。
 	size_t vm_stack_page_size; //是协程栈页大小。
 	zend_execute_data *execute_data; // 是当前协程栈的栈帧。
-	workerman::Coroutine *co;
+	//格式不可以动
+
+	//以下是coroutine结构
+	wmContext ctx;
+	long cid; //协程类ID
+	_Coroutine *origin; //起源协程，记录哪个协程，创建的这个协程
 	wmStack *defer_tasks; //所有的defer
-	//std::stack<php_fci_fcc *> *defer_tasks; //所有的defer
-};
+} Coroutine;
 
-/**
- * 定义类
- */
-namespace workerman {
-/**
- * 协程工具类
- */
-class WorkerCoroutine {
-public:
-	static void init();
-	static long create(zend_fcall_info_cache *fci_cache, uint32_t argc,
-			zval *argv);
-	//获取上一个任务的task结构。
-	static inline php_coro_task* get_origin_task(php_coro_task *task) {
-		Coroutine *co = task->co->get_origin();
-		return co ? (php_coro_task *) co->get_task() : &main_task;
-	}
-	static void defer(php_fci_fcc *defer_fci_fcc);
-	static void sleep(void * co);
-protected:
-	//主协程
-	static php_coro_task main_task;
-	//保存php协程任务
-	static void save_task(php_coro_task *task);
-	//保存协程堆栈
-	static void save_vm_stack(php_coro_task *task);
-	//获取当前协程任务
-	static php_coro_task* get_task();
-	//辅助创建协程
-	static void create_func(void *arg);
-	//初始化协程栈
-	static void vm_stack_init(void);
+long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc,
+		zval *argv);
+Coroutine* wmCoroutine_get_by_cid(long _cid);
+void wmCoroutine_yield(Coroutine *task);
+void wmCoroutine_resume(Coroutine *task);
+void vm_stack_destroy();
+void wmCoroutine_defer(php_fci_fcc *defer_fci_fcc);
+void wmCoroutine_resume2(void *co);
+Coroutine* wmCoroutine_get_current();
 
-	//会在协程被yield的时候，去调用保存PHP栈、加载PHP栈的方法。
-	static void on_yield(void *arg);
-	//会在协程被resume的时候，去调用保存PHP栈、加载PHP栈的方法。
-	static void on_resume(void *arg);
-	static void on_close(void *arg);
-	static void vm_stack_destroy();
+extern swHashMap *coroutines;
 
-	static inline void restore_task(php_coro_task *task);
-
-	//用来重新加载PHP栈。
-	static inline void restore_vm_stack(php_coro_task *task);
-};
-}
-
-#endif	/* COROUTINE_H */
+#endif	/* WM_COROUTINE_H */

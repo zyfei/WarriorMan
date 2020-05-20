@@ -2,8 +2,6 @@
 #include "coroutine.h"
 #include "coroutine_socket.h"
 
-using workerman::WorkerCoroutine;
-
 /**
  * 创建
  */
@@ -45,7 +43,7 @@ bool wm_server_run(wmServer* server) {
 		zend_update_property_long(workerman_socket_ce_ptr, &zsocket,
 				ZEND_STRL("fd"), conn->sockfd);
 
-		WorkerCoroutine::create(&(server->handler->fcc), 1, &zsocket);
+		wmCoroutine_create(&(server->handler->fcc), 1, &zsocket);
 		//清空
 		zval_dtor(&zsocket);
 	}
