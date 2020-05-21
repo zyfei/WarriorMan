@@ -32,7 +32,4 @@ tests/*/*.php
 tests/*/*.exp
 tests/*/*.log
 tests/*/*.sh
-test*.php
-test*.c
-test/*.*
-test/*/*.*
+test/*/*.o
