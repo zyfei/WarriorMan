@@ -1,16 +1,9 @@
 /**
  * 协程工具入口文件
  */
-#include "coroutine.h"
+#include "worker_coroutine.h"
 
 static swHashMap *user_yield_coros = swHashMap_new(NULL);
-
-//声明方法
-//static PHP_METHOD(workerman_coroutine, yield);
-//static PHP_METHOD(workerman_coroutine, resume);
-//static PHP_METHOD(workerman_coroutine, getCid);
-//static PHP_METHOD(workerman_coroutine, defer);
-//static PHP_METHOD(workerman_coroutine, sleep);
 
 //创建协程接口参数声明
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_coroutine_create, 0, 0, 1) //
@@ -68,7 +61,7 @@ PHP_FUNCTION(workerman_coroutine_create) {
 
 //协程yield
 PHP_METHOD(workerman_coroutine, yield) {
-	Coroutine* co = wmCoroutine_get_current();
+	wmCoroutine* co = wmCoroutine_get_current();
 
 	swHashMap_add_int(user_yield_coros, co->cid, co);
 	wmCoroutine_yield(co);
@@ -83,7 +76,7 @@ PHP_METHOD(workerman_coroutine, resume) {
 				Z_PARAM_LONG(cid)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	Coroutine* co = (Coroutine*) swHashMap_find_int(user_yield_coros, cid);
+	wmCoroutine* co = (wmCoroutine*) swHashMap_find_int(user_yield_coros, cid);
 	if (co == NULL) {
 		php_error_docref(NULL, E_WARNING, "resume error");
 		RETURN_FALSE
@@ -96,7 +89,7 @@ PHP_METHOD(workerman_coroutine, resume) {
 
 //获取协程cid
 PHP_METHOD(workerman_coroutine, getCid) {
-	Coroutine* co = wmCoroutine_get_current();
+	wmCoroutine* co = wmCoroutine_get_current();
 	if (co == nullptr) {
 		RETURN_LONG(-1);
 	}
@@ -112,7 +105,7 @@ PHP_METHOD(workerman_coroutine, isExist) {
 				Z_PARAM_LONG(cid)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	Coroutine* co = (Coroutine*) swHashMap_find_int(coroutines, cid);
+	wmCoroutine* co = (wmCoroutine*) swHashMap_find_int(coroutines, cid);
 	is_exist = (co != NULL);
 
 	RETURN_BOOL(is_exist);
@@ -151,10 +144,8 @@ PHP_METHOD(workerman_coroutine, sleep) {
 		RETURN_FALSE
 	}
 
-	Coroutine* co = wmCoroutine_get_current();
-	timerwheel_add_quick(&WorkerG.timer,wmCoroutine_resume2, (void*) co, seconds * 1000);
+	wmCoroutine_sleep(seconds);
 
-	wmCoroutine_yield(co);
 	RETURN_TRUE
 }
 

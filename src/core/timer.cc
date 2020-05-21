@@ -6,9 +6,9 @@
 /**
  * 初始化时间轮，interval为每帧的间隔，currtime为当前时间
  */
-void timerwheel_init(timerwheel_t *tw, uint16_t interval, uint64_t currtime) {
+void wmTimerWheel_init(wmTimerWheel *tw, uint16_t interval, uint64_t currtime) {
 	//初始化
-	memset(tw, 0, sizeof(timerwheel_t));
+	memset(tw, 0, sizeof(wmTimerWheel));
 	//每个时间点的毫秒间隔
 	tw->interval = interval;
 	//上一次的时间毫秒
@@ -34,7 +34,7 @@ void timerwheel_init(timerwheel_t *tw, uint16_t interval, uint64_t currtime) {
 /**
  * 初始化时间结点：cb为回调，ud为用户数据
  */
-void timerwheel_node_init(timernode_t *node, timer_cb_t cb, void *ud) {
+void wmTimerWheel_node_init(wmTimerWheel_Node *node, timer_cb_t cb, void *ud) {
 	node->next = 0;
 	node->prev = 0;
 	node->userdata = ud;
@@ -45,7 +45,7 @@ void timerwheel_node_init(timernode_t *node, timer_cb_t cb, void *ud) {
 }
 
 //将定时任务节点，添加到时间轮中
-static void _timerwheel_add(timerwheel_t *tw, timernode_t *node) {
+static void _wmTimerWheel_add(wmTimerWheel *tw, wmTimerWheel_Node *node) {
 	uint32_t expire = node->expire;	//过期时间
 	uint32_t idx = expire - tw->currtick; //还有多少滴答超时
 	clinknode_t *head = NULL; //链表头
@@ -86,25 +86,25 @@ static void _timerwheel_add(timerwheel_t *tw, timernode_t *node) {
 }
 
 //将定时任务添加到时间轮中
-void timerwheel_add(timerwheel_t *tw, timernode_t *node, uint32_t ticks) {
+void wmTimerWheel_add(wmTimerWheel *tw, wmTimerWheel_Node *node, uint32_t ticks) {
 	//设置过期时间,当前执行的滴答+要执行的滴答
 	//如果马上执行，就放入下一个滴答
 	node->expire = tw->currtick + ((ticks > 0) ? ticks : 1);
-	_timerwheel_add(tw, node);
+	_wmTimerWheel_add(tw, node);
 	tw->num++;
 }
 
 //快速的添加
-void timerwheel_add_quick(timerwheel_t *tw, timer_cb_t cb, void *ud,
+void wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void *ud,
 		uint32_t ticks) {
-	timernode_t *node1 = (timernode_t *) wm_malloc(sizeof(timernode_t));
-	bzero(node1, sizeof(timernode_t));
-	timerwheel_node_init(node1, cb, ud);
-	timerwheel_add(tw, node1, ticks);
+	wmTimerWheel_Node *node1 = (wmTimerWheel_Node *) wm_malloc(sizeof(wmTimerWheel_Node));
+	bzero(node1, sizeof(wmTimerWheel_Node));
+	wmTimerWheel_node_init(node1, cb, ud);
+	wmTimerWheel_add(tw, node1, ticks);
 }
 
 // 删除结点
-//int timerwheel_del(timerwheel_t *tw, timernode_t *node) {
+//int wmTimerWheel_del(wmTimerWheel *tw, wmTimerWheel_Node *node) {
 //	if (!clinklist_is_empty((clinknode_t*) node)) {
 //		clinklist_remote((clinknode_t*) node);
 //		return 1;
@@ -118,25 +118,25 @@ void timerwheel_add_quick(timerwheel_t *tw, timer_cb_t cb, void *ud,
  */
 //tvnum_t *tv, int idx
 //tv->vec + idx
-void _timerwheel_cascade(timerwheel_t *tw, clinknode_t *head1) {
+void _timerwheel_cascade(wmTimerWheel *tw, clinknode_t *head1) {
 	clinknode_t head;
 	clinklist_init(&head);
 	//取出idx刻度，下面的这一条链表。需要将这一条链表打散，放入上一个表盘中
 	clinklist_splice(head1, &head);
 	while (!clinklist_is_empty(&head)) {
 		//取出对应的节点
-		timernode_t *node = (timernode_t*) head.next;
+		wmTimerWheel_Node *node = (wmTimerWheel_Node*) head.next;
 		clinklist_remote(head.next);
 
 		//重新添加到时间轮中
-		_timerwheel_add(tw, node);
+		_wmTimerWheel_add(tw, node);
 	}
 }
 
 /**
  * 终于开始滴答了
  */
-void _timerwheel_tick(timerwheel_t *tw) {
+void _wmTimerWheelick(wmTimerWheel *tw) {
 	//总滴答次数+1
 	++tw->currtick;
 
@@ -175,7 +175,7 @@ void _timerwheel_tick(timerwheel_t *tw) {
 	//循环
 	while (!clinklist_is_empty(&head)) {
 		//拿出先加入的节点
-		timernode_t *node = (timernode_t*) head.next;
+		wmTimerWheel_Node *node = (wmTimerWheel_Node*) head.next;
 		//拿出这个节点
 		clinklist_remote(head.next);
 
@@ -190,7 +190,7 @@ void _timerwheel_tick(timerwheel_t *tw) {
 }
 
 // 更新时间轮
-void timerwheel_update(timerwheel_t *tw, uint64_t currtime) {
+void wmTimerWheel_update(wmTimerWheel *tw, uint64_t currtime) {
 	//如果当前时间，大于定时器最后时间
 	if (currtime > tw->lasttime) {
 		//当前时间 - 定时器上次最后时间 + 上次剩余的毫秒
@@ -202,7 +202,7 @@ void timerwheel_update(timerwheel_t *tw, uint64_t currtime) {
 		//循环滴答，滴答滴答滴答 哈哈哈
 		while (diff >= intv) {
 			diff -= intv;
-			_timerwheel_tick(tw);
+			_wmTimerWheelick(tw);
 		}
 		//剩余毫秒保存起来
 		tw->remainder = diff;

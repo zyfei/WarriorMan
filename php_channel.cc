@@ -19,7 +19,7 @@ static zend_object_handlers workerman_channel_handlers;
 /**
  * 通过这个PHP对象找到我们的wmChannelObject对象的代码
  */
-static wmChannelObject* wm_channel_fetch_object(zend_object *obj) {
+static wmChannelObject* wmChannel_fetch_object(zend_object *obj) {
 	return (wmChannelObject *) ((char *) obj - workerman_channel_handlers.offset);
 }
 
@@ -27,7 +27,7 @@ static wmChannelObject* wm_channel_fetch_object(zend_object *obj) {
  * 创建一个php对象
  * zend_class_entry是一个php类
  */
-static zend_object* wm_channel_create_object(zend_class_entry *ce) {
+static zend_object* wmChannel_create_object(zend_class_entry *ce) {
 	//向PHP申请一块内存,大小是一个coro_chan的大小+
 	//至于为什么不根据size来直接申请内存，因为zend_object最后一个元素是一个数组下标，后面不一定申请了多少个
 	//如果我们直接分配zend_object的大小，就会把PHP对象的属性给漏掉。这是实现自定义对象需要特别关注的问题。如果还是不理解，小伙伴们可以先去学习C语言的柔性数组。
@@ -47,12 +47,12 @@ static zend_object* wm_channel_create_object(zend_class_entry *ce) {
 /**
  * 释放php对象的方法
  */
-static void wm_channel_free_object(zend_object *object) {
-	wmChannelObject *chan_t = (wmChannelObject *) wm_channel_fetch_object(
+static void wmChannel_free_object(zend_object *object) {
+	wmChannelObject *chan_t = (wmChannelObject *) wmChannel_fetch_object(
 			object);
 	wmChannel *chan = chan_t->chan;
 	if (chan) {
-		wm_channel_free(chan);
+		wmChannel_free(chan);
 	}
 	//销毁zend_object，析构函数
 	zend_object_std_dtor(&chan_t->std);
@@ -83,8 +83,8 @@ PHP_METHOD(workerman_channel, __construct) {
 		capacity = 1;
 	}
 
-	chan_t = (wmChannelObject *) wm_channel_fetch_object(Z_OBJ_P(getThis()));
-	chan_t->chan = wm_channel_create(capacity);
+	chan_t = (wmChannelObject *) wmChannel_fetch_object(Z_OBJ_P(getThis()));
+	chan_t->chan = wmChannel_create(capacity);
 
 	zend_update_property_long(workerman_channel_ce_ptr, getThis(),
 			ZEND_STRL("capacity"), capacity);
@@ -102,7 +102,7 @@ static PHP_METHOD(workerman_channel, push) {
 				Z_PARAM_DOUBLE(timeout)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	chan_t = (wmChannelObject *) wm_channel_fetch_object(Z_OBJ_P(getThis()));
+	chan_t = (wmChannelObject *) wmChannel_fetch_object(Z_OBJ_P(getThis()));
 	chan = chan_t->chan;
 
 	//引用计数+1
@@ -110,7 +110,7 @@ static PHP_METHOD(workerman_channel, push) {
 	//这里需要拷贝出一份zdata才可以，因为当协程销毁的时候，这个zdata也销毁了
 	zdata = wm_zval_dup(zdata);
 
-	if (!wm_channel_push(chan, zdata, timeout)) {
+	if (!wmChannel_push(chan, zdata, timeout)) {
 		Z_TRY_DELREF_P(zdata);
 		efree(zdata);
 		RETURN_FALSE
@@ -128,10 +128,10 @@ static PHP_METHOD(workerman_channel, pop) {
 				Z_PARAM_DOUBLE(timeout)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	chan_t = (wmChannelObject *) wm_channel_fetch_object(Z_OBJ_P(getThis()));
+	chan_t = (wmChannelObject *) wmChannel_fetch_object(Z_OBJ_P(getThis()));
 	chan = chan_t->chan;
 
-	zval *zdata = (zval *) wm_channel_pop(chan, timeout);
+	zval *zdata = (zval *) wmChannel_pop(chan, timeout);
 	if (!zdata) {
 		RETURN_FALSE
 	}
@@ -163,11 +163,11 @@ void workerman_channel_init() {
 			sizeof(zend_object_handlers));
 	//php对象实例化已经由我们自己的代码接管了
 //	ST_SET_CLASS_CUSTOM_OBJECT(workerman_channel,
-//			wm_channel_create_object,wm_channel_free_object,
+//			wmChannel_create_object,wmChannel_free_object,
 //			wmChannelObject, std);
 	//上面的宏翻译一下，就是下面的
-	workerman_channel_ce_ptr->create_object = wm_channel_create_object;
-	workerman_channel_handlers.free_obj = wm_channel_free_object;
+	workerman_channel_ce_ptr->create_object = wmChannel_create_object;
+	workerman_channel_handlers.free_obj = wmChannel_free_object;
 	workerman_channel_handlers.offset =
 			(zend_long) (((char *) (&(((wmChannelObject*) NULL)->std)))
 					- ((char *) NULL));

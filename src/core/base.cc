@@ -7,7 +7,7 @@ void workerman_base_init() {
 	//初始化timer
 	long now_time;
 	wmGetMilliTime(&now_time);
-	timerwheel_init(&WorkerG.timer, 1, now_time);
+	wmTimerWheel_init(&WorkerG.timer, 1, now_time);
 	WorkerG.is_running = false;
 	WorkerG.poll = NULL;
 }
@@ -91,7 +91,7 @@ int wm_event_wait() {
 			//if(p->events & EPOLLIN)
 
 			uint64_t u64 = p->data.u64;
-			Coroutine *co;
+			wmCoroutine *co;
 			//解析出来fd和id
 			fromuint64(u64, &fd, &id);
 			co = wmCoroutine_get_by_cid(id);
@@ -101,7 +101,7 @@ int wm_event_wait() {
 		if (WorkerG.timer.num > 0) {
 			//获取毫秒
 			wmGetMilliTime(&mic_time);
-			timerwheel_update(&WorkerG.timer, mic_time);
+			wmTimerWheel_update(&WorkerG.timer, mic_time);
 		} else if (WorkerG.poll->event_num == 0) {
 			WorkerG.is_running = false;
 		}

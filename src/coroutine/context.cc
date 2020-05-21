@@ -43,7 +43,8 @@ void wmContext_func(void *arg) {
 }
 
 /**
- * 加载上下文,也就是执行这个context对于的php代码段
+ * 切换到新栈,并且保存老栈
+ * 保存当前c栈上下文到swap_ctx_的位置，然后从ctx_切换上下文
  */
 bool wmContext_swap_in(wmContext *ctx) {
 	jump_fcontext(&ctx->swap_ctx_, ctx->ctx_, (intptr_t) ctx, true);
@@ -51,7 +52,9 @@ bool wmContext_swap_in(wmContext *ctx) {
 }
 
 /**
- * jump_fcontext这个函数也是boost.asm库提供的
+ * 切换到父栈
+ * 从ctx->swap_ctx_处恢复上下文，swap_ctx_就是父C栈
+ * 把当前C栈上下文保存在ctx_中，然后切换到swap_ctx_
  */
 bool wmContext_swap_out(wmContext *ctx) {
 	jump_fcontext(&ctx->ctx_, ctx->swap_ctx_, (intptr_t) ctx, true);

@@ -18,7 +18,7 @@ typedef struct {
 } wmQueue;
 
 // 初始化队列
-static inline wmQueue* wm_queue_create() {
+static inline wmQueue* wmQueue_create() {
 	wmQueue* queue = (wmQueue *) wm_malloc(sizeof(wmQueue));
 	bzero(queue, sizeof(wmQueue));
 
@@ -28,7 +28,7 @@ static inline wmQueue* wm_queue_create() {
 }
 
 // push
-static inline void wm_queue_push(wmQueue* queue, void *data) {
+static inline void wmQueue_push(wmQueue* queue, void *data) {
 	wmQueueNode* node = (wmQueueNode *) wm_malloc(sizeof(wmQueueNode));
 	bzero(node, sizeof(wmQueueNode));
 	clinklist_init((clinknode_t *) node);
@@ -40,7 +40,7 @@ static inline void wm_queue_push(wmQueue* queue, void *data) {
 }
 
 // pop
-static inline void * wm_queue_pop(wmQueue* queue) {
+static inline void * wmQueue_pop(wmQueue* queue) {
 	//如果没有元素了
 	if (clinklist_is_empty((clinknode_t *) (&queue->head)) || queue->num == 0) {
 		return NULL;
@@ -55,12 +55,12 @@ static inline void * wm_queue_pop(wmQueue* queue) {
 }
 
 //获取长度
-static inline int wm_queue_len(wmQueue* queue) {
+static inline int wmQueue_len(wmQueue* queue) {
 	return queue->num;
 }
 
 //清空队列
-static inline void wm_queue_clear(wmQueue* queue) {
+static inline void wmQueue_clear(wmQueue* queue) {
 	if (queue == NULL || queue->num == 0) {
 		return;
 	}
@@ -74,8 +74,8 @@ static inline void wm_queue_clear(wmQueue* queue) {
 }
 
 //销毁
-static inline void wm_queue_destroy(wmQueue* queue) {
-	wm_queue_clear(queue);
+static inline void wmQueue_destroy(wmQueue* queue) {
+	wmQueue_clear(queue);
 	wm_free(queue);
 	queue = NULL;
 }

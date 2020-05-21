@@ -36,7 +36,7 @@ typedef struct timernode {
 	timer_cb_t callback;          // 回调函数
 	uint32_t expire;              // 到期时间 , 这个不是当前时间戳，是定时器滴答总数+传入的时间间隔产生的
 	unsigned long id;              //定时器ID
-} timernode_t;
+} wmTimerWheel_Node;
 
 // 第1个轮
 typedef struct tvroot {
@@ -58,20 +58,20 @@ typedef struct timerwheel {
 	uint16_t remainder;            // 剩余的毫秒
 	uint32_t num;				   // 当前剩余任务数
 	clinknode_t so_long_node;      // 超出了最大时间的节点，在每次最大表盘归0的时候尝试插入
-} timerwheel_t;
+} wmTimerWheel;
 
 // 初始化时间轮，interval为每帧的间隔，currtime为当前时间
-void timerwheel_init(timerwheel_t *tw, uint16_t interval, uint64_t currtime);
+void wmTimerWheel_init(wmTimerWheel *tw, uint16_t interval, uint64_t currtime);
 // 初始化时间结点：cb为回调，ud为用户数据
-void timerwheel_node_init(timernode_t *node, timer_cb_t cb, void *ud);
+void wmTimerWheel_node_init(wmTimerWheel_Node *node, timer_cb_t cb, void *ud);
 // 增加时间结点，ticks为触发间隔(注意是以interval为单位)
-void timerwheel_add(timerwheel_t *tw, timernode_t *node, uint32_t ticks);
+void wmTimerWheel_add(wmTimerWheel *tw, wmTimerWheel_Node *node, uint32_t ticks);
 // 快速添加
-void timerwheel_add_quick(timerwheel_t *tw, timer_cb_t cb, void *ud,
+void wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void *ud,
 		uint32_t ticks);
 // 删除结点
-//int timerwheel_del(timerwheel_t *tw, timernode_t *node);
+//int wmTimerWheel_del(wmTimerWheel *tw, wmTimerWheel_Node *node);
 // 更新时间轮
-void timerwheel_update(timerwheel_t *tw, uint64_t currtime);
+void wmTimerWheel_update(wmTimerWheel *tw, uint64_t currtime);
 
 #endif

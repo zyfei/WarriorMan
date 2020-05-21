@@ -6,8 +6,6 @@
  */
 #include "bash.h"
 
-extern long wm_coroutine_socket_last_id;
-
 /**
  * 协程化socket结构体
  */
@@ -22,37 +20,34 @@ typedef struct {
 //初始化一个自定义的PHP对象，并且让zsocket这个容器指向自定义对象里面的std对象
 void php_wm_init_socket_object(zval *zsocket, wmCoroutionSocket *socket);
 
-//保存了所有的连接，fd为key,wmCoroutionSocket为value , int的时候填进去，close的时候移出
-extern swHashMap *wm_connections;
-
 //创建协程套接字
-wmCoroutionSocket * wm_coroution_socket_init(int domain, int type,
+wmCoroutionSocket * wmCoroutionSocket_init(int domain, int type,
 		int protocol);
 //给普通客户端连接使用
-wmCoroutionSocket * wm_coroution_socket_init_by_fd(int fd);
+wmCoroutionSocket * wmCoroutionSocket_init_by_fd(int fd);
 
 //查找
-wmCoroutionSocket* wm_coroution_socket_find_by_fd(int fd);
+wmCoroutionSocket* wmCoroutionSocket_find_by_fd(int fd);
 
-ssize_t wm_coroution_socket_recv(wmCoroutionSocket *socket, int32_t length);
+ssize_t wmCoroutionSocket_recv(wmCoroutionSocket *socket, int32_t length);
 
-wmString* wm_coroution_socket_get_write_buffer(wmCoroutionSocket *socket);
+wmString* wmCoroutionSocket_get_write_buffer(wmCoroutionSocket *socket);
 
-int wm_coroution_socket_bind(wmCoroutionSocket *socket, char *host, int port);
+int wmCoroutionSocket_bind(wmCoroutionSocket *socket, char *host, int port);
 
-int wm_coroution_socket_listen(wmCoroutionSocket *socket, int backlog);
+int wmCoroutionSocket_listen(wmCoroutionSocket *socket, int backlog);
 
-wmCoroutionSocket* wm_coroution_socket_accept(wmCoroutionSocket *socket);
+wmCoroutionSocket* wmCoroutionSocket_accept(wmCoroutionSocket *socket);
 
-bool wm_coroution_socket_wait_event(wmCoroutionSocket *socket, int event);
+bool wmCoroutionSocket_wait_event(wmCoroutionSocket *socket, int event);
 
-ssize_t wm_coroution_socket_recv(wmCoroutionSocket *socket);
+ssize_t wmCoroutionSocket_recv(wmCoroutionSocket *socket);
 
-ssize_t wm_coroution_socket_send(wmCoroutionSocket *socket, const void *buf,
+ssize_t wmCoroutionSocket_send(wmCoroutionSocket *socket, const void *buf,
 		size_t len);
 
-int wm_coroution_socket_close(wmCoroutionSocket *socket);
+int wmCoroutionSocket_close(wmCoroutionSocket *socket);
 
-int wm_coroution_socket_free(wmCoroutionSocket *socket);
+int wmCoroutionSocket_free(wmCoroutionSocket *socket);
 
 #endif

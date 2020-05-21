@@ -65,11 +65,11 @@ static inline void fromuint64(uint64_t v, int *fd, int *id) {
 	*id = (int) (v & 0xffffffff);
 }
 
-inline zval* wm_malloc_zval() {
+static inline zval* wm_malloc_zval() {
 	return (zval *) emalloc(sizeof(zval));
 }
 
-inline zval* wm_zval_dup(zval *val) {
+static inline zval* wm_zval_dup(zval *val) {
 	zval *dup = wm_malloc_zval();
 	memcpy(dup, val, sizeof(zval));
 	return dup;
@@ -128,7 +128,7 @@ typedef struct {
 typedef struct {
 	bool is_running;
 	wmPoll_t *poll;
-	timerwheel_t timer; //核心定时器
+	wmTimerWheel timer; //核心定时器
 } wmGlobal_t;
 
 //初始化wmPoll_t

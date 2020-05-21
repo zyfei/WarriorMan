@@ -181,7 +181,7 @@ char* wmString_alloc(wmString *str, size_t __size) {
 	return tmp;
 }
 
-u_int32_t wm_utf8_decode(char **p, size_t n) {
+u_int32_t wmString_utf8_decode(char **p, size_t n) {
 	size_t len;
 	u_int32_t u, i, valid;
 
@@ -226,7 +226,7 @@ u_int32_t wm_utf8_decode(char **p, size_t n) {
 	return 0xffffffff;
 }
 
-size_t wm_utf8_length(char *p, size_t n) {
+size_t wmString_utf8_length(char *p, size_t n) {
 	char c, *last;
 	size_t len;
 
@@ -238,7 +238,7 @@ size_t wm_utf8_length(char *p, size_t n) {
 			p++;
 			continue;
 		}
-		if (wm_utf8_decode(&p, n) > 0x10ffff) {
+		if (wmString_utf8_decode(&p, n) > 0x10ffff) {
 			/* invalid UTF-8 */
 			return n;
 		}
@@ -246,7 +246,7 @@ size_t wm_utf8_length(char *p, size_t n) {
 	return len;
 }
 
-void wm_random_string(char *buf, size_t size) {
+void wmString_random_string(char *buf, size_t size) {
 	static char characters[] =
 			{ 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
 					'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y',

@@ -1,25 +1,25 @@
-#include "server.h"
+#include "worker_server.h"
+
 #include "coroutine.h"
 #include "coroutine_socket.h"
 
 /**
  * 创建
  */
-wmServer* wm_server_create(char *host, int port) {
-	wmCoroutionSocket *socket = wm_coroution_socket_init(AF_INET, SOCK_STREAM,
+wmServer* wmServer_create(char *host, int port) {
+	wmCoroutionSocket *socket = wmCoroutionSocket_init(AF_INET, SOCK_STREAM,
 			0);
-	if (wm_coroution_socket_bind(socket, host, port) < 0) {
+	if (wmCoroutionSocket_bind(socket, host, port) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 		return NULL;
 	}
 
-	if (wm_coroution_socket_listen(socket, 512) < 0) {
+	if (wmCoroutionSocket_listen(socket, 512) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 		return NULL;
 	}
 
-	wmServer* server = (wmServer *) wm_malloc(
-			sizeof(wmServer));
+	wmServer* server = (wmServer *) wm_malloc(sizeof(wmServer));
 	bzero(server, sizeof(wmServer));
 	server->socket = socket;
 	server->running = false;
@@ -28,12 +28,12 @@ wmServer* wm_server_create(char *host, int port) {
 }
 
 //启动服务器
-bool wm_server_run(wmServer* server) {
+bool wmServer_run(wmServer* server) {
 	zval zsocket;
 	server->running = true;
 
 	while (server->running) {
-		wmCoroutionSocket* conn = wm_coroution_socket_accept(server->socket);
+		wmCoroutionSocket* conn = wmCoroutionSocket_accept(server->socket);
 		if (!conn) {
 			return false;
 		}
@@ -55,29 +55,29 @@ bool wm_server_run(wmServer* server) {
 }
 
 //关闭服务器
-bool wm_server_stop(wmServer* server) {
+bool wmServer_stop(wmServer* server) {
 	server->running = false;
 	return true;
 }
 
-void wm_server_set_handler(wmServer* server, php_fci_fcc *_handler) {
+void wmServer_set_handler(wmServer* server, php_fci_fcc *_handler) {
 	server->handler = _handler;
 }
 
-void wm_server_free(wmServer* server) {
+php_fci_fcc* wmServer_get_handler(wmServer* server) {
+	return server->handler;
+}
+
+void wmServer_free(wmServer* server) {
 	if (server) {
 		if (server->handler) {
 			efree(server->handler);
-			wm_server_set_handler(server, NULL);
+			wmServer_set_handler(server, NULL);
 		}
 		if (server->socket) {
-			wm_coroution_socket_free(server->socket);
+			wmCoroutionSocket_free(server->socket);
 		}
 		wm_free(server);
 	}
-}
-
-php_fci_fcc* wm_server_get_handler(wmServer* server) {
-	return server->handler;
 }
 

@@ -2,17 +2,17 @@
 
 static long last_cid = 0; //自增id
 swHashMap *coroutines = swHashMap_new(NULL); //保存所有协程
-static Coroutine main_task = { 0 }; //主协程
-static Coroutine* current_task = NULL; //当前协程
+static wmCoroutine main_task = { 0 }; //主协程
+static wmCoroutine* current_task = NULL; //当前协程
 
-long run(Coroutine* task);
+long run(wmCoroutine* task);
 void main_func(void *arg);
 void vm_stack_init();
-void save_vm_stack(Coroutine *task);
-void close(Coroutine *task);
-Coroutine* get_origin_task(Coroutine *task);
-Coroutine* get_task();
-void restore_vm_stack(Coroutine *task);
+void save_vm_stack(wmCoroutine *task);
+void close(wmCoroutine *task);
+wmCoroutine* get_origin_task(wmCoroutine *task);
+wmCoroutine* get_task();
+void restore_vm_stack(wmCoroutine *task);
 
 /**
  * 创建一个协程
@@ -29,8 +29,8 @@ long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc,
 	save_vm_stack(get_task());
 
 	//创建协程,注意 这个时候当前的task还没有php协程栈，是在main_func中初始化的
-	Coroutine* task = (Coroutine *) wm_malloc(sizeof(Coroutine));
-	bzero(task, sizeof(Coroutine));
+	wmCoroutine* task = (wmCoroutine *) wm_malloc(sizeof(wmCoroutine));
+	bzero(task, sizeof(wmCoroutine));
 
 	size_t stack_size = DEFAULT_C_STACK_SIZE;
 	wmContext_init(&task->ctx, stack_size, main_func, ((void*) &php_coro_args));
@@ -41,13 +41,13 @@ long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc,
 	return run(task);
 }
 
-long run(Coroutine* task) {
+long run(wmCoroutine* task) {
 	long cid = task->cid;
 	//起源协程 = 记录的上一个协程
 	task->origin = current_task;
 	current_task = task;
 
-	//切换到这个堆栈来工作,在这里面初始化了php协程栈
+	//切换到这个堆栈来工作,在这里面切换了C栈，并且在回调中申请了php协程栈
 	wmContext_swap_in(&task->ctx);
 	//下面有可能执行完毕，也有可能程序自己yield了
 
@@ -105,7 +105,7 @@ void main_func(void *arg) {
 	EG(current_execute_data) = call;
 
 	//当前协程
-	Coroutine* _task = current_task;
+	wmCoroutine* _task = current_task;
 	//保存php栈信息
 	save_vm_stack(_task);
 
@@ -145,7 +145,7 @@ void main_func(void *arg) {
 /**
  * 获取当前协程任务
  */
-Coroutine* get_task() {
+wmCoroutine* get_task() {
 	//如果当前协程不为空，就取当前协程
 	if (!current_task) {
 		current_task = &main_task;
@@ -177,7 +177,7 @@ void vm_stack_init() {
 /**
  * 读取当前PHP运行栈，存入task中
  */
-void save_vm_stack(Coroutine *task) {
+void save_vm_stack(wmCoroutine *task) {
 	task->vm_stack_top = EG(vm_stack_top);
 	task->vm_stack_end = EG(vm_stack_end);
 	task->vm_stack = EG(vm_stack);
@@ -188,12 +188,12 @@ void save_vm_stack(Coroutine *task) {
 /**
  * 切换协程
  */
-void wmCoroutine_yield(Coroutine *task) {
+void wmCoroutine_yield(wmCoroutine *task) {
 	assert(current_task == task);
-	Coroutine *origin_task = task->origin;
+	wmCoroutine *origin_task = task->origin;
 
-	save_vm_stack((Coroutine *) task);
-	restore_vm_stack((Coroutine *) origin_task);
+	save_vm_stack((wmCoroutine *) task);
+	restore_vm_stack((wmCoroutine *) origin_task);
 
 	current_task = origin_task;
 
@@ -204,10 +204,10 @@ void wmCoroutine_yield(Coroutine *task) {
 /**
  * 恢复协程
  */
-void wmCoroutine_resume(Coroutine *task) {
+void wmCoroutine_resume(wmCoroutine *task) {
 	assert(current_task != task);
 
-	Coroutine *_current_task = get_task();
+	wmCoroutine *_current_task = get_task();
 	//保存当前的协程
 	save_vm_stack(_current_task);
 	//恢复指定的task
@@ -227,11 +227,11 @@ void wmCoroutine_resume(Coroutine *task) {
 	}
 }
 
-void close(Coroutine *task) {
+void close(wmCoroutine *task) {
 	//在hash表中删除
 	swHashMap_del_int(coroutines, task->cid);
 	//获取他的起源
-	Coroutine *origin_task = get_origin_task(task);
+	wmCoroutine *origin_task = get_origin_task(task);
 	//销毁ctx
 	wmContext_destroy(&task->ctx);
 
@@ -243,13 +243,13 @@ void close(Coroutine *task) {
 }
 
 //获取起源协程
-Coroutine* get_origin_task(Coroutine *task) {
-	Coroutine *_origin = task->origin;
+wmCoroutine* get_origin_task(wmCoroutine *task) {
+	wmCoroutine *_origin = task->origin;
 	return _origin ? _origin : &main_task;
 }
 
 //加载一个php运行栈
-void restore_vm_stack(Coroutine *task) {
+void restore_vm_stack(wmCoroutine *task) {
 	EG(vm_stack_top) = task->vm_stack_top;
 	EG(vm_stack_end) = task->vm_stack_end;
 	EG(vm_stack) = task->vm_stack;
@@ -269,8 +269,8 @@ void vm_stack_destroy() {
 	}
 }
 
-Coroutine* wmCoroutine_get_by_cid(long _cid) {
-	Coroutine* _co = (Coroutine*) swHashMap_find_int(coroutines, _cid);
+wmCoroutine* wmCoroutine_get_by_cid(long _cid) {
+	wmCoroutine* _co = (wmCoroutine*) swHashMap_find_int(coroutines, _cid);
 	return _co;
 }
 
@@ -282,13 +282,6 @@ void wmCoroutine_defer(php_fci_fcc *defer_fci_fcc) {
 }
 
 //返回当前协程任务
-Coroutine* wmCoroutine_get_current() {
+wmCoroutine* wmCoroutine_get_current() {
 	return current_task;
-}
-
-/**
- * sleep的回调函数
- */
-void wmCoroutine_resume2(void *co) {
-	wmCoroutine_resume((Coroutine*) co);
 }

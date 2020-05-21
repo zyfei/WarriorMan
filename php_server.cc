@@ -1,7 +1,7 @@
 /**
  * server入口文件
  */
-#include "server.h"
+#include "worker_server.h"
 
 zend_class_entry workerman_server_ce;
 zend_class_entry *workerman_server_ce_ptr;
@@ -26,7 +26,7 @@ static wmServerObject* wm_server_fetch_object(zend_object *obj) {
  * 创建一个php对象
  * zend_class_entry是一个php类
  */
-static zend_object* wm_server_create_object(zend_class_entry *ce) {
+static zend_object* wmServer_create_object(zend_class_entry *ce) {
 	wmServerObject *server_obj = (wmServerObject *) ecalloc(1,
 			sizeof(wmServerObject) + zend_object_properties_size(ce));
 	zend_object_std_init(&server_obj->std, ce);
@@ -39,11 +39,11 @@ static zend_object* wm_server_create_object(zend_class_entry *ce) {
  * 释放php对象的方法
  * 最新 问题找到了，是因为malloc申请了的地址重复了，现在的解决办法是，这里可以释放，但是不可以关。只能在其他地方关
  */
-static void wm_server_free_object(zend_object *object) {
+static void wmServer_free_object(zend_object *object) {
 	wmServerObject *server_obj = (wmServerObject *) wm_server_fetch_object(
 			object);
 
-	wm_server_free(server_obj->server);
+	wmServer_free(server_obj->server);
 
 	//free obj
 	zend_object_std_dtor(&server_obj->std);
@@ -72,7 +72,7 @@ PHP_METHOD(workerman_server, __construct) {
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
 	server_obj = (wmServerObject *) wm_server_fetch_object(Z_OBJ_P(getThis()));
-	server_obj->server = wm_server_create(Z_STRVAL_P(zhost), port);
+	server_obj->server = wmServer_create(Z_STRVAL_P(zhost), port);
 
 	zend_update_property_string(workerman_server_ce_ptr, getThis(),
 			ZEND_STRL("host"), Z_STRVAL_P(zhost));
@@ -84,7 +84,7 @@ PHP_METHOD(workerman_server, stop) {
 	wmServerObject *server_obj;
 	server_obj = (wmServerObject *) wm_server_fetch_object(Z_OBJ_P(getThis()));
 
-	if (wm_server_stop(server_obj->server) == false) {
+	if (wmServer_stop(server_obj->server) == false) {
 		RETURN_FALSE
 	}
 	RETURN_TRUE
@@ -107,7 +107,7 @@ PHP_METHOD(workerman_server, set_handler) {
 	//增加引用计数
 	wm_zend_fci_cache_persist(&handle_fci_fcc->fcc);
 
-	wm_server_set_handler(server_obj->server, handle_fci_fcc);
+	wmServer_set_handler(server_obj->server, handle_fci_fcc);
 }
 
 PHP_METHOD(workerman_server, run) {
@@ -115,7 +115,7 @@ PHP_METHOD(workerman_server, run) {
 
 	server_obj = (wmServerObject *) wm_server_fetch_object(Z_OBJ_P(getThis()));
 
-	if (wm_server_run(server_obj->server) == false) {
+	if (wmServer_run(server_obj->server) == false) {
 		RETURN_FALSE
 	}
 	RETURN_TRUE
@@ -147,8 +147,8 @@ void workerman_server_init() {
 	memcpy(&workerman_server_handlers, zend_get_std_object_handlers(),
 			sizeof(zend_object_handlers));
 	//php对象实例化已经由我们自己的代码接管了
-	workerman_server_ce_ptr->create_object = wm_server_create_object;
-	workerman_server_handlers.free_obj = wm_server_free_object;
+	workerman_server_ce_ptr->create_object = wmServer_create_object;
+	workerman_server_handlers.free_obj = wmServer_free_object;
 	workerman_server_handlers.offset =
 			(zend_long) (((char *) (&(((wmServerObject*) NULL)->std)))
 					- ((char *) NULL));

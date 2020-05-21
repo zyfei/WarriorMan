@@ -22,8 +22,8 @@ int wmString_write_ptr(wmString *str, off_t offset, char *write_str,
 		size_t length);
 int wmString_extend(wmString *str, size_t new_size);
 char* wmString_alloc(wmString *str, size_t __size);
-u_int32_t wm_utf8_decode(char **p, size_t n);
-size_t wm_utf8_length(char *p, size_t n);
-void wm_random_string(char *buf, size_t size);
+u_int32_t wmString_utf8_decode(char **p, size_t n);
+size_t wmString_utf8_length(char *p, size_t n);
+void wmString_random_string(char *buf, size_t size);
 
 #endif    /* _WM_STRING_H */

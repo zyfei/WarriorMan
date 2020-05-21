@@ -12,7 +12,7 @@ enum wmEvent_type {
 
 //coroutine.h 默认的PHP栈页大小
 #define DEFAULT_PHP_STACK_PAGE_SIZE       8192
-#define PHP_CORO_TASK_SLOT ((int)((ZEND_MM_ALIGNED_SIZE(sizeof(Coroutine)) + ZEND_MM_ALIGNED_SIZE(sizeof(zval)) - 1) / ZEND_MM_ALIGNED_SIZE(sizeof(zval))))
+#define PHP_CORO_TASK_SLOT ((int)((ZEND_MM_ALIGNED_SIZE(sizeof(wmCoroutine)) + ZEND_MM_ALIGNED_SIZE(sizeof(zval)) - 1) / ZEND_MM_ALIGNED_SIZE(sizeof(zval))))
 #define DEFAULT_C_STACK_SIZE          (2 *1024 * 1024)
 
 #define WM_MAXEVENTS            1024

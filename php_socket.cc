@@ -48,7 +48,7 @@ static void wm_socket_free_object(zend_object *object) {
 	//这里需要判断，这个socket是不是被人继续用了。
 	if (sock->socket && sock->socket != NULL) {
 		//现在有这个时候，把别的正常的fd关闭的情况
-		wm_coroution_socket_free(sock->socket);
+		wmCoroutionSocket_free(sock->socket);
 	}
 	//free_obj
 	zend_object_std_dtor(&sock->std);
@@ -113,7 +113,7 @@ PHP_METHOD(workerman_socket, __construct) {
 
 	socket_object = (wmCoroutionSocketObject *) wm_socket_fetch_object(
 			Z_OBJ_P(getThis()));
-	socket_object->socket = wm_coroution_socket_init(domain, type, protocol);
+	socket_object->socket = wmCoroutionSocket_init(domain, type, protocol);
 
 	zend_update_property_long(workerman_socket_ce_ptr, getThis(),
 			ZEND_STRL("fd"), socket_object->socket->sockfd);
@@ -133,7 +133,7 @@ PHP_METHOD(workerman_socket, bind) {
 	socket_object = (wmCoroutionSocketObject *) wm_socket_fetch_object(
 			Z_OBJ_P(getThis()));
 
-	if (wm_coroution_socket_bind(socket_object->socket, Z_STRVAL_P(zhost),
+	if (wmCoroutionSocket_bind(socket_object->socket, Z_STRVAL_P(zhost),
 			zport) < 0) {
 		RETURN_FALSE
 	}
@@ -153,7 +153,7 @@ PHP_METHOD(workerman_socket, listen) {
 	socket_object = (wmCoroutionSocketObject *) wm_socket_fetch_object(
 			Z_OBJ_P(getThis()));
 
-	if (wm_coroution_socket_listen(socket_object->socket, backlog) < 0) {
+	if (wmCoroutionSocket_listen(socket_object->socket, backlog) < 0) {
 		RETURN_FALSE
 	}
 	RETURN_TRUE
@@ -173,7 +173,7 @@ PHP_METHOD(workerman_socket, accept) {
 	socket_object2 = (wmCoroutionSocketObject *) wm_socket_fetch_object(obj);
 
 	//接客
-	socket_object2->socket = wm_coroution_socket_accept(socket_object->socket);
+	socket_object2->socket = wmCoroutionSocket_accept(socket_object->socket);
 
 //	zval obj_zval;
 //	ZVAL_OBJ(&obj_zval, &(socket_object2->std));
@@ -209,7 +209,7 @@ PHP_METHOD(workerman_socket, recv) {
 		RETURN_FALSE
 	}
 
-	wm_coroution_socket_recv(conn, length);
+	wmCoroutionSocket_recv(conn, length);
 	ret = conn->read_buffer->length;
 
 	//客户端已关闭
@@ -220,7 +220,7 @@ PHP_METHOD(workerman_socket, recv) {
 		zend_update_property_string(workerman_socket_ce_ptr,
 		getThis(), ZEND_STRL("errMsg"),
 				wm_strerror(WM_ERROR_SESSION_CLOSED_BY_CLIENT));
-		wm_coroution_socket_close(conn);
+		wmCoroutionSocket_close(conn);
 		RETURN_FALSE
 	}
 	if (ret < 0) {
@@ -260,11 +260,11 @@ PHP_METHOD(workerman_socket, send) {
 		RETURN_FALSE
 	}
 
-	ret = wm_coroution_socket_send(conn, data, length);
+	ret = wmCoroutionSocket_send(conn, data, length);
 	if (ret < 0) {
 		php_error_docref(NULL, E_WARNING, "send error");
 		//释放掉申请的内存
-		wm_coroution_socket_close(conn);
+		wmCoroutionSocket_close(conn);
 		RETURN_FALSE
 	}
 	RETURN_LONG(ret);
@@ -275,7 +275,7 @@ PHP_METHOD(workerman_socket, close) {
 	int ret = 0;
 	socket_object = (wmCoroutionSocketObject *) wm_socket_fetch_object(
 			Z_OBJ_P(getThis()));
-	ret = wm_coroution_socket_close(socket_object->socket);
+	ret = wmCoroutionSocket_close(socket_object->socket);
 	if (ret < 0) {
 		php_error_docref(NULL, E_WARNING, "close error");
 		RETURN_FALSE
