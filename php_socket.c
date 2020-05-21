@@ -219,7 +219,7 @@ PHP_METHOD(workerman_socket, recv) {
 
 		zend_update_property_string(workerman_socket_ce_ptr,
 		getThis(), ZEND_STRL("errMsg"),
-				wm_strerror(WM_ERROR_SESSION_CLOSED_BY_CLIENT));
+				wmCode_str(WM_ERROR_SESSION_CLOSED_BY_CLIENT));
 		wmCoroutionSocket_close(conn);
 		RETURN_FALSE
 	}

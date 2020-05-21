@@ -8,7 +8,6 @@
 #include "timer.h"
 #include "socket.h"
 #include "stack.h"
-#include "error.h"
 #include "log.h"
 #include "queue.h"
 #include "wm_string.h"

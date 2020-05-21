@@ -55,7 +55,6 @@ if test "$PHP_WM" != "no"; then
     	src/core/log.c \
     	src/core/socket.c \
     	src/core/hashmap.c \
-    	src/core/error.c \
     	src/core/timer.c \
     	src/core/wm_string.c \
     	src/coroutine/channel.c \
@@ -87,8 +86,8 @@ if test "$PHP_WM" != "no"; then
     PHP_INSTALL_HEADERS([ext/workerman], [*.h config.h include/*.h thirdparty/*.h])
 
 	dnl 我们使用c，把下面的c++相关注释了
-	dnl CFLAGS="$CFLAGS -std=gnu99"
-	dnl CFLAGS="-Wall -pthread $CFLAGS"
+	CFLAGS="-Wall -pthread $CFLAGS"
+	CFLAGS="$CFLAGS -std=gnu99"
 
 
     dnl 我们使用了C++，所以我们需要指明一下。（没有这句会编译出错）

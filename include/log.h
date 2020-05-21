@@ -19,6 +19,15 @@ extern char wm_trace[WM_TRACE_MSG_SIZE];
 extern char wm_warn[WM_WARN_MSG_SIZE];
 extern char wm_error[WM_ERROR_MSG_SIZE];
 
+enum wmCode {
+	/**
+	 * connection error
+	 */
+	WM_ERROR_SESSION_CLOSED_BY_SERVER = 1001, //代表连接是被服务器关闭的，
+	WM_ERROR_SESSION_CLOSED_BY_CLIENT = 1002, //代表连接是被客户端关闭的。
+
+};
+
 #define wmDebug(wmr, ...)                                                         \
     snprintf(wm_debug, WM_DEBUG_MSG_SIZE, "%s: " wmr " in %s on line %d.", __func__, ##__VA_ARGS__, __FILE__, __LINE__); \
     wmLog_put(WM_LOG_DEBUG, wm_debug);
@@ -36,16 +45,17 @@ extern char wm_error[WM_ERROR_MSG_SIZE];
     wmLog_put(WM_LOG_ERROR, wm_error); \
     exit(-1);
 
-enum wmLog_level
-{
-    WM_LOG_DEBUG = 0,
-    WM_LOG_TRACE,
-    WM_LOG_INFO,
-    WM_LOG_NOTICE,
-    WM_LOG_WARNING,
-    WM_LOG_ERROR,
+enum wmLog_level {
+	WM_LOG_DEBUG = 0,
+	WM_LOG_TRACE,
+	WM_LOG_INFO,
+	WM_LOG_NOTICE,
+	WM_LOG_WARNING,
+	WM_LOG_ERROR,
 };
 
 void wmLog_put(int level, char *cnt);
+
+const char* wmCode_str(int code);
 
 #endif /* LOG_H_ */
