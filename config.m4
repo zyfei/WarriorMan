@@ -51,31 +51,32 @@ if test "$PHP_WM" != "no"; then
 
     dnl 把我们需要编译的所有文件已字符串的方式存入到变量workerman_source_file里面。
     workerman_source_file="\
-    	src/core/base.cc \
-    	src/core/log.cc \
-    	src/core/socket.cc \
-    	src/core/hashmap.cc \
-    	src/core/error.cc \
-    	src/core/timer.cc \
-    	src/core/wm_string.cc \
-    	src/coroutine/channel.cc \
-    	src/coroutine/coroutine_socket.cc \
-    	src/coroutine/context.cc \
-    	src/coroutine/coroutine.cc \
-    	src/worker_coroutine.cc \
-    	src/worker_server.cc \
-    	php_coroutine.cc \
-        php_workerman.cc \
-        php_socket.cc \
-        php_channel.cc \
-        php_server.cc \
-        php_runtime.cc \
+    	src/core/base.c \
+    	src/core/log.c \
+    	src/core/socket.c \
+    	src/core/hashmap.c \
+    	src/core/error.c \
+    	src/core/timer.c \
+    	src/core/wm_string.c \
+    	src/coroutine/channel.c \
+    	src/coroutine/coroutine_socket.c \
+    	src/coroutine/context.c \
+    	src/coroutine/coroutine.c \
+    	src/worker_coroutine.c \
+    	src/worker_server.c \
+    	php_coroutine.c \
+        php_workerman.c \
+        php_socket.c \
+        php_channel.c \
+        php_server.c \
+        php_runtime.c \
         ${WM_ASM_DIR}make_${WM_CONTEXT_ASM_FILE} \
         ${WM_ASM_DIR}jump_${WM_CONTEXT_ASM_FILE}
     "
 
     dnl 声明这个扩展的名称、需要的源文件名、此扩展的编译形式。其中$ext_shared代表此扩展是动态库，使用cxx的原因是，我们的这个扩展使用C++来编写。
-    PHP_NEW_EXTENSION(workerman, $workerman_source_file, $ext_shared,,, cxx)
+    dnl PHP_NEW_EXTENSION(workerman, $workerman_source_file, $ext_shared,,, cxx)
+    PHP_NEW_EXTENSION(workerman, $workerman_source_file, $ext_shared)
 
     dnl 用来添加额外的包含头文件的目录。
     PHP_ADD_INCLUDE([$ext_srcdir])
@@ -85,17 +86,22 @@ if test "$PHP_WM" != "no"; then
     dnl 下的ext/workerman里面。这个是在执行make install的时候会进行复制。我们待会会看到。
     PHP_INSTALL_HEADERS([ext/workerman], [*.h config.h include/*.h thirdparty/*.h])
 
+	dnl 我们使用c，把下面的c++相关注释了
+	dnl CFLAGS="$CFLAGS -std=gnu99"
+	dnl CFLAGS="-Wall -pthread $CFLAGS"
+
+
     dnl 我们使用了C++，所以我们需要指明一下。（没有这句会编译出错）
-    PHP_REQUIRE_CXX()
+    dnl PHP_REQUIRE_CXX()
 
     dnl 编译C++时候，用到的编译选项。
-    CXXFLAGS="$CXXFLAGS -Wall -Wno-unused-function -Wno-deprecated -Wno-deprecated-declarations"
+    dnl CXXFLAGS="$CXXFLAGS -Wall -Wno-unused-function -Wno-deprecated -Wno-deprecated-declarations"
     dnl 编译C++时候，用到的编译选项。
-    if test "$WM_OS" = "CYGWIN" || test "$WM_OS" = "MINGW"; then
-        CXXFLAGS="$CXXFLAGS -std=gnu++11"
-    else
-        CXXFLAGS="$CXXFLAGS -std=c++11"
-    fi
+    dnl if test "$WM_OS" = "CYGWIN" || test "$WM_OS" = "MINGW"; then
+    dnl     CXXFLAGS="$CXXFLAGS -std=gnu++11"
+    dnl else
+    dnl     CXXFLAGS="$CXXFLAGS -std=c++11"
+    dnl fi
 
     dnl 指定这个扩展需要被编译到的文件的目录。因为我们需要编译boost提供的代码，所以需要进行指定。
     PHP_ADD_BUILD_DIR($ext_builddir/thirdparty/boost)

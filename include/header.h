@@ -24,6 +24,7 @@
 #include <signal.h>
 #include <time.h>
 #include <sys/timeb.h>
+#include <stdbool.h>
 
 
 #include <fcntl.h>

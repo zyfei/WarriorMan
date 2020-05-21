@@ -41,8 +41,6 @@ wmCoroutionSocket* wmCoroutionSocket_accept(wmCoroutionSocket *socket);
 
 bool wmCoroutionSocket_wait_event(wmCoroutionSocket *socket, int event);
 
-ssize_t wmCoroutionSocket_recv(wmCoroutionSocket *socket);
-
 ssize_t wmCoroutionSocket_send(wmCoroutionSocket *socket, const void *buf,
 		size_t len);
 

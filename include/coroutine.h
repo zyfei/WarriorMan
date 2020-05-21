@@ -30,19 +30,17 @@ typedef struct _Coroutine {
 	//以下是coroutine结构
 	wmContext ctx;
 	long cid; //协程类ID
-	_Coroutine *origin; //起源协程，记录哪个协程，创建的这个协程
+	struct _Coroutine *origin; //起源协程，记录哪个协程，创建的这个协程
 	wmStack *defer_tasks; //所有的defer
 } wmCoroutine;
 
 long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc,
 		zval *argv);
 wmCoroutine* wmCoroutine_get_by_cid(long _cid);
-void wmCoroutine_yield(wmCoroutine *task);
-void wmCoroutine_resume(wmCoroutine *task);
+void wmCoroutine_yield();
+bool wmCoroutine_resume(wmCoroutine *task);
 void vm_stack_destroy();
 void wmCoroutine_defer(php_fci_fcc *defer_fci_fcc);
 wmCoroutine* wmCoroutine_get_current();
-
-extern swHashMap *coroutines;
 
 #endif	/* WM_COROUTINE_H */
