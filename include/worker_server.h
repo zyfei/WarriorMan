@@ -8,13 +8,21 @@
 #include "coroutine.h"
 #include "coroutine_socket.h"
 
-typedef struct {
+typedef struct _wmServer {
+	uint32_t id; //server id
 	wmCoroutionSocket *socket;
-	php_fci_fcc *handler; //接收到客户端连接之后，会回调的函数。
-	bool running; //服务器是否正在运行中
+	php_fci_fcc *onWorkerStart; //onWorkerStart回调
+	php_fci_fcc *handler;
+	int _status; //当前状态
+	int32_t backlog; //listen队列长度
+	char* host;
+	int32_t port;
+	int32_t count; //进程数量
 } wmServer;
 
-wmServer* wmServer_create(char *host, int port);
+wmServer* wmServer_create();
+
+wmServer* wmServer_create2(char *host, int port);
 
 bool wmServer_run(wmServer* server); //启动服务器
 

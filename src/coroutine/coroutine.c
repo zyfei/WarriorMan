@@ -96,9 +96,24 @@ void main_func(void *arg) {
 			+ PHP_CORO_TASK_SLOT * sizeof(zval));
 
 	//函数分配一块用于当前作用域的内存空间，返回结果是zend_execute_data的起始位置。
+#if PHP_VERSION_ID < 70400
 	call = zend_vm_stack_push_call_frame(
 			ZEND_CALL_TOP_FUNCTION | ZEND_CALL_ALLOCATED, func, argc,
 			fci_cache.called_scope, fci_cache.object);
+#else
+	do {
+		uint32_t call_info;
+		void *object_or_called_scope;
+		if ((func->common.fn_flags & ZEND_ACC_STATIC) || !fci_cache.object) {
+			object_or_called_scope = fci_cache.called_scope;
+			call_info = ZEND_CALL_TOP_FUNCTION | ZEND_CALL_DYNAMIC;
+		} else {
+			object_or_called_scope = fci_cache.object;
+			call_info = ZEND_CALL_TOP_FUNCTION | ZEND_CALL_DYNAMIC | ZEND_CALL_HAS_THIS;
+		}
+		call = zend_vm_stack_push_call_frame(call_info, func, argc, object_or_called_scope);
+	}while (0);
+#endif
 
 	for (i = 0; i < argc; ++i) {
 		zval *param;
@@ -122,7 +137,13 @@ void main_func(void *arg) {
 	if (func->type == ZEND_USER_FUNCTION) {
 		ZVAL_UNDEF(retval);
 		EG(current_execute_data) = NULL;
-		zend_init_func_execute_data(call, &func->op_array, retval);
+
+#if PHP_VERSION_ID >= 70200
+        zend_init_func_execute_data(call, &func->op_array, retval);
+#else
+        zend_init_execute_data(call, &func->op_array, retval);
+#endif
+
 		zend_execute_ex(EG(current_execute_data));
 	}
 
@@ -179,7 +200,9 @@ void vm_stack_init() {
 	EG(vm_stack)->top++;
 	EG(vm_stack_top) = EG(vm_stack)->top;
 	EG(vm_stack_end) = EG(vm_stack)->end;
+#if PHP_VERSION_ID >= 70300
 	EG(vm_stack_page_size) = size;
+#endif
 }
 
 /**
@@ -189,7 +212,9 @@ void save_vm_stack(wmCoroutine *task) {
 	task->vm_stack_top = EG(vm_stack_top);
 	task->vm_stack_end = EG(vm_stack_end);
 	task->vm_stack = EG(vm_stack);
+#if PHP_VERSION_ID >= 70300
 	task->vm_stack_page_size = EG(vm_stack_page_size);
+#endif
 	task->execute_data = EG(current_execute_data);
 }
 
@@ -220,7 +245,8 @@ bool wmCoroutine_resume(wmCoroutine *task) {
 	assert(current_task != task);
 
 	//判断是否之前yield过
-	wmCoroutine* yield_co = (wmCoroutine*) swHashMap_find_int(user_yield_coros, task->cid);
+	wmCoroutine* yield_co = (wmCoroutine*) swHashMap_find_int(user_yield_coros,
+			task->cid);
 	if (yield_co == NULL) {
 		return false;
 	}
@@ -278,7 +304,9 @@ void restore_vm_stack(wmCoroutine *task) {
 	EG(vm_stack_top) = task->vm_stack_top;
 	EG(vm_stack_end) = task->vm_stack_end;
 	EG(vm_stack) = task->vm_stack;
+#if PHP_VERSION_ID >= 70300
 	EG(vm_stack_page_size) = task->vm_stack_page_size;
+#endif
 	EG(current_execute_data) = task->execute_data;
 }
 

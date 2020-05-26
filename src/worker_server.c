@@ -3,18 +3,60 @@
 #include "coroutine.h"
 #include "coroutine_socket.h"
 
+static unsigned int last_id = 0;
+static swHashMap *_workers = NULL; //worker map
+static swHashMap *_pidMap = NULL; //worker map
+
 /**
  * 创建
  */
-wmServer* wmServer_create(char *host, int port) {
-	wmCoroutionSocket *socket = wmCoroutionSocket_init(AF_INET, SOCK_STREAM,
-			0);
+wmServer* wmServer_create() {
+	if (!_workers) {
+		_workers = swHashMap_new(NULL);
+	}
+	if (!_pidMap) {
+		_pidMap = swHashMap_new(NULL);
+	}
+
+	wmServer* server = (wmServer *) wm_malloc(sizeof(wmServer));
+	bzero(server, sizeof(wmServer));
+	server->socket = NULL;
+	server->_status = WM_STATUS_STARTING;
+	server->handler = NULL;
+	server->onWorkerStart = NULL;
+	server->id = ++last_id; //server id
+	server->backlog = WM_DEFAULT_BACKLOG;
+	server->host = NULL;
+	server->port = 0;
+	server->count = 0;
+
+	//写入workers对照表
+	swHashMap_add_int(_workers, server->id, server);
+	swHashMap_add_int(_pidMap, server->id, swHashMap_new(NULL));
+
+	return server;
+}
+
+/**
+ * 创建
+ */
+wmServer* wmServer_create2(char *host, int port) {
+	int backlog = WM_DEFAULT_BACKLOG;
+
+	if (!_workers) {
+		_workers = swHashMap_new(NULL);
+	}
+	if (!_pidMap) {
+		_pidMap = swHashMap_new(NULL);
+	}
+
+	wmCoroutionSocket *socket = wmCoroutionSocket_init(AF_INET, SOCK_STREAM, 0);
 	if (wmCoroutionSocket_bind(socket, host, port) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 		return NULL;
 	}
 
-	if (wmCoroutionSocket_listen(socket, 512) < 0) {
+	if (wmCoroutionSocket_listen(socket, backlog) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 		return NULL;
 	}
@@ -22,17 +64,35 @@ wmServer* wmServer_create(char *host, int port) {
 	wmServer* server = (wmServer *) wm_malloc(sizeof(wmServer));
 	bzero(server, sizeof(wmServer));
 	server->socket = socket;
-	server->running = false;
+	server->_status = WM_STATUS_STARTING;
 	server->handler = NULL;
+	server->onWorkerStart = NULL;
+	server->id = ++last_id; //server id
+	server->backlog = WM_DEFAULT_BACKLOG;
+	server->host = NULL;
+	server->port = 0;
+	server->count = 0;
+
+	//写入workers对照表
+	swHashMap_add_int(_workers, server->id, server);
+	swHashMap_add_int(_pidMap, server->id, swHashMap_new(NULL));
 	return server;
 }
 
 //启动服务器
 bool wmServer_run(wmServer* server) {
 	zval zsocket;
-	server->running = true;
+	server->_status = WM_STATUS_RUNNING;
 
-	while (server->running) {
+	//调用onworkerStart 这个不是一个协程
+	if (server->onWorkerStart) {
+		if (call_closure_func(server->onWorkerStart) != SUCCESS) {
+			php_error_docref(NULL, E_ERROR, "call onWorkerStart error");
+			return false;
+		}
+	}
+
+	while (server->_status == WM_STATUS_RUNNING) {
 		wmCoroutionSocket* conn = wmCoroutionSocket_accept(server->socket);
 		if (!conn) {
 			return false;
@@ -56,7 +116,7 @@ bool wmServer_run(wmServer* server) {
 
 //关闭服务器
 bool wmServer_stop(wmServer* server) {
-	server->running = false;
+	server->_status = WM_STATUS_SHUTDOWN;
 	return true;
 }
 

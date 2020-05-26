@@ -53,8 +53,8 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_server_void, 0, 0, 0) //
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_server_construct, 0, 0, 2) //
-ZEND_ARG_INFO(0, host) //
-ZEND_ARG_INFO(0, port)//
+ZEND_ARG_INFO(0, listen) //
+ZEND_ARG_INFO(0, options)//
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_server_handler, 0, 0, 1) //
@@ -62,22 +62,42 @@ ZEND_ARG_CALLABLE_INFO(0, func, 0) //
 ZEND_END_ARG_INFO()
 
 PHP_METHOD(workerman_server, __construct) {
-	zend_long port;
-	wmServerObject *server_obj;
-	zval *zhost;
+	zval *options = NULL;
+	zend_string *listen;
 
-	ZEND_PARSE_PARAMETERS_START(2, 2)
-				Z_PARAM_ZVAL(zhost)
-				Z_PARAM_LONG(port)
+	ZEND_PARSE_PARAMETERS_START(1, 2)
+				Z_PARAM_STR(listen)
+				Z_PARAM_OPTIONAL
+				Z_PARAM_ARRAY(options)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-
-	server_obj = (wmServerObject *) wm_server_fetch_object(Z_OBJ_P(getThis()));
-	server_obj->server = wmServer_create(Z_STRVAL_P(zhost), port);
-
-	zend_update_property_string(workerman_server_ce_ptr, getThis(),
-			ZEND_STRL("host"), Z_STRVAL_P(zhost));
+	//初始化server
+	wmServerObject *server_obj = (wmServerObject *) wm_server_fetch_object(
+			Z_OBJ_P(getThis()));
+	server_obj->server = wmServer_create2("127.0.0.1", 8080);
+	//设置worker id
 	zend_update_property_long(workerman_server_ce_ptr, getThis(),
-			ZEND_STRL("port"), port);
+			ZEND_STRL("workerId"), server_obj->server->id);
+
+	//解析options
+	HashTable *vht = Z_ARRVAL_P(options);
+	zval *ztmp = NULL;
+	//backlog
+	if (php_workerman_array_get_value(vht, "backlog", ztmp)) {
+		zend_long v = zval_get_long(ztmp);
+		server_obj->server->backlog = v;
+		zend_update_property_long(workerman_server_ce_ptr, getThis(),
+				ZEND_STRL("backlog"), v);
+	}
+
+	//count
+	server_obj->server->count = 1;
+	if (php_workerman_array_get_value(vht, "count", ztmp)) {
+		zend_long v = zval_get_long(ztmp);
+		server_obj->server->count = v;
+	}
+	zend_update_property_long(workerman_server_ce_ptr, getThis(),
+			ZEND_STRL("count"), server_obj->server->count);
+
 }
 
 PHP_METHOD(workerman_server, stop) {
@@ -112,8 +132,30 @@ PHP_METHOD(workerman_server, set_handler) {
 
 PHP_METHOD(workerman_server, run) {
 	wmServerObject *server_obj;
-
 	server_obj = (wmServerObject *) wm_server_fetch_object(Z_OBJ_P(getThis()));
+	//php_var_dump(onWorkerStart_zval, 1 TSRMLS_CC);
+
+	//判断是否有workerStart
+	zval *_zval = wm_zend_read_property(workerman_server_ce_ptr,
+	getThis(), ZEND_STRL("onWorkerStart"), 0);
+	php_fci_fcc *handle_fci_fcc = (php_fci_fcc *) ecalloc(1,
+			sizeof(php_fci_fcc));
+
+	char *_error = NULL;
+	if (!_zval
+			|| zend_parse_arg_func(_zval, &handle_fci_fcc->fci,
+					&handle_fci_fcc->fcc, 0, &_error) == 0) {
+		efree(handle_fci_fcc);
+		php_error_docref(NULL, E_ERROR, "onWorkerStart error : %s" , _error);
+		RETURN_FALSE
+	}
+
+
+	//为这个闭包增加引用计数
+	wm_zend_fci_cache_persist(&handle_fci_fcc->fcc);
+	server_obj->server->onWorkerStart = handle_fci_fcc;
+	server_obj->server->onWorkerStart->fci.param_count = 1;
+	server_obj->server->onWorkerStart->fci.params = getThis();
 
 	if (wmServer_run(server_obj->server) == false) {
 		RETURN_FALSE
@@ -157,6 +199,7 @@ void workerman_server_init() {
 	zend_declare_property_long(workerman_server_ce_ptr, ZEND_STRL("errCode"), 0,
 	ZEND_ACC_PUBLIC);
 	zend_declare_property_string(workerman_server_ce_ptr, ZEND_STRL("errMsg"),
-			"", ZEND_ACC_PUBLIC);
+			"",
+			ZEND_ACC_PUBLIC);
 
 }

@@ -32,6 +32,4 @@ tests/*/*.php
 tests/*/*.exp
 tests/*/*.log
 tests/*/*.sh
-Workerman/
-test/*/*.o
-test/*/*.out
+test/*/*.*

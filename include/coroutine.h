@@ -4,12 +4,6 @@
 #include "bash.h"
 #include "context.h"
 
-//defer用到
-typedef struct {
-	zend_fcall_info fci;
-	zend_fcall_info_cache fcc;
-} php_fci_fcc;
-
 //协程参数结构体
 typedef struct {
 	zend_fcall_info_cache *fci_cache;

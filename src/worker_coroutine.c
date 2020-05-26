@@ -9,7 +9,7 @@ void wmCoroutine_sleep(double seconds) {
 	wmCoroutine* co = wmCoroutine_get_current();
 	wmTimerWheel_add_quick(&WorkerG.timer, sleep_callback, (void*) co,
 			seconds * 1000);
-	wmCoroutine_yield(co);
+	wmCoroutine_yield();
 }
 
 //sleep回调
