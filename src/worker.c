@@ -7,8 +7,8 @@ static swHashMap *_pidMap = NULL; //worker map
 
 //解析地址
 void parseSocketAddress(wmWorker* worker, zend_string *listen);
-void bind_onWorkerStart(wmWorker *worker);
-void bind_onConnect(wmWorker *worker, wmConnection *connection);
+void bind_callback(zval* _This, const char* fun_name,
+		php_fci_fcc **handle_fci_fcc);
 void acceptConnection(void *_worker);
 void resumeAccept(wmWorker *worker);
 
@@ -26,7 +26,6 @@ wmWorker* wmWorker_create(zval *_This, zend_string *listen) {
 
 	wmWorker* worker = (wmWorker *) wm_malloc(sizeof(wmWorker));
 	bzero(worker, sizeof(wmWorker));
-	worker->connection = NULL;
 	worker->_status = WM_STATUS_STARTING;
 	worker->handler = NULL;
 	worker->onWorkerStart = NULL;
@@ -38,6 +37,7 @@ wmWorker* wmWorker_create(zval *_This, zend_string *listen) {
 	worker->onBufferDrain = NULL;
 	worker->onError = NULL;
 	worker->id = ++last_id; //worker id
+	worker->fd = 0;
 	worker->backlog = WM_DEFAULT_BACKLOG;
 	worker->host = NULL;
 	worker->port = 0;
@@ -59,27 +59,28 @@ bool wmWorker_run(wmWorker *worker) {
 	//zval zsocket;
 	worker->_status = WM_STATUS_RUNNING;
 
-	wmConnection *connection = wmConnection_init(AF_INET, SOCK_STREAM, 0);
-	if (wmConnection_bind(connection, worker->host, worker->port) < 0) {
+	worker->fd = wmSocket_create(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+	wmSocket_set_nonblock(worker->fd);
+
+	if (wmSocket_bind(worker->fd, worker->host, worker->port) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 		return false;
 	}
 
-	if (wmConnection_listen(connection, worker->backlog) < 0) {
+	if (wmSocket_listen(worker->fd, worker->backlog) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 		return false;
 	}
 
 	//绑定fd
 	zend_update_property_long(workerman_worker_ce_ptr, worker->_This,
-			ZEND_STRL("fd"), connection->sockfd);
-
-	connection->_This = NULL;
-	worker->connection = connection;
+			ZEND_STRL("fd"), worker->fd);
 
 	//处理onWorkerStart
-	bind_onWorkerStart(worker);
+	bind_callback(worker->_This, "onWorkerStart", &worker->onWorkerStart);
 	if (worker->onWorkerStart) {
+		worker->onWorkerStart->fci.param_count = 1;
+		worker->onWorkerStart->fci.params = worker->_This;
 		if (call_closure_func(worker->onWorkerStart) != SUCCESS) {
 			php_error_docref(NULL, E_ERROR, "call onWorkerStart error");
 			return false;
@@ -122,9 +123,6 @@ void wmWorker_free(wmWorker* worker) {
 			efree(worker->handler);
 			wmWorker_set_handler(worker, NULL);
 		}
-		if (worker->connection) {
-			wmConnection_free(worker->connection);
-		}
 		wm_free(worker);
 	}
 }
@@ -138,64 +136,31 @@ void wmWorker_checkSapiEnv() {
 	zend_string_free(_php_sapi);
 }
 
-//判断是否有onWorkerStart并绑定
-void bind_onWorkerStart(wmWorker *worker) {
-	zval* _This = worker->_This;
-
+//绑定回调
+void bind_callback(zval* _This, const char* fun_name,
+		php_fci_fcc **handle_fci_fcc) {
 	//判断是否有workerStart
 	zval *_zval = wm_zend_read_property(workerman_worker_ce_ptr, _This,
-			ZEND_STRL("onWorkerStart"), 0);
-	php_fci_fcc *handle_fci_fcc = (php_fci_fcc *) ecalloc(1,
-			sizeof(php_fci_fcc));
+			fun_name, strlen(fun_name), 0);
+	*handle_fci_fcc = (php_fci_fcc *) ecalloc(1, sizeof(php_fci_fcc));
 
 	char *_error = NULL;
 	if (!_zval
-			|| zend_parse_arg_func(_zval, &handle_fci_fcc->fci,
-					&handle_fci_fcc->fcc, 0, &_error) == 0) {
-		efree(handle_fci_fcc);
-		php_error_docref(NULL, E_ERROR, "onWorkerStart error : %s", _error);
+			|| zend_parse_arg_func(_zval, &(*handle_fci_fcc)->fci,
+					&(*handle_fci_fcc)->fcc, 0, &_error) == 0) {
+		efree(*handle_fci_fcc);
+		php_error_docref(NULL, E_ERROR, "%s error : %s", fun_name, _error);
 	}
 
 	//为这个闭包增加引用计数
-	wm_zend_fci_cache_persist(&handle_fci_fcc->fcc);
-
-	worker->onWorkerStart = handle_fci_fcc;
-	worker->onWorkerStart->fci.param_count = 1;
-	worker->onWorkerStart->fci.params = _This;
-}
-
-//判断是否有onWorkerStart并绑定
-void bind_onConnect(wmWorker *worker, wmConnection *connection) {
-	zval* _This = worker->_This;
-
-	//判断是否有workerStart
-	zval *_zval = wm_zend_read_property(workerman_worker_ce_ptr, _This,
-			ZEND_STRL("onConnect"), 0);
-	php_fci_fcc *handle_fci_fcc = (php_fci_fcc *) ecalloc(1,
-			sizeof(php_fci_fcc));
-
-	char *_error = NULL;
-	if (!_zval
-			|| zend_parse_arg_func(_zval, &handle_fci_fcc->fci,
-					&handle_fci_fcc->fcc, 0, &_error) == 0) {
-		efree(handle_fci_fcc);
-		php_error_docref(NULL, E_ERROR, "onWorkerStart error : %s", _error);
-	}
-
-	//为这个闭包增加引用计数
-	wm_zend_fci_cache_persist(&handle_fci_fcc->fcc);
-
-	worker->onConnect = handle_fci_fcc;
-	worker->onConnect->fci.param_count = 1;
-	worker->onConnect->fci.params = connection->_This;
+	wm_zend_fci_cache_persist(&(*handle_fci_fcc)->fcc);
 }
 
 /**
  * 向loop注册accept
  */
 void resumeAccept(wmWorker *worker) {
-	wmWorkerLoop_add(worker->connection->sockfd, WM_EVENT_READ,
-			acceptConnection, worker);
+	wmWorkerLoop_add(worker->fd, WM_EVENT_READ, acceptConnection, worker);
 }
 
 /**
@@ -212,24 +177,23 @@ void acceptConnection(void *_worker) {
 			(wmConnectionObject *) wm_connection_fetch_object(obj);
 
 	//接客
-	connection_object->connection = wmConnection_accept(worker->connection);
-
+	connection_object->connection = wmConnection_accept(worker->fd);
+	connection_object->connection->worker = _worker;
 	connection_object->connection->_This = z;
+
 	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("id"),
 			connection_object->connection->id);
 	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("fd"),
-				connection_object->connection->sockfd);
+			connection_object->connection->fd);
 
-	//检查绑定
-	if (!worker->onConnect) {
-		bind_onConnect(worker, connection_object->connection);
-	}
+	bind_callback(worker->_This, "onConnect", &worker->onConnect);
+
+	bind_callback(worker->_This, "onMessage", &worker->onMessage);
+	connection_object->connection->onMessage = worker->onMessage;
 
 	//onConnect
 	if (worker->onConnect) {
-		wmCoroutine_create(&(worker->onConnect->fcc),
-				worker->onConnect->fci.param_count,
-				worker->onConnect->fci.params); //创建新协程
+		wmCoroutine_create(&(worker->onConnect->fcc), 1, z); //创建新协程
 	}
 }
 

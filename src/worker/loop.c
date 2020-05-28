@@ -26,11 +26,13 @@ wmWorkerLoopEvent* wmWorkerLoop_get_event() {
 	return _event;
 }
 
-void wmWorkerLoop_add(int fd, int event, coroutine_func_t fn, void* data) {
+void wmWorkerLoop_add(int fd, int event, loop_func_t fn, void* data) {
 	//初始化epoll
 	if (!WorkerG.poll) {
 		init_wmPoll();
 	}
+
+php_printf("loop_add  fd=%d\n",fd);
 
 	wmWorkerLoopEvent *_event = wmWorkerLoop_get_event();
 	_event->fd = fd;
@@ -47,22 +49,33 @@ void wmWorkerLoop_add(int fd, int event, coroutine_func_t fn, void* data) {
 	ev->data.ptr = (void *) _event;
 
 	//注册到全局的epollfd上面。
-	epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_ADD, fd, ev);
+	if(epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_ADD, fd, ev) < 0) {
+		wmStack_push(_allRecycleEvents,_event); //回收再利用
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		return;
+	}
+	swHashMap_add_int(_allEvents,fd,_event);
 
 	(WorkerG.poll->event_num)++; // 事件数量+1
+}
 
-	//切换协程
-//	wmCoroutine_yield(co);
-//
-//	//程序到这里，说明已经执行完毕了。那么应该减去这个事件
-//	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, socket->sockfd, NULL)
-//			< 0) {
-//		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-//		return false;
-//	}
-//
-//	(WorkerG.poll->event_num)--; // 事件数量-1
-//	return true;
+void wmWorkerLoop_del(int fd) {
+	//初始化epoll
+	if (!WorkerG.poll) {
+		init_wmPoll();
+	}
+	//程序到这里，说明已经执行完毕了。那么应该减去这个事件
+	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, fd, NULL) < 0) {
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		return;
+	}
+	wmWorkerLoopEvent *_event = (wmWorkerLoopEvent *)swHashMap_find_int(_allEvents,fd);
+	if(_event){
+		swHashMap_del_int(_allEvents,fd);
+		wmStack_push(_allRecycleEvents,_event); //回收再利用
+	}
+	(WorkerG.poll->event_num)--; // 事件数量-1
+	return;
 }
 
 /**
@@ -86,8 +99,7 @@ void wmWorkerLoop_loop() {
 				timeout);
 		//循环处理epoll请求
 		for (int i = 0; i < n; i++) {
-			int fd;
-			int id;
+			php_printf("~~~~\n");
 			struct epoll_event *p = &events[i];
 			wmWorkerLoopEvent *_event = (wmWorkerLoopEvent *) p->data.ptr;
 			//回调相关方法
@@ -106,7 +118,6 @@ void wmWorkerLoop_loop() {
 
 }
 
-void wmWorkerLoop_free() {
-
+void wmWorkerLoop_stop() {
 	wm_event_free();
 }

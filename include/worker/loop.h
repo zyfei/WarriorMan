@@ -7,17 +7,18 @@
 #include "bash.h"
 #include "coroutine.h"
 
+typedef void (*loop_func_t)(void*);
+
 typedef struct {
 	int fd;
 	coroutine_func_t fn;
 	void *data;
 } wmWorkerLoopEvent;
 
-typedef void (*worker_func_t)(void*);
-
 wmWorkerLoopEvent* wmWorkerLoop_get_event();
-void wmWorkerLoop_add(int fd, int event, coroutine_func_t fn, void* data);
+void wmWorkerLoop_add(int fd, int event, loop_func_t fn, void* data);
 void wmWorkerLoop_loop();
-void wmWorkerLoop_free();
+void wmWorkerLoop_stop();
+void wmWorkerLoop_del(int fd);
 
 #endif

@@ -8,9 +8,25 @@ $worker->onWorkerStart = function ($worker) {
 };
 
 $worker->onConnect = function ($connection) {
-	var_dump($connection);
 	echo "new connection id  {$connection->id} \n";
 };
+$cid = 0;
+$worker->onMessage = function ($connection, $data) use(&$cid) {
+	var_dump($data);
+//	echo "new onMessage id  {$connection->id} start \n";
+// 	if($connection->id==1){
+// 		$cid = worker_coroutine::getCid();
+// 		var_dump("---->".$cid);
+// 		worker_coroutine::yield();
+// 	}
+// 	if($connection->id==2){
+// 		var_dump("22222222  >".$cid);
+// 		worker_coroutine::resume($cid);
+// 	}
+//	echo "new onMessage id  {$connection->id} $data \n";
+	//$connection->send('receive success');
+};
+
 // $worker->set_handler(function (Workerman\Socket $conn) use ($worker) {
 // $data = $conn->recv();
 // if ($data == false) {

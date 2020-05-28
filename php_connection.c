@@ -7,7 +7,6 @@
 zend_class_entry workerman_connection_ce;
 zend_class_entry *workerman_connection_ce_ptr;
 
-
 //zend_object_handlers实际上就是我们在PHP脚本上面操作一个PHP对象的时候，底层会去调用的函数。
 static zend_object_handlers workerman_connection_handlers;
 
@@ -51,7 +50,8 @@ static void wm_connection_free_object(zend_object *object) {
 
 //初始化一个自定义的PHP对象，并且让zconnection这个容器指向自定义对象里面的std对象
 void php_wm_init_connection_object(zval *zconnection, wmConnection *connection) {
-	zend_object *object = wm_connection_create_object(workerman_connection_ce_ptr);
+	zend_object *object = wm_connection_create_object(
+			workerman_connection_ce_ptr);
 
 	wmConnectionObject *connection_t =
 			(wmConnectionObject *) wm_connection_fetch_object(object);
@@ -63,66 +63,11 @@ void php_wm_init_connection_object(zval *zconnection, wmConnection *connection) 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_connection_void, 0, 0, 0) //
 ZEND_END_ARG_INFO()
 
-//接收数据recv
-ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_connection_recv, 0, 0, 0) //
-ZEND_ARG_INFO(0, length)
-ZEND_END_ARG_INFO()
-
 //发送数据方法
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_connection_send, 0, 0, 2) //
 ZEND_ARG_INFO(0, data)
 ZEND_ARG_INFO(0, fd)
 ZEND_END_ARG_INFO()
-
-/**
- * 接收数据
- */
-PHP_METHOD(workerman_connection, recv) {
-	wmConnectionObject* connection_object;
-	wmConnection *conn;
-	ssize_t ret;
-	zend_long length = WM_BUFFER_SIZE_BIG;
-
-	ZEND_PARSE_PARAMETERS_START(0, 1)
-				Z_PARAM_OPTIONAL
-				Z_PARAM_LONG(length)
-			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-
-	connection_object = (wmConnectionObject *) wm_connection_fetch_object(
-			Z_OBJ_P(getThis()));
-	conn = connection_object->connection;
-
-	if (conn == NULL) {
-		php_error_docref(NULL, E_WARNING, "recv error");
-		RETURN_FALSE
-	}
-
-	wmConnection_recv(conn, length);
-	ret = conn->read_buffer->length;
-
-	//客户端已关闭
-	if (ret == 0) {
-		zend_update_property_long(workerman_connection_ce_ptr, getThis(),
-				ZEND_STRL("errCode"), WM_ERROR_SESSION_CLOSED_BY_CLIENT);
-
-		zend_update_property_string(workerman_connection_ce_ptr,
-		getThis(), ZEND_STRL("errMsg"),
-				wmCode_str(WM_ERROR_SESSION_CLOSED_BY_CLIENT));
-		wmConnection_close(conn);
-		RETURN_FALSE
-	}
-	if (ret < 0) {
-		php_error_docref(NULL, E_WARNING, "recv error");
-		RETURN_FALSE
-	}
-
-	//计数重新开始
-	conn->read_buffer->length = 0;
-
-	RETURN_STRINGL(conn->read_buffer->str, ret);
-	//conn->read_buffer->str[ret] = '\0';
-	//RETURN_STRING(conn->read_buffer->str);
-}
 
 //发送数据
 PHP_METHOD(workerman_connection, send) {
@@ -172,7 +117,6 @@ PHP_METHOD(workerman_connection, close) {
 }
 
 static const zend_function_entry workerman_connection_methods[] = { //
-						PHP_ME(workerman_connection, recv, arginfo_workerman_connection_recv, ZEND_ACC_PUBLIC) //
 						PHP_ME(workerman_connection, send, arginfo_workerman_connection_send, ZEND_ACC_PUBLIC) //
 						PHP_ME(workerman_connection, close, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
 				PHP_FE_END };
@@ -204,9 +148,10 @@ void workerman_connection_init() {
 	ZEND_ACC_PUBLIC);
 
 	//注册变量和初始值
-	zend_declare_property_long(workerman_connection_ce_ptr, ZEND_STRL("errCode"), 0,
-	ZEND_ACC_PUBLIC);
-	zend_declare_property_string(workerman_connection_ce_ptr, ZEND_STRL("errMsg"),
-			"", ZEND_ACC_PUBLIC);
+	zend_declare_property_long(workerman_connection_ce_ptr,
+			ZEND_STRL("errCode"), 0,
+			ZEND_ACC_PUBLIC);
+	zend_declare_property_string(workerman_connection_ce_ptr,
+			ZEND_STRL("errMsg"), "", ZEND_ACC_PUBLIC);
 
 }

@@ -1,4 +1,4 @@
-#include "../../include/wm_string.h"
+#include "wm_string.h"
 
 /**
  * new一个string
