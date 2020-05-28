@@ -243,11 +243,10 @@ void workerman_base_init();
 void workerman_coroutine_init();
 //协程类静态create方法，封装为方法
 long worker_go();
-//socket注册方法
-void workerman_socket_init();
-
-//server注册方法
-void workerman_server_init();
+//connection注册方法
+void workerman_connection_init();
+//worker注册方法
+void workerman_worker_init();
 //channel注册方法
 void workerman_channel_init();
 //runtime注册方法

@@ -14,4 +14,4 @@ worker_go(function () {
 	var_dump(Workerman::getCid());
 });
 
-worker_event_wait();
+//worker_event_wait();

@@ -50,7 +50,7 @@ void wmLog_put(int level, char *cnt) {
 const char* wmCode_str(int code) {
 	switch (code) {
 	case WM_ERROR_SESSION_CLOSED_BY_SERVER:
-		return "Session closed by server";
+		return "Session closed by worker";
 		break;
 	case WM_ERROR_SESSION_CLOSED_BY_CLIENT:
 		return "Session closed by client";

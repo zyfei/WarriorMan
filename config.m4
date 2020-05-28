@@ -58,16 +58,16 @@ if test "$PHP_WM" != "no"; then
     	src/core/timer.c \
     	src/core/wm_string.c \
     	src/coroutine/channel.c \
-    	src/coroutine/coroutine_socket.c \
     	src/coroutine/context.c \
     	src/coroutine/coroutine.c \
-    	src/worker_coroutine.c \
-    	src/worker_server.c \
+    	src/worker/loop.c \
+    	src/worker/connection.c \
+    	src/worker.c \
     	php_coroutine.c \
         php_workerman.c \
-        php_socket.c \
         php_channel.c \
-        php_server.c \
+        php_worker.c \
+        php_connection.c \
         php_runtime.c \
         ${WM_ASM_DIR}make_${WM_CONTEXT_ASM_FILE} \
         ${WM_ASM_DIR}jump_${WM_CONTEXT_ASM_FILE}
@@ -80,10 +80,11 @@ if test "$PHP_WM" != "no"; then
     dnl 用来添加额外的包含头文件的目录。
     PHP_ADD_INCLUDE([$ext_srcdir])
     PHP_ADD_INCLUDE([$ext_srcdir/include])
+    PHP_ADD_INCLUDE([$ext_srcdir/include/worker])
 
     dnl 把我们的workerman扩展目录里面的*.h、config.h、include/*.h、thirdparty/*.h复制到： php-config --include-dir
     dnl 下的ext/workerman里面。这个是在执行make install的时候会进行复制。我们待会会看到。
-    PHP_INSTALL_HEADERS([ext/workerman], [*.h config.h include/*.h thirdparty/*.h])
+    PHP_INSTALL_HEADERS([ext/workerman], [*.h config.h include/*.h include/worker/*.h thirdparty/*.h])
 
 	dnl 我们使用c，把下面的c++相关注释了
 	CFLAGS="-Wall -pthread $CFLAGS"

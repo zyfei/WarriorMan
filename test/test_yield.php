@@ -17,6 +17,4 @@ foreach ($arr as $n) {
 	Workerman::resume($n);
 }
 
-
-
-worker_event_wait();
+//worker_event_wait();

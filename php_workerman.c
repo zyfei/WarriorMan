@@ -22,10 +22,10 @@ PHP_MINIT_FUNCTION(workerman) {
 	workerman_base_init();
 	//初始化协程定义
 	workerman_coroutine_init();
-	//初始化socket
-	workerman_socket_init();
-	//初始化server相关
-	workerman_server_init();
+	//初始化connection
+	workerman_connection_init();
+	//初始化worker相关
+	workerman_worker_init();
 	//初始化channel
 	workerman_channel_init();
 	//初始化runtime

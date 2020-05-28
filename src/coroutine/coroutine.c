@@ -15,6 +15,7 @@ void close_coro(wmCoroutine *task);
 wmCoroutine* get_origin_task(wmCoroutine *task);
 wmCoroutine* get_task();
 void restore_vm_stack(wmCoroutine *task);
+void sleep_callback(void* co);
 
 /**
  * 创建一个协程
@@ -52,7 +53,7 @@ long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc,
 
 long run(wmCoroutine* task) {
 	long cid = task->cid;
-	//起源协程 = 记录的上一个协程
+	//唤起协程 = 记录的上一个协程
 	task->origin = current_task;
 	current_task = task;
 
@@ -62,11 +63,11 @@ long run(wmCoroutine* task) {
 
 	//判断一下是否执行完毕了
 	if (task->ctx.end_) {
-		//如果不相等，说明已经创建了其他的协程
+		//如果不相等，那就是出错了
 		assert(current_task == task);
 
 		//如果没创建其他协程
-		current_task = task->origin; //重新设置当前协程为，task的起源协程
+		current_task = task->origin; //重新设置当前协程为，task的唤起协程
 		close_coro(task); //关闭当前协程
 	}
 	return cid;
@@ -139,9 +140,9 @@ void main_func(void *arg) {
 		EG(current_execute_data) = NULL;
 
 #if PHP_VERSION_ID >= 70200
-        zend_init_func_execute_data(call, &func->op_array, retval);
+		zend_init_func_execute_data(call, &func->op_array, retval);
 #else
-        zend_init_execute_data(call, &func->op_array, retval);
+		zend_init_execute_data(call, &func->op_array, retval);
 #endif
 
 		zend_execute_ex(EG(current_execute_data));
@@ -234,7 +235,7 @@ void wmCoroutine_yield() {
 
 	current_task = origin_task;
 
-	//让出CPU控制权
+	//让出CPU控制权,给唤起栈
 	wmContext_swap_out(&task->ctx);
 }
 
@@ -253,7 +254,7 @@ bool wmCoroutine_resume(wmCoroutine *task) {
 	swHashMap_del_int(user_yield_coros, task->cid);
 
 	wmCoroutine *_current_task = get_task();
-	//保存当前的协程
+	//这里要注意，不是保存的父协程，是谁唤醒他的，就保存谁保存当前的协程
 	save_vm_stack(_current_task);
 	//恢复指定的task
 	restore_vm_stack(task);
@@ -267,7 +268,7 @@ bool wmCoroutine_resume(wmCoroutine *task) {
 		assert(current_task == task);
 
 		//如果没创建其他协程
-		current_task = task->origin; //重新设置当前协程为，task的起源协程
+		current_task = task->origin; //重新设置当前协程为，task的唤起协程
 		close_coro(task); //关闭当前协程
 	}
 	return true;
@@ -280,7 +281,7 @@ void close_coro(wmCoroutine *task) {
 	//yield表中删除
 	swHashMap_del_int(user_yield_coros, task->cid);
 
-	//获取他的起源
+	//获取他的唤起
 	wmCoroutine *origin_task = get_origin_task(task);
 	//销毁ctx
 	wmContext_destroy(&task->ctx);
@@ -293,7 +294,7 @@ void close_coro(wmCoroutine *task) {
 	task = NULL;
 }
 
-//获取起源协程
+//获取唤起协程
 wmCoroutine* get_origin_task(wmCoroutine *task) {
 	wmCoroutine *_origin = task->origin;
 	return _origin ? _origin : &main_task;
@@ -337,4 +338,19 @@ void wmCoroutine_defer(php_fci_fcc *defer_fci_fcc) {
 //返回当前协程任务
 wmCoroutine* wmCoroutine_get_current() {
 	return current_task;
+}
+
+void wmCoroutine_sleep(double seconds) {
+	if (seconds < 0.001) {
+		seconds = 0.001;
+	}
+	wmCoroutine* co = wmCoroutine_get_current();
+	wmTimerWheel_add_quick(&WorkerG.timer, sleep_callback, (void*) co,
+			seconds * 1000);
+	wmCoroutine_yield();
+}
+
+//sleep回调
+void sleep_callback(void* co) {
+	wmCoroutine_resume((wmCoroutine*) co);
 }

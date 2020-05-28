@@ -19,7 +19,7 @@ enum wmEvent_type {
 #define WM_BUFFER_SIZE_BIG         65536
 #define WM_DEFAULT_BACKLOG	102400
 
-//worker_server.h
+//worker_worker.h
 #define WM_STATUS_STARTING 1
 #define WM_STATUS_RUNNING 2
 #define WM_STATUS_SHUTDOWN 4

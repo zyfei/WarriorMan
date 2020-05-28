@@ -24,7 +24,7 @@ typedef struct _Coroutine {
 	//以下是coroutine结构
 	wmContext ctx;
 	long cid; //协程类ID
-	struct _Coroutine *origin; //起源协程，记录哪个协程，创建的这个协程
+	struct _Coroutine *origin; //唤起协程，记录哪个协程，创建的这个协程
 	wmStack *defer_tasks; //所有的defer
 } wmCoroutine;
 
@@ -35,6 +35,7 @@ void wmCoroutine_yield();
 bool wmCoroutine_resume(wmCoroutine *task);
 void vm_stack_destroy();
 void wmCoroutine_defer(php_fci_fcc *defer_fci_fcc);
+void wmCoroutine_sleep(double seconds);
 wmCoroutine* wmCoroutine_get_current();
 
 #endif	/* WM_COROUTINE_H */
