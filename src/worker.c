@@ -1,15 +1,16 @@
 #include "worker.h"
 #include "coroutine.h"
+#include "loop.h"
 
 static unsigned int last_id = 0;
 static swHashMap *_workers = NULL; //worker map
 static swHashMap *_pidMap = NULL; //worker map
+static swHashMap *_fd_workers = NULL; //worker map
 
 //解析地址
 void parseSocketAddress(wmWorker* worker, zend_string *listen);
 void bind_callback(zval* _This, const char* fun_name,
 		php_fci_fcc **handle_fci_fcc);
-void acceptConnection(void *_worker);
 void resumeAccept(wmWorker *worker);
 
 /**
@@ -22,6 +23,9 @@ wmWorker* wmWorker_create(zval *_This, zend_string *listen) {
 	}
 	if (!_pidMap) {
 		_pidMap = swHashMap_new(NULL);
+	}
+	if (!_fd_workers) {
+		_fd_workers = swHashMap_new(NULL);
 	}
 
 	wmWorker* worker = (wmWorker *) wm_malloc(sizeof(wmWorker));
@@ -72,6 +76,8 @@ bool wmWorker_run(wmWorker *worker) {
 		return false;
 	}
 
+	swHashMap_add_int(_fd_workers, worker->fd, worker);
+
 	//绑定fd
 	zend_update_property_long(workerman_worker_ce_ptr, worker->_This,
 			ZEND_STRL("fd"), worker->fd);
@@ -109,6 +115,11 @@ php_fci_fcc* wmWorker_get_handler(wmWorker* worker) {
 
 void wmWorker_free(wmWorker* worker) {
 	if (worker) {
+		swHashMap_free(swHashMap_find_int(_pidMap, worker->id));
+		swHashMap_del_int(_pidMap, worker->id);
+		swHashMap_del_int(_workers, worker->id);
+		swHashMap_del_int(_fd_workers, worker->fd);
+
 		if (worker->onWorkerStart) {
 			//减少引用计数
 			wm_zend_fci_cache_discard(&worker->onWorkerStart->fcc);
@@ -160,14 +171,13 @@ void bind_callback(zval* _This, const char* fun_name,
  * 向loop注册accept
  */
 void resumeAccept(wmWorker *worker) {
-	wmWorkerLoop_add(worker->fd, WM_EVENT_READ, acceptConnection, worker);
+	wmWorkerLoop_add(worker->fd, WM_EVENT_READ);
 }
 
 /**
  * accept回调函数
  */
-void acceptConnection(void *_worker) {
-	wmWorker *worker = (wmWorker *) _worker;
+void _wmWorker_acceptConnection(wmWorker *worker) {
 	//新的Connection对象
 	zend_object *obj = wm_connection_create_object(workerman_connection_ce_ptr);
 	zval *z = emalloc(sizeof(zval));
@@ -178,7 +188,7 @@ void acceptConnection(void *_worker) {
 
 	//接客
 	connection_object->connection = wmConnection_accept(worker->fd);
-	connection_object->connection->worker = _worker;
+	connection_object->connection->worker = (void*) worker;
 	connection_object->connection->_This = z;
 
 	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("id"),
@@ -195,6 +205,10 @@ void acceptConnection(void *_worker) {
 	if (worker->onConnect) {
 		wmCoroutine_create(&(worker->onConnect->fcc), 1, z); //创建新协程
 	}
+}
+
+wmWorker* wmWorker_find_by_fd(int fd) {
+	return swHashMap_find_int(_fd_workers, fd);
 }
 
 /**

@@ -8,6 +8,7 @@
 #include "connection.h"
 #include "coroutine.h"
 
+
 extern zend_class_entry workerman_worker_ce;
 extern zend_class_entry *workerman_worker_ce_ptr;
 
@@ -55,5 +56,11 @@ php_fci_fcc* wmWorker_get_handler(wmWorker* worker);
 void wmWorker_free(wmWorker* worker);
 
 void wmWorker_checkSapiEnv();
+
+wmWorker* wmWorker_find_by_fd(int fd);
+
+
+//loop 用
+void _wmWorker_acceptConnection(wmWorker *worker);
 
 #endif

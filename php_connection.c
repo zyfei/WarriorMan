@@ -48,17 +48,6 @@ static void wm_connection_free_object(zend_object *object) {
 	zend_object_std_dtor(&sock->std);
 }
 
-//初始化一个自定义的PHP对象，并且让zconnection这个容器指向自定义对象里面的std对象
-void php_wm_init_connection_object(zval *zconnection, wmConnection *connection) {
-	zend_object *object = wm_connection_create_object(
-			workerman_connection_ce_ptr);
-
-	wmConnectionObject *connection_t =
-			(wmConnectionObject *) wm_connection_fetch_object(object);
-	connection_t->connection = connection;
-	ZVAL_OBJ(zconnection, object);
-}
-
 //空的参数声明
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_connection_void, 0, 0, 0) //
 ZEND_END_ARG_INFO()
@@ -74,7 +63,6 @@ PHP_METHOD(workerman_connection, send) {
 	wmConnectionObject* connection_object;
 	wmConnection *conn;
 
-	ssize_t ret;
 	zend_long fd = 0;
 	char *data;
 	size_t length;
@@ -93,14 +81,11 @@ PHP_METHOD(workerman_connection, send) {
 		RETURN_FALSE
 	}
 
-	ret = wmConnection_send(conn, data, length);
-	if (ret < 0) {
+	if (!wmConnection_send(conn, data, length)) {
 		php_error_docref(NULL, E_WARNING, "send error");
-		//释放掉申请的内存
-		wmConnection_close(conn);
 		RETURN_FALSE
 	}
-	RETURN_LONG(ret);
+	RETURN_TRUE
 }
 
 PHP_METHOD(workerman_connection, close) {

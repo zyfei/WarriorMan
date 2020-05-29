@@ -15,9 +15,11 @@ extern zend_class_entry *workerman_connection_ce_ptr;
 typedef struct {
 	int id;
 	int fd;
+	int events; //当前这个conn已经注册给epoll的事件
 	wmString *read_buffer; //读缓冲区
 	wmString *write_buffer; //写缓冲区
 	zval* _This; //指向当前类的指针
+	bool closed; //是否打开
 
 	php_fci_fcc *onMessage;
 	php_fci_fcc *onClose;
@@ -50,10 +52,14 @@ ssize_t wmConnection_recv(wmConnection *socket, int32_t length);
 
 wmConnection* wmConnection_accept(uint32_t fd);
 
-ssize_t wmConnection_send(wmConnection *socket, const void *buf, size_t len);
+bool wmConnection_send(wmConnection *connection, const void *buf, size_t len);
 
 int wmConnection_close(wmConnection *socket);
 
 void wmConnection_free(wmConnection *socket);
+
+//专门给loop回调用的
+void _wmConnection_read_callback(int fd);
+void _wmConnection_write_callback(int fd, int coro_id);
 
 #endif

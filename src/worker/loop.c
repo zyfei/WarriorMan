@@ -1,81 +1,92 @@
 #include "loop.h"
 
-static swHashMap *_allEvents = NULL; //fd为key，保存着所有的事件
-static wmStack* _allRecycleEvents = NULL; //将所有应该删除的event，都放在这里，给后面的连接用
+//把我们自己的events转换成epoll的
+static inline int event_decode(int events) {
+	uint32_t flag = 0;
 
-wmWorkerLoopEvent* wmWorkerLoop_get_event() {
-	if (_allRecycleEvents == NULL) {
-		_allRecycleEvents = wmStack_create();
+	if (events & WM_EVENT_READ) {
+		flag |= EPOLLIN;
 	}
-	if (_allEvents == NULL) {
-		_allEvents = swHashMap_new(NULL);
+	if (events & WM_EVENT_WRITE) {
+		flag |= EPOLLOUT;
 	}
-	//先从_allRecycleEvents中弹
-	if (wmStack_len(_allRecycleEvents) > 0) {
-		wmWorkerLoopEvent * _event = (wmWorkerLoopEvent *) wmStack_pop(
-				_allRecycleEvents);
-		bzero(_event, sizeof(wmWorkerLoopEvent));
-		return _event;
+	if (events & WM_EVENT_ONCE) {
+		flag |= EPOLLONESHOT;
 	}
-
-	//如果没有就要NEW了
-	//申请一个事件
-	wmWorkerLoopEvent *_event = (wmWorkerLoopEvent *) wm_malloc(
-			sizeof(wmWorkerLoopEvent));
-	bzero(_event, sizeof(wmWorkerLoopEvent));
-	return _event;
+	if (events & WM_EVENT_ERROR) {
+		flag |= (EPOLLRDHUP | EPOLLHUP | EPOLLERR);
+	}
+	return flag;
 }
 
-void wmWorkerLoop_add(int fd, int event, loop_func_t fn, void* data) {
+void wmWorkerLoop_add(int fd, int events) {
+	php_printf("wmWorkerLoop_add >  %d,event %d \n", fd, events);
+
 	//初始化epoll
 	if (!WorkerG.poll) {
 		init_wmPoll();
 	}
-
-php_printf("loop_add  fd=%d\n",fd);
-
-	wmWorkerLoopEvent *_event = wmWorkerLoop_get_event();
-	_event->fd = fd;
-	_event->fn = fn;
-	_event->data = data;
-
-	struct epoll_event *ev;
-
-	ev = WorkerG.poll->events;
-
-	//用来判断这个协程需要等待那种类型的事件，目前是支持WRITE和READ
-	ev->events = (event == WM_EVENT_WRITE ? EPOLLOUT : EPOLLIN);
-
-	ev->data.ptr = (void *) _event;
-
-	//注册到全局的epollfd上面。
-	if(epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_ADD, fd, ev) < 0) {
-		wmStack_push(_allRecycleEvents,_event); //回收再利用
+	//没有事件
+	if (events == WM_EVENT_NULL) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 		return;
 	}
-	swHashMap_add_int(_allEvents,fd,_event);
 
-	(WorkerG.poll->event_num)++; // 事件数量+1
+	int co_id = 0;
+	wmCoroutine* co = wmCoroutine_get_current();
+	if (co != NULL) {
+		co_id = co->cid;
+	}
+
+	struct epoll_event *ev;
+	ev = WorkerG.poll->events;
+	//转换epoll能看懂的事件类型
+	ev->events = event_decode(events);
+	ev->data.u64 = touint64(fd, co_id);
+	//注册到全局的epollfd上面。
+	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_ADD, fd, ev) < 0) {
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		return;
+	}
+}
+
+void wmWorkerLoop_update(int fd, int events) {
+	php_printf("wmWorkerLoop_update >  %d,event %d \n", fd, events);
+
+	//初始化epoll
+	if (!WorkerG.poll) {
+		init_wmPoll();
+	}
+	//没有事件
+	if (events == WM_EVENT_NULL) {
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		return;
+	}
+
+	int co_id = 0;
+	wmCoroutine* co = wmCoroutine_get_current();
+	if (co != NULL) {
+		co_id = co->cid;
+	}
+
+	struct epoll_event *ev;
+	ev = WorkerG.poll->events;
+	//转换epoll能看懂的事件类型
+	ev->events = event_decode(events);
+	ev->data.u64 = touint64(fd, co_id);
+
+	//注册到全局的epollfd上面。
+	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_MOD, fd, ev) < 0) {
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		return;
+	}
 }
 
 void wmWorkerLoop_del(int fd) {
-	//初始化epoll
-	if (!WorkerG.poll) {
-		init_wmPoll();
-	}
-	//程序到这里，说明已经执行完毕了。那么应该减去这个事件
+	php_printf("wmWorkerLoop_del >  %d \n",fd);
 	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, fd, NULL) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		return;
 	}
-	wmWorkerLoopEvent *_event = (wmWorkerLoopEvent *)swHashMap_find_int(_allEvents,fd);
-	if(_event){
-		swHashMap_del_int(_allEvents,fd);
-		wmStack_push(_allRecycleEvents,_event); //回收再利用
-	}
-	(WorkerG.poll->event_num)--; // 事件数量-1
-	return;
 }
 
 /**
@@ -99,23 +110,41 @@ void wmWorkerLoop_loop() {
 				timeout);
 		//循环处理epoll请求
 		for (int i = 0; i < n; i++) {
-			php_printf("~~~~\n");
-			struct epoll_event *p = &events[i];
-			wmWorkerLoopEvent *_event = (wmWorkerLoopEvent *) p->data.ptr;
-			//回调相关方法
-			_event->fn(_event->data);
+			int fd, coro_id;
+			fromuint64(events[i].data.u64, &fd, &coro_id);
+			wmWorker* worker = wmWorker_find_by_fd(fd);
+			//这个是worker Accept的
+			if (worker) {
+				_wmWorker_acceptConnection(worker);
+				continue;
+			}
+
+			//read
+			if (events[i].events & EPOLLIN) {
+				_wmConnection_read_callback(fd);
+			}
+			//write
+			if (events[i].events & EPOLLOUT) {
+				_wmConnection_write_callback(fd, coro_id);
+			}
+			//error  以后完善
+			if (events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) {
+				//ignore ERR and HUP, because event is already processed at IN and OUT handler.
+				if ((events[i].events & EPOLLIN)
+						|| (events[i].events & EPOLLOUT)) {
+					continue;
+				}
+				wmWarn("Error has occurred: (errno %d) %s", errno,
+						strerror(errno));
+			}
 		}
 		//有定时器才更新
 		if (WorkerG.timer.num > 0) {
 			//获取毫秒
 			wmGetMilliTime(&mic_time);
 			wmTimerWheel_update(&WorkerG.timer, mic_time);
-		} else if (WorkerG.poll->event_num == 0) {
-			WorkerG.is_running = false;
 		}
-
 	}
-
 }
 
 void wmWorkerLoop_stop() {
