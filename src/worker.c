@@ -175,6 +175,12 @@ void resumeAccept(wmWorker *worker) {
 }
 
 /**
+ * 测试产品，一个回调
+ */
+void onConnect_callback(void* _This){
+}
+
+/**
  * accept回调函数
  */
 void _wmWorker_acceptConnection(wmWorker *worker) {
@@ -203,7 +209,8 @@ void _wmWorker_acceptConnection(wmWorker *worker) {
 
 	//onConnect
 	if (worker->onConnect) {
-		wmCoroutine_create(&(worker->onConnect->fcc), 1, z); //创建新协程
+		long _cid = wmCoroutine_create(&(worker->onConnect->fcc), 1, z); //创建新协程
+		wmCoroutine_set_callback(_cid,onConnect_callback,z);
 	}
 }
 

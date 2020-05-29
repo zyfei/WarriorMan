@@ -20,8 +20,6 @@ static inline int event_decode(int events) {
 }
 
 void wmWorkerLoop_add(int fd, int events) {
-	php_printf("wmWorkerLoop_add >  %d,event %d \n", fd, events);
-
 	//初始化epoll
 	if (!WorkerG.poll) {
 		init_wmPoll();
@@ -51,8 +49,6 @@ void wmWorkerLoop_add(int fd, int events) {
 }
 
 void wmWorkerLoop_update(int fd, int events) {
-	php_printf("wmWorkerLoop_update >  %d,event %d \n", fd, events);
-
 	//初始化epoll
 	if (!WorkerG.poll) {
 		init_wmPoll();
@@ -83,7 +79,6 @@ void wmWorkerLoop_update(int fd, int events) {
 }
 
 void wmWorkerLoop_del(int fd) {
-	php_printf("wmWorkerLoop_del >  %d \n",fd);
 	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, fd, NULL) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 	}

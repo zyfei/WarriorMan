@@ -199,6 +199,7 @@ static inline void fromuint64(uint64_t v, int *fd, int *id) {
 }
 
 static inline zval* wm_malloc_zval() {
+	php_printf("1");
 	return (zval *) emalloc(sizeof(zval));
 }
 

@@ -26,6 +26,9 @@ typedef struct _Coroutine {
 	long cid; //协程类ID
 	struct _Coroutine *origin; //唤起协程，记录哪个协程，创建的这个协程
 	wmStack *defer_tasks; //所有的defer
+
+	coroutine_func_t _defer; //c语言级别defer
+	void *_defer_data; //c语言级别defer
 } wmCoroutine;
 
 long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc,

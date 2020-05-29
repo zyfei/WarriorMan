@@ -46,6 +46,7 @@ long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc,
 	wmContext_init(&task->ctx, stack_size, main_func, ((void*) &php_coro_args));
 
 	task->cid = ++last_cid;
+	task->_defer = NULL;
 	swHashMap_add_int(coroutines, task->cid, task);
 
 	return run(task);
@@ -168,8 +169,27 @@ void main_func(void *arg) {
 		wmStack_destroy(defer_tasks);
 		_task->defer_tasks = NULL;
 	}
+
+	if (_task->_defer) {
+		_task->_defer(_task->_defer_data);
+	}
+
 	//释放
 	zval_ptr_dtor(retval);
+}
+
+/**
+ * 获取当前协程任务
+ */
+void wmCoroutine_set_callback(long cid, coroutine_func_t _defer,
+		void *_defer_data) {
+	wmCoroutine* task = wmCoroutine_get_by_cid(cid);
+	if(task==NULL){
+		_defer(_defer_data);
+		return;
+	}
+	task->_defer = _defer;
+	task->_defer_data = _defer_data;
 }
 
 /**
@@ -314,7 +334,6 @@ void restore_vm_stack(wmCoroutine *task) {
 //清空整个php允许栈，我们不需要保存，都在自己task内保存
 void vm_stack_destroy() {
 	zend_vm_stack stack = EG(vm_stack);
-
 	while (stack != NULL) {
 		zend_vm_stack p = stack->prev;
 		//内存叶读取出问题，好像重复释放了

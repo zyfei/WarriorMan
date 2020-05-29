@@ -19,7 +19,7 @@ typedef struct {
 	wmString *read_buffer; //读缓冲区
 	wmString *write_buffer; //写缓冲区
 	zval* _This; //指向当前类的指针
-	bool closed; //是否打开
+	bool open; //是否打开  true打开 false关闭
 
 	php_fci_fcc *onMessage;
 	php_fci_fcc *onClose;
