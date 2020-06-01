@@ -21,7 +21,6 @@ typedef struct {
 	zend_fcall_info_cache fcc;
 } php_fci_fcc;
 
-
 /** 兼容性设置 **/
 
 #if PHP_VERSION_ID < 70100
@@ -147,8 +146,6 @@ static inline int php_workerman_array_length_safe(zval *zarray) {
 		return 0;
 	}
 }
-
-
 
 /**
  * Socket类

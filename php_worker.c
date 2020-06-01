@@ -51,10 +51,6 @@ ZEND_ARG_INFO(0, listen) //
 ZEND_ARG_INFO(0, options)//
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_worker_handler, 0, 0, 1) //
-ZEND_ARG_CALLABLE_INFO(0, func, 0) //
-ZEND_END_ARG_INFO()
-
 PHP_METHOD(workerman_worker, __construct) {
 	zval *options = NULL;
 	zend_string *listen;
@@ -106,26 +102,6 @@ PHP_METHOD(workerman_worker, stop) {
 	RETURN_TRUE
 }
 
-PHP_METHOD(workerman_worker, set_handler) {
-	wmWorkerObject *worker_obj;
-	php_fci_fcc *handle_fci_fcc;
-
-	handle_fci_fcc = (php_fci_fcc *) ecalloc(1, sizeof(php_fci_fcc));
-
-	ZEND_PARSE_PARAMETERS_START(1, 1)
-				Z_PARAM_FUNC(handle_fci_fcc->fci, handle_fci_fcc->fcc)
-			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-
-	//引用计数+1
-	//Z_TRY_ADDREF_P(zdata);
-	worker_obj = (wmWorkerObject *) wm_worker_fetch_object(Z_OBJ_P(getThis()));
-
-	//增加引用计数
-	wm_zend_fci_cache_persist(&handle_fci_fcc->fcc);
-
-	wmWorker_set_handler(worker_obj->worker, handle_fci_fcc);
-}
-
 PHP_METHOD(workerman_worker, run) {
 	wmWorkerObject *worker_obj = (wmWorkerObject *) wm_worker_fetch_object(Z_OBJ_P(getThis()));
 
@@ -145,7 +121,6 @@ static const zend_function_entry workerman_worker_methods[] = { //
 						PHP_ME(workerman_worker, run, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC)
 						PHP_ME(workerman_worker, runAll, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC)
 						PHP_ME(workerman_worker, stop, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC)
-						PHP_ME(workerman_worker, set_handler, arginfo_workerman_worker_handler, ZEND_ACC_PUBLIC)
 				PHP_FE_END };
 
 /**

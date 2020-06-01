@@ -2,6 +2,7 @@
 Workerman\Runtime::enableCoroutine();
 
 $arr[] = worker_go(function () {
+	var_dump(Workerman\Connection::defaultMaxSendBufferSize);
 	var_dump(Workerman::getCid() . " start");
 	Workerman::yield();
 	var_dump(Workerman::getCid() . " end");

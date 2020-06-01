@@ -139,4 +139,14 @@ void workerman_connection_init() {
 	zend_declare_property_string(workerman_connection_ce_ptr,
 			ZEND_STRL("errMsg"), "", ZEND_ACC_PUBLIC);
 
+	//初始化发送静态缓冲区大小
+	zend_declare_property_long(workerman_connection_ce_ptr,
+			ZEND_STRL("defaultMaxSendBufferSize"), WM_MAX_SEND_BUFFER_SIZE,
+			ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
+
+	//初始化静态最大包包长
+	zend_declare_property_long(workerman_connection_ce_ptr,
+			ZEND_STRL("defaultMaxPackageSize"), WM_MAX_PACKAGE_SIZE,
+			ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
+
 }

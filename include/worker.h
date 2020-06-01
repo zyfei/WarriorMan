@@ -25,7 +25,6 @@ typedef struct _wmWorker {
 	php_fci_fcc *onBufferDrain;
 	php_fci_fcc *onError;
 
-	php_fci_fcc *handler;
 	int _status; //当前状态
 	int32_t backlog; //listen队列长度
 	char* host;

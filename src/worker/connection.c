@@ -6,6 +6,8 @@ static long wm_coroutine_socket_last_id = 0;
 //
 static swHashMap *wm_connections = NULL;
 
+//全局静态属性,应用层发送缓冲区
+
 wmConnection * create(int fd);
 wmConnection * create(int fd) {
 	if (!wm_connections) {
@@ -20,6 +22,15 @@ wmConnection * create(int fd) {
 	connection->id = ++wm_coroutine_socket_last_id;
 	connection->events = WM_EVENT_NULL;
 	connection->open = false;
+
+	connection->maxSendBufferSize = WM_MAX_SEND_BUFFER_SIZE;
+	connection->maxPackageSize = WM_MAX_PACKAGE_SIZE;
+
+	connection->onMessage = NULL;
+	connection->onClose = NULL;
+	connection->onBufferFull = NULL;
+	connection->onBufferDrain = NULL;
+	connection->onError = NULL;
 	if (connection->fd < 0) {
 		return NULL;
 	}
@@ -62,15 +73,9 @@ wmConnection* wmConnection_accept(uint32_t fd) {
 void onMessage_callback(void* _mess_data) {
 	//php_printf("1111111111111111111111111111 \n");
 	zval* md = (zval*) _mess_data;
-	zval* md2 = (zval*) ((char *)_mess_data + sizeof(zval));
+	zval* md2 = (zval*) ((char *) _mess_data + sizeof(zval));
 	//php_printf("aaa %d \n",md->value.counted->gc.refcount);
-	//efree(md);
-	//zval_ptr_dtor(md);
-
-	//zval_ptr_dtor(&md[0]);
-	//efree(md);
-
-	efree(md2->value.str);
+	zval_ptr_dtor(md2);
 	efree(md);
 }
 
@@ -173,7 +178,6 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 			return true;
 		}
 		if (!_add_Loop) {
-			wmCoroutine* co = wmCoroutine_get_current();
 			connection->events |= WM_EVENT_WRITE;
 			if (connection->events & WM_EVENT_READ) {
 				wmWorkerLoop_update(connection->fd, connection->events);
@@ -209,12 +213,13 @@ int wmConnection_close(wmConnection *connection) {
 		wmWorkerLoop_del(connection->fd); //释放事件
 		ret = wmSocket_close(connection->fd);
 	}
-	//假装调用onclose
-	//还没写
+	//触发onClose
+	if (connection->onClose) {
+		wmCoroutine_create(&(connection->onClose->fcc), 1, connection->_This); //创建新协程
+	}
 
-	//释放connection
+	//释放connection,摧毁这个类
 	zval_ptr_dtor(connection->_This);
-	//摧毁这个类
 	return ret;
 }
 

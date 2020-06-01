@@ -39,6 +39,8 @@ bool wmCoroutine_resume(wmCoroutine *task);
 void vm_stack_destroy();
 void wmCoroutine_defer(php_fci_fcc *defer_fci_fcc);
 void wmCoroutine_sleep(double seconds);
+void wmCoroutine_set_callback(long cid, coroutine_func_t _defer,
+		void *_defer_data);
 wmCoroutine* wmCoroutine_get_current();
 
 #endif	/* WM_COROUTINE_H */

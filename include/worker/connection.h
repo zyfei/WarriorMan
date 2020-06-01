@@ -13,8 +13,13 @@ extern zend_class_entry *workerman_connection_ce_ptr;
  * 协程化socket结构体
  */
 typedef struct {
+	//写入类属性中 start
 	int id;
 	int fd;
+	int maxSendBufferSize; //应用层发送缓冲区
+	int maxPackageSize; //接收的最大包包长
+	//写入类属性中 end
+
 	int events; //当前这个conn已经注册给epoll的事件
 	wmString *read_buffer; //读缓冲区
 	wmString *write_buffer; //写缓冲区

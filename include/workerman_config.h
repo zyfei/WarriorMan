@@ -30,6 +30,10 @@ enum wmEventFd_type {
 #define WM_STATUS_SHUTDOWN 4
 #define WM_STATUS_RELOADING 8
 
+//worker connection
+#define WM_MAX_SEND_BUFFER_SIZE 102400 //默认应用层发送缓冲区大小  1M
+#define WM_MAX_PACKAGE_SIZE 1024000   //每个连接能够接收的最大包包长 10M
+
 #define wm_malloc              malloc
 #define wm_free                free
 #define wm_calloc              calloc
