@@ -58,6 +58,43 @@ ZEND_ARG_INFO(0, data)
 ZEND_ARG_INFO(0, fd)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_connection_set, 0, 0, 1) //
+ZEND_ARG_INFO(0, options) //
+ZEND_END_ARG_INFO()
+
+/**
+ * 设置connection属性
+ */
+PHP_METHOD(workerman_connection, set) {
+	zval *options = NULL;
+	ZEND_PARSE_PARAMETERS_START(1, 1)
+				Z_PARAM_ARRAY(options)
+			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
+	wmConnectionObject* connection_object =
+			(wmConnectionObject *) wm_connection_fetch_object(
+					Z_OBJ_P(getThis()));
+
+	//解析options
+	HashTable *vht = Z_ARRVAL_P(options);
+	zval *ztmp = NULL;
+
+	//maxSendBufferSize
+	if (php_workerman_array_get_value(vht, "maxSendBufferSize", ztmp)) {
+		zend_long v = zval_get_long(ztmp);
+		connection_object->connection->maxSendBufferSize = v;
+		zend_update_property_long(workerman_connection_ce_ptr, getThis(),
+				ZEND_STRL("maxSendBufferSize"), v);
+	}
+
+	//maxPackageSize
+	if (php_workerman_array_get_value(vht, "maxPackageSize", ztmp)) {
+		zend_long v = zval_get_long(ztmp);
+		connection_object->connection->maxPackageSize = v;
+		zend_update_property_long(workerman_connection_ce_ptr, getThis(),
+				ZEND_STRL("maxPackageSize"), v);
+	}
+}
+
 //发送数据
 PHP_METHOD(workerman_connection, send) {
 	wmConnectionObject* connection_object;
@@ -102,6 +139,7 @@ PHP_METHOD(workerman_connection, close) {
 }
 
 static const zend_function_entry workerman_connection_methods[] = { //
+						PHP_ME(workerman_connection, set, arginfo_workerman_connection_set, ZEND_ACC_PUBLIC) //
 						PHP_ME(workerman_connection, send, arginfo_workerman_connection_send, ZEND_ACC_PUBLIC) //
 						PHP_ME(workerman_connection, close, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
 				PHP_FE_END };

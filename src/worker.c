@@ -166,31 +166,25 @@ void wmWorker_checkSapiEnv() {
 //绑定回调
 void bind_callback(zval* _This, const char* fun_name,
 		php_fci_fcc **handle_fci_fcc) {
-	zend_string* _zs = zend_string_init(fun_name, strlen(fun_name), 0);
-	zval z;
-	ZVAL_STR(&z, _zs);
-	if (zend_std_has_property(_This, &z,
-	ZEND_PROPERTY_ISSET, NULL)) {
-		zend_string_free(_zs);
-		//判断是否有workerStart
-		zval *_zval = wm_zend_read_property(workerman_worker_ce_ptr, _This,
-				fun_name, strlen(fun_name), 0);
-		*handle_fci_fcc = (php_fci_fcc *) ecalloc(1, sizeof(php_fci_fcc));
-
-		char *_error = NULL;
-		if (!_zval
-				|| zend_parse_arg_func(_zval, &(*handle_fci_fcc)->fci,
-						&(*handle_fci_fcc)->fcc, 0, &_error) == 0) {
-			efree(*handle_fci_fcc);
-			*handle_fci_fcc = NULL;
-			php_error_docref(NULL, E_ERROR, "%s error : %s", fun_name, _error);
-			return;
-		}
-		//为这个闭包增加引用计数
-		wm_zend_fci_cache_persist(&(*handle_fci_fcc)->fcc);
-	}else{
-		zend_string_free(_zs);
+	//判断是否有workerStart
+	zval *_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, _This,
+			fun_name, strlen(fun_name), 0);
+	//如果没有
+	if (_zval == NULL) {
+		return;
 	}
+	*handle_fci_fcc = (php_fci_fcc *) ecalloc(1, sizeof(php_fci_fcc));
+	char *_error = NULL;
+	if (!_zval
+			|| zend_parse_arg_func(_zval, &(*handle_fci_fcc)->fci,
+					&(*handle_fci_fcc)->fcc, 0, &_error) == 0) {
+		efree(*handle_fci_fcc);
+		*handle_fci_fcc = NULL;
+		php_error_docref(NULL, E_ERROR, "%s error : %s", fun_name, _error);
+		return;
+	}
+	//为这个闭包增加引用计数
+	wm_zend_fci_cache_persist(&(*handle_fci_fcc)->fcc);
 }
 
 /**
@@ -198,34 +192,6 @@ void bind_callback(zval* _This, const char* fun_name,
  */
 void resumeAccept(wmWorker *worker) {
 	wmWorkerLoop_add(worker->fd, WM_EVENT_READ);
-}
-
-//执行完一个onConnect之后回调
-void onConnect_callback(void* _connection) {
-	wmConnection* conn = (wmConnection*) _connection;
-
-	//设置属性 start
-	if (zend_std_has_property(conn->_This, _wm_zval_maxSendBufferSize,
-	ZEND_PROPERTY_ISSET, NULL)) {
-		zval* __zval = wm_zend_read_property(workerman_connection_ce_ptr,
-				conn->_This, ZEND_STRL("maxSendBufferSize"), 0);
-		conn->maxSendBufferSize = __zval->value.lval;
-	} else {
-		zend_update_property_long(workerman_connection_ce_ptr, conn->_This,
-				ZEND_STRL("maxSendBufferSize"), conn->maxSendBufferSize);
-	}
-
-	if (zend_std_has_property(conn->_This, _wm_zval_maxPackageSize,
-	ZEND_PROPERTY_ISSET, NULL)) {
-		zval* __zval = wm_zend_read_property(workerman_connection_ce_ptr,
-				conn->_This, ZEND_STRL("maxPackageSize"), 0);
-		conn->maxPackageSize = __zval->value.lval;
-	} else {
-		zend_update_property_long(workerman_connection_ce_ptr, conn->_This,
-				ZEND_STRL("maxPackageSize"), conn->maxPackageSize);
-	}
-	//设置属性 end
-
 }
 
 /**
@@ -254,18 +220,22 @@ void _wmWorker_acceptConnection(wmWorker *worker) {
 	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("fd"),
 			connection_object->connection->fd);
 
+	//
 	zval* __zval = zend_read_static_property(workerman_connection_ce_ptr,
 			ZEND_STRL("defaultMaxSendBufferSize"), 0);
-
 	connection_object->connection->maxSendBufferSize = __zval->value.lval;
+	zend_update_property_long(workerman_connection_ce_ptr, z,
+					ZEND_STRL("maxSendBufferSize"), connection_object->connection->maxSendBufferSize);
 
+	//
 	__zval = zend_read_static_property(workerman_connection_ce_ptr,
 			ZEND_STRL("defaultMaxPackageSize"), 0);
 	connection_object->connection->maxPackageSize = __zval->value.lval;
 
 	zend_update_property_long(workerman_connection_ce_ptr, z,
-			ZEND_STRL("maxSendBufferSize"), 4567);
+			ZEND_STRL("maxPackageSize"), connection_object->connection->maxPackageSize);
 
+	zval_ptr_dtor(__zval);
 	//设置属性 end
 
 	//设置回调方法 start
@@ -278,9 +248,7 @@ void _wmWorker_acceptConnection(wmWorker *worker) {
 
 	//onConnect
 	if (worker->onConnect) {
-		long _cid = wmCoroutine_create(&(worker->onConnect->fcc), 1, z); //创建新协程
-		wmCoroutine_set_callback(_cid, onConnect_callback,
-				connection_object->connection);
+		wmCoroutine_create(&(worker->onConnect->fcc), 1, z); //创建新协程
 	}
 }
 

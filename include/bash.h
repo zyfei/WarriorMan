@@ -15,6 +15,7 @@
 //php库
 #include "zend_closures.h"
 #include "zend_exceptions.h"
+#include "zend_object_handlers.h"
 
 //构造函数用到
 typedef struct {
@@ -155,10 +156,21 @@ extern zend_class_entry workerman_socket_ce;
 extern zend_class_entry *workerman_socket_ce_ptr;
 
 //定义一些全局方法
-static inline zval *wm_zend_read_property(zend_class_entry *class_ptr,
+static inline zval *wm_zend_read_property(zend_class_entry *ce, zval *obj,
+		const char *s, int len, int silent) {
+	zval rv, *property = zend_read_property(ce, obj, s, len, silent, &rv);
+	if (UNEXPECTED(property == &EG(uninitialized_zval))) {
+		zend_update_property_null(ce, obj, s, len);
+		return zend_read_property(ce, obj, s, len, silent, &rv);
+	}
+	return property;
+}
+
+static inline zval* wm_zend_read_property_not_null(zend_class_entry *ce,
 		zval *obj, const char *s, int len, int silent) {
-	zval rv;
-	return zend_read_property(class_ptr, obj, s, len, silent, &rv);
+	zval rv, *property = zend_read_property(ce, obj, s, len, silent, &rv);
+	zend_uchar type = Z_TYPE_P(property);
+	return (type == IS_NULL || UNEXPECTED(type == IS_UNDEF)) ? NULL : property;
 }
 
 //获取当前时间

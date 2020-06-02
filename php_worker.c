@@ -145,9 +145,20 @@ void workerman_worker_init() {
 					- ((char *) NULL));
 
 	//注册变量和初始值
-	zend_declare_property_long(workerman_worker_ce_ptr, ZEND_STRL("errCode"), 0,
-	ZEND_ACC_PUBLIC);
-	zend_declare_property_string(workerman_worker_ce_ptr, ZEND_STRL("errMsg"),
-			"",
+	zend_declare_property_null(workerman_worker_ce_ptr,
+			ZEND_STRL("onWorkerStart"), ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr,
+			ZEND_STRL("onWorkerReload"), ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onConnect"),
+			ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onMessage"),
+			ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onClose"),
+			ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr,
+			ZEND_STRL("onBufferFull"), ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr,
+			ZEND_STRL("onBufferDrain"), ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onError"),
 			ZEND_ACC_PUBLIC);
 }
