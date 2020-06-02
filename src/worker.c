@@ -16,11 +16,8 @@ void bind_callback(zval* _This, const char* fun_name,
 		php_fci_fcc **handle_fci_fcc);
 void resumeAccept(wmWorker *worker);
 
-/**
- * 创建
- */
-wmWorker* wmWorker_create(zval *_This, zend_string *listen) {
-	//zend_string
+//初始化一下参数
+void wm_worker_init() {
 	if (!_workers) {
 		_workers = swHashMap_new(NULL);
 	}
@@ -30,16 +27,25 @@ wmWorker* wmWorker_create(zval *_This, zend_string *listen) {
 	if (!_fd_workers) {
 		_fd_workers = swHashMap_new(NULL);
 	}
-
-	if (_wm_zval_maxSendBufferSize == NULL) {
+	if (!_wm_zval_maxSendBufferSize) {
 		_wm_zval_maxSendBufferSize = emalloc(sizeof(zval));
 		ZVAL_STR(_wm_zval_maxSendBufferSize,
 				zend_string_init( ZEND_STRL("maxSendBufferSize"), 0));
-
+		_wm_zval_maxSendBufferSize->value.str->gc.refcount++;
+	}
+	if (!_wm_zval_maxPackageSize) {
 		_wm_zval_maxPackageSize = emalloc(sizeof(zval));
 		ZVAL_STR(_wm_zval_maxPackageSize,
 				zend_string_init( ZEND_STRL("maxPackageSize"), 0));
+		_wm_zval_maxPackageSize->value.str->gc.refcount++;
 	}
+}
+
+/**
+ * 创建
+ */
+wmWorker* wmWorker_create(zval *_This, zend_string *listen) {
+	wm_worker_init();
 
 	wmWorker* worker = (wmWorker *) wm_malloc(sizeof(wmWorker));
 	bzero(worker, sizeof(wmWorker));
@@ -114,10 +120,6 @@ bool wmWorker_run(wmWorker *worker) {
 //关闭服务器
 bool wmWorker_stop(wmWorker* worker) {
 	worker->_status = WM_STATUS_SHUTDOWN;
-	//直接释放掉
-	zval_dtor(_wm_zval_maxSendBufferSize);
-	zval_dtor(_wm_zval_maxPackageSize);
-
 	return true;
 }
 

@@ -121,6 +121,7 @@ void main_func(void *arg) {
 		zval *param;
 		zval *arg = &argv[i];
 		param = ZEND_CALL_ARG(call, i + 1);
+		//这块不是真的拷贝，写时复制不支持object。只是引用相同。
 		ZVAL_COPY(param, arg);
 	}
 

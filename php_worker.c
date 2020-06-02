@@ -61,10 +61,9 @@ PHP_METHOD(workerman_worker, __construct) {
 				Z_PARAM_ARRAY(options)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 	wmWorkerObject *worker_obj = (wmWorkerObject *) wm_worker_fetch_object(
-				Z_OBJ_P(getThis()));
+			Z_OBJ_P(getThis()));
 	//初始化worker
-	worker_obj->worker = wmWorker_create(getThis(),listen);
-
+	worker_obj->worker = wmWorker_create(getThis(), listen);
 
 	//设置worker id
 	zend_update_property_long(workerman_worker_ce_ptr, getThis(),
@@ -103,7 +102,8 @@ PHP_METHOD(workerman_worker, stop) {
 }
 
 PHP_METHOD(workerman_worker, run) {
-	wmWorkerObject *worker_obj = (wmWorkerObject *) wm_worker_fetch_object(Z_OBJ_P(getThis()));
+	wmWorkerObject *worker_obj = (wmWorkerObject *) wm_worker_fetch_object(
+			Z_OBJ_P(getThis()));
 
 	//php_var_dump(onWorkerStart_zval, 1 TSRMLS_CC);
 	if (wmWorker_run(worker_obj->worker) == false) {
@@ -127,7 +127,6 @@ static const zend_function_entry workerman_worker_methods[] = { //
  * 注册我们的WorkerMan\Server这个类
  */
 void workerman_worker_init() {
-
 	//定义好一个类
 	INIT_NS_CLASS_ENTRY(workerman_worker_ce, "Workerman", "Worker",
 			workerman_worker_methods);
@@ -151,5 +150,4 @@ void workerman_worker_init() {
 	zend_declare_property_string(workerman_worker_ce_ptr, ZEND_STRL("errMsg"),
 			"",
 			ZEND_ACC_PUBLIC);
-
 }
