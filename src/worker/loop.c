@@ -13,9 +13,13 @@ static inline int event_decode(int events) {
 	if (events & WM_EVENT_ONCE) {
 		flag |= EPOLLONESHOT;
 	}
+	if (events & WM_EVENT_EPOLLEXCLUSIVE) { //避免惊群
+		flag |= EPOLLEXCLUSIVE;
+	}
 	if (events & WM_EVENT_ERROR) {
 		flag |= (EPOLLRDHUP | EPOLLHUP | EPOLLERR);
 	}
+
 	return flag;
 }
 
