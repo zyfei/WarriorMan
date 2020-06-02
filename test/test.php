@@ -38,3 +38,4 @@ $worker->onClose = function ($connection) {
 };
 
 $worker->run();
+Workerman\Worker::runAll();
