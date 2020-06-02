@@ -7,12 +7,12 @@ enum wmEvent_type {
 	WM_EVENT_WRITE = 1u << 10,
 	WM_EVENT_ERROR = 1u << 11,
 	WM_EVENT_ONCE = 1u << 12, //只执行一次
+	WM_EVENT_EPOLLEXCLUSIVE = 1u << 13, //防止惊群效应
 };
 
 //fd是什么类型的
 enum wmEventFd_type {
-	WM_EVENT_WORKER_FD = 0,
-	WM_EVENT_CONNECTION_FD = 1
+	WM_EVENT_WORKER_FD = 0, WM_EVENT_CONNECTION_FD = 1
 };
 
 //fd是什么类型的

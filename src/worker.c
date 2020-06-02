@@ -191,7 +191,8 @@ void bind_callback(zval* _This, const char* fun_name,
  * 向loop注册accept
  */
 void resumeAccept(wmWorker *worker) {
-	wmWorkerLoop_add(worker->fd, WM_EVENT_READ);
+	//读 | 避免惊群
+	wmWorkerLoop_add(worker->fd, WM_EVENT_READ | WM_EVENT_EPOLLEXCLUSIVE);
 }
 
 /**
@@ -225,7 +226,8 @@ void _wmWorker_acceptConnection(wmWorker *worker) {
 			ZEND_STRL("defaultMaxSendBufferSize"), 0);
 	connection_object->connection->maxSendBufferSize = __zval->value.lval;
 	zend_update_property_long(workerman_connection_ce_ptr, z,
-					ZEND_STRL("maxSendBufferSize"), connection_object->connection->maxSendBufferSize);
+			ZEND_STRL("maxSendBufferSize"),
+			connection_object->connection->maxSendBufferSize);
 
 	//
 	__zval = zend_read_static_property(workerman_connection_ce_ptr,
@@ -233,7 +235,8 @@ void _wmWorker_acceptConnection(wmWorker *worker) {
 	connection_object->connection->maxPackageSize = __zval->value.lval;
 
 	zend_update_property_long(workerman_connection_ce_ptr, z,
-			ZEND_STRL("maxPackageSize"), connection_object->connection->maxPackageSize);
+			ZEND_STRL("maxPackageSize"),
+			connection_object->connection->maxPackageSize);
 
 	zval_ptr_dtor(__zval);
 	//设置属性 end

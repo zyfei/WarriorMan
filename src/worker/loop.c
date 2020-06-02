@@ -39,7 +39,7 @@ void wmWorkerLoop_add(int fd, int events) {
 	struct epoll_event *ev;
 	ev = WorkerG.poll->events;
 	//转换epoll能看懂的事件类型
-	ev->events = event_decode(events) | EPOLLEXCLUSIVE;
+	ev->events = event_decode(events);
 	ev->data.u64 = touint64(fd, co_id);
 	//注册到全局的epollfd上面。
 	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_ADD, fd, ev) < 0) {
@@ -68,7 +68,7 @@ void wmWorkerLoop_update(int fd, int events) {
 	struct epoll_event *ev;
 	ev = WorkerG.poll->events;
 	//转换epoll能看懂的事件类型
-	ev->events = event_decode(events | EPOLLEXCLUSIVE);
+	ev->events = event_decode(events);
 	ev->data.u64 = touint64(fd, co_id);
 
 	//注册到全局的epollfd上面。
