@@ -13,4 +13,6 @@ worker_go(function () use ($chan) {
 	var_dump($ret);
 });
 
-//worker_event_wait();
+if (! defined("RUN_TEST")) {
+	worker_event_wait();
+}

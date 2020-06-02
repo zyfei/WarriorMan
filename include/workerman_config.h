@@ -15,6 +15,15 @@ enum wmEventFd_type {
 	WM_EVENT_CONNECTION_FD = 1
 };
 
+//fd是什么类型的
+enum wmConnection_status {
+	WM_CONNECTION_STATUS_INITIAL = 0, //没用上，作为客户端使用
+	WM_CONNECTION_STATUS_CONNECTING = 1, //没用上，作为客户端使用
+	WM_CONNECTION_STATUS_ESTABLISHED = 2,
+	WM_CONNECTION_STATUS_CLOSING = 4,
+	WM_CONNECTION_STATUS_CLOSED = 8
+};
+
 //coroutine.h 默认的PHP栈页大小
 #define DEFAULT_PHP_STACK_PAGE_SIZE       8192
 #define PHP_CORO_TASK_SLOT ((int)((ZEND_MM_ALIGNED_SIZE(sizeof(wmCoroutine)) + ZEND_MM_ALIGNED_SIZE(sizeof(zval)) - 1) / ZEND_MM_ALIGNED_SIZE(sizeof(zval))))

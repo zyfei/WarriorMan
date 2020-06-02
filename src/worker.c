@@ -109,8 +109,17 @@ bool wmWorker_run(wmWorker *worker) {
 			php_error_docref(NULL, E_ERROR, "call onWorkerStart error");
 			return false;
 		}
-		php_printf("12345 \n");
 	}
+
+	//设置回调方法 start
+	bind_callback(worker->_This, "onConnect", &worker->onConnect);
+	bind_callback(worker->_This, "onMessage", &worker->onMessage);
+	bind_callback(worker->_This, "onClose", &worker->onClose);
+	bind_callback(worker->_This, "onBufferFull", &worker->onBufferFull);
+	bind_callback(worker->_This, "onBufferDrain", &worker->onBufferDrain);
+	bind_callback(worker->_This, "onError", &worker->onError);
+	//设置回调方法 end
+
 	//在这里应该注册事件回调
 	resumeAccept(worker);
 	//进入loop
@@ -150,28 +159,38 @@ void wmWorker_checkSapiEnv() {
 	zend_string* _php_sapi = zend_string_init("PHP_SAPI", strlen("PHP_SAPI"),
 			0);
 	zval* _php_sapi_zval = zend_get_constant(_php_sapi);
-	php_var_dump(_php_sapi_zval, 1 TSRMLS_CC);
+//	php_var_dump(_php_sapi_zval, 1 TSRMLS_CC);
 	zend_string_free(_php_sapi);
 }
 
 //绑定回调
 void bind_callback(zval* _This, const char* fun_name,
 		php_fci_fcc **handle_fci_fcc) {
-	//判断是否有workerStart
-	zval *_zval = wm_zend_read_property(workerman_worker_ce_ptr, _This,
-			fun_name, strlen(fun_name), 0);
-	*handle_fci_fcc = (php_fci_fcc *) ecalloc(1, sizeof(php_fci_fcc));
+	zend_string* _zs = zend_string_init(fun_name, strlen(fun_name), 0);
+	zval z;
+	ZVAL_STR(&z, _zs);
+	if (zend_std_has_property(_This, &z,
+	ZEND_PROPERTY_ISSET, NULL)) {
+		zend_string_free(_zs);
+		//判断是否有workerStart
+		zval *_zval = wm_zend_read_property(workerman_worker_ce_ptr, _This,
+				fun_name, strlen(fun_name), 0);
+		*handle_fci_fcc = (php_fci_fcc *) ecalloc(1, sizeof(php_fci_fcc));
 
-	char *_error = NULL;
-	if (!_zval
-			|| zend_parse_arg_func(_zval, &(*handle_fci_fcc)->fci,
-					&(*handle_fci_fcc)->fcc, 0, &_error) == 0) {
-		efree(*handle_fci_fcc);
-		php_error_docref(NULL, E_ERROR, "%s error : %s", fun_name, _error);
+		char *_error = NULL;
+		if (!_zval
+				|| zend_parse_arg_func(_zval, &(*handle_fci_fcc)->fci,
+						&(*handle_fci_fcc)->fcc, 0, &_error) == 0) {
+			efree(*handle_fci_fcc);
+			*handle_fci_fcc = NULL;
+			php_error_docref(NULL, E_ERROR, "%s error : %s", fun_name, _error);
+			return;
+		}
+		//为这个闭包增加引用计数
+		wm_zend_fci_cache_persist(&(*handle_fci_fcc)->fcc);
+	}else{
+		zend_string_free(_zs);
 	}
-
-	//为这个闭包增加引用计数
-	wm_zend_fci_cache_persist(&(*handle_fci_fcc)->fcc);
 }
 
 /**
@@ -250,13 +269,11 @@ void _wmWorker_acceptConnection(wmWorker *worker) {
 	//设置属性 end
 
 	//设置回调方法 start
-	bind_callback(worker->_This, "onConnect", &worker->onConnect);
-
-	bind_callback(worker->_This, "onMessage", &worker->onMessage);
 	connection_object->connection->onMessage = worker->onMessage;
-
-	bind_callback(worker->_This, "onClose", &worker->onClose);
 	connection_object->connection->onClose = worker->onClose;
+	connection_object->connection->onBufferFull = worker->onBufferFull;
+	connection_object->connection->onBufferDrain = worker->onBufferDrain;
+	connection_object->connection->onError = worker->onError;
 	//设置回调方法 end
 
 	//onConnect

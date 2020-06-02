@@ -181,6 +181,13 @@ char* wmString_alloc(wmString *str, size_t __size) {
 	return tmp;
 }
 
+void wmString_free(wmString *str) {
+	if(str){
+		wm_free(str->str);
+		wm_free(str);
+	}
+}
+
 u_int32_t wmString_utf8_decode(char **p, size_t n) {
 	size_t len;
 	u_int32_t u, i, valid;

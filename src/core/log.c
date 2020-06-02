@@ -55,6 +55,9 @@ const char* wmCode_str(int code) {
 	case WM_ERROR_SESSION_CLOSED_BY_CLIENT:
 		return "Session closed by client";
 		break;
+	case WM_ERROR_SEND_FAIL:
+		return "send buffer full and drop package";
+		break;
 	default:
 		snprintf(wm_error, sizeof(wm_error), "Unknown error: %d", code);
 		return wm_error;

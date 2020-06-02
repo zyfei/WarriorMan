@@ -9,6 +9,7 @@
 extern zend_class_entry workerman_connection_ce;
 extern zend_class_entry *workerman_connection_ce_ptr;
 
+
 /**
  * 协程化socket结构体
  */
@@ -24,7 +25,7 @@ typedef struct {
 	wmString *read_buffer; //读缓冲区
 	wmString *write_buffer; //写缓冲区
 	zval* _This; //指向当前类的指针
-	bool open; //是否打开  true打开 false关闭
+	int _status; //当前连接的状态
 
 	php_fci_fcc *onMessage;
 	php_fci_fcc *onClose;
@@ -59,7 +60,7 @@ wmConnection* wmConnection_accept(uint32_t fd);
 
 bool wmConnection_send(wmConnection *connection, const void *buf, size_t len);
 
-int wmConnection_close(wmConnection *socket);
+int wmConnection_close(wmConnection *connection);
 
 void wmConnection_free(wmConnection *socket);
 

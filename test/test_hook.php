@@ -14,4 +14,6 @@ worker_go(function () {
 	var_dump(Workerman::getCid());
 });
 
-//worker_event_wait();
+if (! defined("RUN_TEST")) {
+	worker_event_wait();
+}

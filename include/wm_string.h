@@ -25,5 +25,6 @@ char* wmString_alloc(wmString *str, size_t __size);
 u_int32_t wmString_utf8_decode(char **p, size_t n);
 size_t wmString_utf8_length(char *p, size_t n);
 void wmString_random_string(char *buf, size_t size);
+void wmString_free(wmString *str);
 
 #endif    /* _WM_STRING_H */
