@@ -120,6 +120,13 @@ void main_func(void *arg) {
 	for (i = 0; i < argc; ++i) {
 		zval *param;
 		zval *arg = &argv[i];
+
+		if (Z_ISREF_P(arg)
+				&& !(func->common.fn_flags & ZEND_ACC_CALL_VIA_TRAMPOLINE)) {
+			/* don't separate references for __call */
+			arg = Z_REFVAL_P(arg);
+		}
+
 		param = ZEND_CALL_ARG(call, i + 1);
 		//这块不是真的拷贝，写时复制不支持object。只是引用相同。
 		ZVAL_COPY(param, arg);
@@ -129,6 +136,9 @@ void main_func(void *arg) {
 
 	//执行区域设置为call
 	EG(current_execute_data) = call;
+	EG(error_handling) = 0;
+	EG(exception_class) = NULL;
+	EG(exception) = NULL;
 
 	//当前协程
 	wmCoroutine* _task = current_task;
@@ -177,6 +187,11 @@ void main_func(void *arg) {
 
 	//释放
 	zval_ptr_dtor(retval);
+
+	// TODO: exceptions will only cause the coroutine to exit
+	if (UNEXPECTED(EG(exception))) {
+		zend_exception_error(EG(exception), E_ERROR);
+	}
 }
 
 /**
@@ -185,7 +200,7 @@ void main_func(void *arg) {
 void wmCoroutine_set_callback(long cid, coroutine_func_t _defer,
 		void *_defer_data) {
 	wmCoroutine* task = wmCoroutine_get_by_cid(cid);
-	if(task==NULL){
+	if (task == NULL) {
 		_defer(_defer_data);
 		return;
 	}

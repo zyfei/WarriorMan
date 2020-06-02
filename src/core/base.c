@@ -120,9 +120,13 @@ int call_closure_func(php_fci_fcc* fci_fcc) {
 	zval _retval, *retval = &_retval;
 
 	fci_fcc->fci.retval = retval;
-	if (zend_call_function(&fci_fcc->fci, &fci_fcc->fcc) != SUCCESS) {
+	int ret = zend_call_function(&fci_fcc->fci, &fci_fcc->fcc);
+	if (ret != SUCCESS) {
 		php_error_docref(NULL, E_WARNING, "call onWorkerStart warning");
 		return FAILURE;
+	}
+	if (UNEXPECTED(EG(exception))) {
+		zend_exception_error(EG(exception), E_ERROR);
 	}
 
 	//释放

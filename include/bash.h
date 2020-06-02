@@ -14,6 +14,7 @@
 
 //php库
 #include "zend_closures.h"
+#include "zend_exceptions.h"
 
 //构造函数用到
 typedef struct {

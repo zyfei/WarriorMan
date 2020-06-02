@@ -109,6 +109,7 @@ bool wmWorker_run(wmWorker *worker) {
 			php_error_docref(NULL, E_ERROR, "call onWorkerStart error");
 			return false;
 		}
+		php_printf("12345 \n");
 	}
 	//在这里应该注册事件回调
 	resumeAccept(worker);
@@ -204,16 +205,7 @@ void onConnect_callback(void* _connection) {
 		zend_update_property_long(workerman_connection_ce_ptr, conn->_This,
 				ZEND_STRL("maxPackageSize"), conn->maxPackageSize);
 	}
-
-//	if (wm_property_exists(conn->_This, ZEND_STRL("maxPackageSize"))) {
-//		zval* __zval = wm_zend_read_property(workerman_connection_ce_ptr,
-//				conn->_This, ZEND_STRL("maxPackageSize"), 0);
-//		conn->maxPackageSize = __zval->value.lval;
-//	} else {
-//		zend_update_property_long(workerman_connection_ce_ptr, conn->_This,
-//				ZEND_STRL("maxPackageSize"), conn->maxPackageSize);
-//	}
-//	//设置属性 end
+	//设置属性 end
 
 }
 
