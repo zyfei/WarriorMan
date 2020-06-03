@@ -22,7 +22,6 @@ extern zend_module_entry workerman_module_entry;
 #include "TSRM.h"
 #endif
 
-
 /**
  * Declare any global variables you may need between the BEGIN and END macros here
  */

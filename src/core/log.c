@@ -36,14 +36,10 @@ void wmLog_put(int level, char *cnt) {
 
 	t = time(NULL);
 	p = localtime(&t);
-	snprintf(date_wmr, WM_LOG_DATE_WMRLEN, "%d-%02d-%02d %02d:%02d:%02d",
-			p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min,
-			p->tm_sec);
-	n = snprintf(log_wmr, WM_LOG_BUFFER_SIZE, "[%s]\t%s\t%s\n", date_wmr,
-			level_wmr, cnt);
+	snprintf(date_wmr, WM_LOG_DATE_WMRLEN, "%d-%02d-%02d %02d:%02d:%02d", p->tm_year + 1900, p->tm_mon + 1, p->tm_mday, p->tm_hour, p->tm_min, p->tm_sec);
+	n = snprintf(log_wmr, WM_LOG_BUFFER_SIZE, "[%s]\t%s\t%s\n", date_wmr, level_wmr, cnt);
 	if (write(STDOUT_FILENO, log_wmr, n) < 0) {
-		printf("write(log_fd, size=%d) failed. Error: %s[%d].\n", n,
-				strerror(errno), errno);
+		printf("write(log_fd, size=%d) failed. Error: %s[%d].\n", n, strerror(errno), errno);
 	}
 }
 

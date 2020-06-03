@@ -20,8 +20,7 @@ void sleep_callback(void* co);
 /**
  * 创建一个协程
  */
-long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc,
-		zval *argv) {
+long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc, zval *argv) {
 	if (!coroutines) {
 		coroutines = swHashMap_new(NULL); //保存所有协程
 	}
@@ -94,14 +93,11 @@ void main_func(void *arg) {
 	call = (zend_execute_data *) (EG(vm_stack_top));
 
 	//因为php中内存分配是有对齐的，所以取真实地址
-	EG(vm_stack_top) = (zval *) ((char *) call
-			+ PHP_CORO_TASK_SLOT * sizeof(zval));
+	EG(vm_stack_top) = (zval *) ((char *) call + PHP_CORO_TASK_SLOT * sizeof(zval));
 
 	//函数分配一块用于当前作用域的内存空间，返回结果是zend_execute_data的起始位置。
 #if PHP_VERSION_ID < 70400
-	call = zend_vm_stack_push_call_frame(
-			ZEND_CALL_TOP_FUNCTION | ZEND_CALL_ALLOCATED, func, argc,
-			fci_cache.called_scope, fci_cache.object);
+	call = zend_vm_stack_push_call_frame(ZEND_CALL_TOP_FUNCTION | ZEND_CALL_ALLOCATED, func, argc, fci_cache.called_scope, fci_cache.object);
 #else
 	do {
 		uint32_t call_info;
@@ -121,8 +117,7 @@ void main_func(void *arg) {
 		zval *param;
 		zval *arg = &argv[i];
 
-		if (Z_ISREF_P(arg)
-				&& !(func->common.fn_flags & ZEND_ACC_CALL_VIA_TRAMPOLINE)) {
+		if (Z_ISREF_P(arg) && !(func->common.fn_flags & ZEND_ACC_CALL_VIA_TRAMPOLINE)) {
 			/* don't separate references for __call */
 			arg = Z_REFVAL_P(arg);
 		}
@@ -170,8 +165,7 @@ void main_func(void *arg) {
 
 			defer_fci_fcc->fci.retval = &result;
 
-			if (zend_call_function(&defer_fci_fcc->fci, &defer_fci_fcc->fcc)
-					!= SUCCESS) {
+			if (zend_call_function(&defer_fci_fcc->fci, &defer_fci_fcc->fcc) != SUCCESS) {
 				php_error_docref(NULL, E_WARNING, "defer execute error");
 				return;
 			}
@@ -197,8 +191,7 @@ void main_func(void *arg) {
 /**
  * 获取当前协程任务
  */
-void wmCoroutine_set_callback(long cid, coroutine_func_t _defer,
-		void *_defer_data) {
+void wmCoroutine_set_callback(long cid, coroutine_func_t _defer, void *_defer_data) {
 	wmCoroutine* task = wmCoroutine_get_by_cid(cid);
 	if (task == NULL) {
 		_defer(_defer_data);
@@ -282,8 +275,7 @@ bool wmCoroutine_resume(wmCoroutine *task) {
 	assert(current_task != task);
 
 	//判断是否之前yield过
-	wmCoroutine* yield_co = (wmCoroutine*) swHashMap_find_int(user_yield_coros,
-			task->cid);
+	wmCoroutine* yield_co = (wmCoroutine*) swHashMap_find_int(user_yield_coros, task->cid);
 	if (yield_co == NULL) {
 		return false;
 	}
@@ -380,8 +372,7 @@ void wmCoroutine_sleep(double seconds) {
 		seconds = 0.001;
 	}
 	wmCoroutine* co = wmCoroutine_get_current();
-	wmTimerWheel_add_quick(&WorkerG.timer, sleep_callback, (void*) co,
-			seconds * 1000);
+	wmTimerWheel_add_quick(&WorkerG.timer, sleep_callback, (void*) co, seconds * 1000);
 	wmCoroutine_yield();
 }
 

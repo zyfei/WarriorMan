@@ -1,4 +1,4 @@
-#include "bash.h"
+#include "base.h"
 
 /**
  * 创建套接字
@@ -102,8 +102,7 @@ ssize_t wmSocket_send(int sock, const void *buf, size_t len, int flag) {
 
 	ret = send(sock, buf, len, flag);
 	if (ret < 0 && errno != EAGAIN) {
-		wmWarn("Error has occurred: (fd=%d,errno %d) %s", sock, errno,
-				strerror(errno));
+		wmWarn("Error has occurred: (fd=%d,errno %d) %s", sock, errno, strerror(errno));
 	}
 	return ret;
 }
@@ -113,8 +112,7 @@ int wmSocket_close(int fd) {
 
 	ret = close(fd);
 	if (ret < 0) {
-		wmWarn("Error has occurred: (fd=%d,errno %d) %s", fd, errno,
-				strerror(errno));
+		wmWarn("Error has occurred: (fd=%d,errno %d) %s", fd, errno, strerror(errno));
 	}
 	return ret;
 }

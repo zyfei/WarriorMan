@@ -133,8 +133,7 @@ PHP_METHOD(workerman_coroutine, sleep) {
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
 	if (UNEXPECTED(seconds < 0.001)) {
-		php_error_docref(NULL, E_WARNING,
-				"Timer must be greater than or equal to 0.001");
+		php_error_docref(NULL, E_WARNING, "Timer must be greater than or equal to 0.001");
 		RETURN_FALSE
 	}
 
@@ -147,18 +146,18 @@ PHP_METHOD(workerman_coroutine, sleep) {
  * 我们需要对这个方法进行收集，放在变量 workerman_coroutine_methods里面
  */
 const zend_function_entry workerman_coroutine_methods[] = { //
-				//PHP_ME(workerman_coroutine, create, arginfo_workerman_coroutine_create, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
-				ZEND_FENTRY(create, ZEND_FN(workerman_coroutine_create),
-						arginfo_workerman_coroutine_create,
-						ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) // ZEND_FENTRY这行是新增的
-						PHP_ME(workerman_coroutine, yield, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
-						PHP_ME(workerman_coroutine, resume, arginfo_workerman_coroutine_resume, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
-						PHP_ME(workerman_coroutine, getCid, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
-						PHP_ME(workerman_coroutine, isExist, arginfo_workerman_coroutine_isExist, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
-						PHP_ME(workerman_coroutine, defer, arginfo_workerman_coroutine_defer, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
-						PHP_ME(workerman_coroutine, sleep, arginfo_workerman_coroutine_sleep, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
-				PHP_FE_END //
-				};
+	//PHP_ME(workerman_coroutine, create, arginfo_workerman_coroutine_create, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
+		ZEND_FENTRY(create, ZEND_FN(workerman_coroutine_create),
+			arginfo_workerman_coroutine_create,
+			ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) // ZEND_FENTRY这行是新增的
+		PHP_ME(workerman_coroutine, yield, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
+		PHP_ME(workerman_coroutine, resume, arginfo_workerman_coroutine_resume, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
+		PHP_ME(workerman_coroutine, getCid, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
+		PHP_ME(workerman_coroutine, isExist, arginfo_workerman_coroutine_isExist, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
+		PHP_ME(workerman_coroutine, defer, arginfo_workerman_coroutine_defer, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
+		PHP_ME(workerman_coroutine, sleep, arginfo_workerman_coroutine_sleep, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
+		PHP_FE_END //
+		};
 
 /**
  * 定义 zend class entry
@@ -171,12 +170,10 @@ zend_class_entry *workerman_coroutine_ce_ptr;
  * 考虑到以后我们会有许多的类，我们不在MINIT里面直接写注册的代码，而是让study_coroutine_util.cc提供一个函数，我们在这个函数里面实现注册功能：
  */
 void workerman_coroutine_init() {
-//定义好一个类
-	INIT_CLASS_ENTRY(workerman_coroutine_ce, "Corkerman",
-			workerman_coroutine_methods);
-//在zedn中注册类
-	workerman_coroutine_ce_ptr = zend_register_internal_class(
-			&workerman_coroutine_ce TSRMLS_CC); // 在 Zend Engine 中注册
+	//定义好一个类
+	INIT_CLASS_ENTRY(workerman_coroutine_ce, "Corkerman", workerman_coroutine_methods);
+	//在zedn中注册类
+	workerman_coroutine_ce_ptr = zend_register_internal_class(&workerman_coroutine_ce TSRMLS_CC); // 在 Zend Engine 中注册
 
 	//短名
 	zend_register_class_alias("Corker", workerman_coroutine_ce_ptr);

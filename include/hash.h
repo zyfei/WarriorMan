@@ -44,12 +44,9 @@ static inline uint64_t swoole_hash_jenkins(const char *key, uint32_t keylen) {
 	k = (unsigned) (keylen);
 
 	while (k >= 12) {
-		i += (key[0] + ((unsigned) key[1] << 8) + ((unsigned) key[2] << 16)
-				+ ((unsigned) key[3] << 24));
-		j += (key[4] + ((unsigned) key[5] << 8) + ((unsigned) key[6] << 16)
-				+ ((unsigned) key[7] << 24));
-		hashv += (key[8] + ((unsigned) key[9] << 8) + ((unsigned) key[10] << 16)
-				+ ((unsigned) key[11] << 24));
+		i += (key[0] + ((unsigned) key[1] << 8) + ((unsigned) key[2] << 16) + ((unsigned) key[3] << 24));
+		j += (key[4] + ((unsigned) key[5] << 8) + ((unsigned) key[6] << 16) + ((unsigned) key[7] << 24));
+		hashv += (key[8] + ((unsigned) key[9] << 8) + ((unsigned) key[10] << 16) + ((unsigned) key[11] << 24));
 
 		HASH_JEN_MIX(i, j, hashv);
 
@@ -98,8 +95,7 @@ static inline uint64_t swoole_hash_jenkins(const char *key, uint32_t keylen) {
 /**
  * MurmurHash2(Austin Appleby)
  */
-static inline uint32_t swoole_hash_austin(const char *key,
-		unsigned int keylen) {
+static inline uint32_t swoole_hash_austin(const char *key, unsigned int keylen) {
 	unsigned int h, k;
 	h = 0 ^ keylen;
 

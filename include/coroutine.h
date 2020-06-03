@@ -1,7 +1,7 @@
 #ifndef WM_COROUTINE_H
 #define WM_COROUTINE_H
 
-#include "bash.h"
+#include "base.h"
 #include "context.h"
 
 //协程参数结构体
@@ -31,16 +31,14 @@ typedef struct _Coroutine {
 	void *_defer_data; //c语言级别defer
 } wmCoroutine;
 
-long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc,
-		zval *argv);
+long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc, zval *argv);
 wmCoroutine* wmCoroutine_get_by_cid(long _cid);
 void wmCoroutine_yield();
 bool wmCoroutine_resume(wmCoroutine *task);
 void vm_stack_destroy();
 void wmCoroutine_defer(php_fci_fcc *defer_fci_fcc);
 void wmCoroutine_sleep(double seconds);
-void wmCoroutine_set_callback(long cid, coroutine_func_t _defer,
-		void *_defer_data);
+void wmCoroutine_set_callback(long cid, coroutine_func_t _defer, void *_defer_data);
 wmCoroutine* wmCoroutine_get_current();
 
 #endif	/* WM_COROUTINE_H */

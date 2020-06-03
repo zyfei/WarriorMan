@@ -26,7 +26,6 @@
 #include <sys/timeb.h>
 #include <stdbool.h>
 
-
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -50,7 +49,6 @@
 
 //公共配置
 #include "workerman_config.h"
-
 
 /**
  * 把数字转换成字符串
@@ -95,9 +93,7 @@ static inline int wm_rand(int min, int max) {
 	}
 
 	int _rand = rand();
-	_rand = min
-			+ (int) ((double) ((double) (max) - (min) + 1.0)
-					* ((_rand) / ((RAND_MAX) + 1.0)));
+	_rand = min + (int) ((double) ((double) (max) - (min) + 1.0) * ((_rand) / ((RAND_MAX) + 1.0)));
 	return _rand;
 }
 

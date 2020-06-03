@@ -1,7 +1,7 @@
 /**
  * worker入口文件
  */
-#include "bash.h"
+#include "base.h"
 #include "connection.h"
 
 zend_class_entry workerman_connection_ce;
@@ -14,8 +14,7 @@ static zend_object_handlers workerman_connection_handlers;
  * 通过这个PHP对象找到我们的wmConnectionObject对象的代码
  */
 wmConnectionObject* wm_connection_fetch_object(zend_object *obj) {
-	return (wmConnectionObject *) ((char *) obj
-			- workerman_connection_handlers.offset);
+	return (wmConnectionObject *) ((char *) obj - workerman_connection_handlers.offset);
 }
 
 /**
@@ -23,8 +22,7 @@ wmConnectionObject* wm_connection_fetch_object(zend_object *obj) {
  * zend_class_entry是一个php类
  */
 zend_object* wm_connection_create_object(zend_class_entry *ce) {
-	wmConnectionObject *sock = (wmConnectionObject *) ecalloc(1,
-			sizeof(wmConnectionObject) + zend_object_properties_size(ce));
+	wmConnectionObject *sock = (wmConnectionObject *) ecalloc(1, sizeof(wmConnectionObject) + zend_object_properties_size(ce));
 	zend_object_std_init(&sock->std, ce);
 	object_properties_init(&sock->std, ce);
 	sock->std.handlers = &workerman_connection_handlers;
@@ -36,8 +34,7 @@ zend_object* wm_connection_create_object(zend_class_entry *ce) {
  * 最新 问题找到了，是因为malloc申请了的地址重复了，现在的解决办法是，这里可以释放，但是不可以关。只能在其他地方关
  */
 static void wm_connection_free_object(zend_object *object) {
-	wmConnectionObject *sock =
-			(wmConnectionObject *) wm_connection_fetch_object(object);
+	wmConnectionObject *sock = (wmConnectionObject *) wm_connection_fetch_object(object);
 
 	//这里需要判断，这个connection是不是被人继续用了。
 	if (sock->connection && sock->connection != NULL) {
@@ -70,9 +67,7 @@ PHP_METHOD(workerman_connection, set) {
 	ZEND_PARSE_PARAMETERS_START(1, 1)
 				Z_PARAM_ARRAY(options)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-	wmConnectionObject* connection_object =
-			(wmConnectionObject *) wm_connection_fetch_object(
-					Z_OBJ_P(getThis()));
+	wmConnectionObject* connection_object = (wmConnectionObject *) wm_connection_fetch_object(Z_OBJ_P(getThis()));
 
 	//解析options
 	HashTable *vht = Z_ARRVAL_P(options);
@@ -82,16 +77,14 @@ PHP_METHOD(workerman_connection, set) {
 	if (php_workerman_array_get_value(vht, "maxSendBufferSize", ztmp)) {
 		zend_long v = zval_get_long(ztmp);
 		connection_object->connection->maxSendBufferSize = v;
-		zend_update_property_long(workerman_connection_ce_ptr, getThis(),
-				ZEND_STRL("maxSendBufferSize"), v);
+		zend_update_property_long(workerman_connection_ce_ptr, getThis(), ZEND_STRL("maxSendBufferSize"), v);
 	}
 
 	//maxPackageSize
 	if (php_workerman_array_get_value(vht, "maxPackageSize", ztmp)) {
 		zend_long v = zval_get_long(ztmp);
 		connection_object->connection->maxPackageSize = v;
-		zend_update_property_long(workerman_connection_ce_ptr, getThis(),
-				ZEND_STRL("maxPackageSize"), v);
+		zend_update_property_long(workerman_connection_ce_ptr, getThis(), ZEND_STRL("maxPackageSize"), v);
 	}
 }
 
@@ -110,8 +103,7 @@ PHP_METHOD(workerman_connection, send) {
 				Z_PARAM_LONG(fd)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	connection_object = (wmConnectionObject *) wm_connection_fetch_object(
-			Z_OBJ_P(getThis()));
+	connection_object = (wmConnectionObject *) wm_connection_fetch_object(Z_OBJ_P(getThis()));
 	conn = connection_object->connection;
 	if (conn == NULL) {
 		php_error_docref(NULL, E_WARNING, "send error");
@@ -128,8 +120,7 @@ PHP_METHOD(workerman_connection, send) {
 PHP_METHOD(workerman_connection, close) {
 	wmConnectionObject* connection_object;
 	int ret = 0;
-	connection_object = (wmConnectionObject *) wm_connection_fetch_object(
-			Z_OBJ_P(getThis()));
+	connection_object = (wmConnectionObject *) wm_connection_fetch_object(Z_OBJ_P(getThis()));
 	ret = wmConnection_close(connection_object->connection);
 	if (ret < 0) {
 		php_error_docref(NULL, E_WARNING, "close error");
@@ -139,10 +130,10 @@ PHP_METHOD(workerman_connection, close) {
 }
 
 static const zend_function_entry workerman_connection_methods[] = { //
-						PHP_ME(workerman_connection, set, arginfo_workerman_connection_set, ZEND_ACC_PUBLIC) //
-						PHP_ME(workerman_connection, send, arginfo_workerman_connection_send, ZEND_ACC_PUBLIC) //
-						PHP_ME(workerman_connection, close, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
-				PHP_FE_END };
+	PHP_ME(workerman_connection, set, arginfo_workerman_connection_set, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_connection, send, arginfo_workerman_connection_send, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_connection, close, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
+		PHP_FE_END };
 
 /**
  * 注册我们的WorkerMan\Server这个类
@@ -150,41 +141,28 @@ static const zend_function_entry workerman_connection_methods[] = { //
 void workerman_connection_init() {
 
 	//定义好一个类
-	INIT_NS_CLASS_ENTRY(workerman_connection_ce, "Corkerman", "Connection",
-			workerman_connection_methods);
+	INIT_NS_CLASS_ENTRY(workerman_connection_ce, "Corkerman", "Connection", workerman_connection_methods);
 	//在zedn中注册类
-	workerman_connection_ce_ptr = zend_register_internal_class(
-			&workerman_connection_ce TSRMLS_CC); // 在 Zend Engine 中注册
+	workerman_connection_ce_ptr = zend_register_internal_class(&workerman_connection_ce TSRMLS_CC); // 在 Zend Engine 中注册
 
 	//替换掉PHP默认的handler
-	memcpy(&workerman_connection_handlers, zend_get_std_object_handlers(),
-			sizeof(zend_object_handlers));
+	memcpy(&workerman_connection_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
 	//php对象实例化已经由我们自己的代码接管了
 	workerman_connection_ce_ptr->create_object = wm_connection_create_object;
 	workerman_connection_handlers.free_obj = wm_connection_free_object;
-	workerman_connection_handlers.offset =
-			(zend_long) (((char *) (&(((wmConnectionObject*) NULL)->std)))
-					- ((char *) NULL));
+	workerman_connection_handlers.offset = (zend_long) (((char *) (&(((wmConnectionObject*) NULL)->std))) - ((char *) NULL));
 
 	//类进行初始化的时候设置变量
-	zend_declare_property_long(workerman_connection_ce_ptr, ZEND_STRL("fd"), 0,
-	ZEND_ACC_PUBLIC);
+	zend_declare_property_long(workerman_connection_ce_ptr, ZEND_STRL("fd"), 0, ZEND_ACC_PUBLIC);
 
 	//注册变量和初始值
-	zend_declare_property_long(workerman_connection_ce_ptr,
-			ZEND_STRL("errCode"), 0,
-			ZEND_ACC_PUBLIC);
-	zend_declare_property_string(workerman_connection_ce_ptr,
-			ZEND_STRL("errMsg"), "", ZEND_ACC_PUBLIC);
+	zend_declare_property_long(workerman_connection_ce_ptr, ZEND_STRL("errCode"), 0, ZEND_ACC_PUBLIC);
+	zend_declare_property_string(workerman_connection_ce_ptr, ZEND_STRL("errMsg"), "", ZEND_ACC_PUBLIC);
 
 	//初始化发送静态缓冲区大小
-	zend_declare_property_long(workerman_connection_ce_ptr,
-			ZEND_STRL("defaultMaxSendBufferSize"), WM_MAX_SEND_BUFFER_SIZE,
-			ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
+	zend_declare_property_long(workerman_connection_ce_ptr, ZEND_STRL("defaultMaxSendBufferSize"), WM_MAX_SEND_BUFFER_SIZE, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
 
 	//初始化静态最大包包长
-	zend_declare_property_long(workerman_connection_ce_ptr,
-			ZEND_STRL("defaultMaxPackageSize"), WM_MAX_PACKAGE_SIZE,
-			ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
+	zend_declare_property_long(workerman_connection_ce_ptr, ZEND_STRL("defaultMaxPackageSize"), WM_MAX_PACKAGE_SIZE, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
 
 }

@@ -67,8 +67,7 @@ void wmTimerWheel_node_init(wmTimerWheel_Node *node, timer_cb_t cb, void *ud);
 // 增加时间结点，ticks为触发间隔(注意是以interval为单位)
 void wmTimerWheel_add(wmTimerWheel *tw, wmTimerWheel_Node *node, uint32_t ticks);
 // 快速添加
-void wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void *ud,
-		uint32_t ticks);
+void wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void *ud, uint32_t ticks);
 // 删除结点
 //int wmTimerWheel_del(wmTimerWheel *tw, wmTimerWheel_Node *node);
 // 更新时间轮

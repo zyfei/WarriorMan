@@ -95,8 +95,7 @@ void wmTimerWheel_add(wmTimerWheel *tw, wmTimerWheel_Node *node, uint32_t ticks)
 }
 
 //快速的添加
-void wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void *ud,
-		uint32_t ticks) {
+void wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void *ud, uint32_t ticks) {
 	wmTimerWheel_Node *node1 = (wmTimerWheel_Node *) wm_malloc(sizeof(wmTimerWheel_Node));
 	bzero(node1, sizeof(wmTimerWheel_Node));
 	wmTimerWheel_node_init(node1, cb, ud);

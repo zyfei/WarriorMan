@@ -4,10 +4,9 @@
 /**
  * worker的头文件咯
  */
-#include "bash.h"
+#include "base.h"
 #include "connection.h"
 #include "coroutine.h"
-
 
 extern zend_class_entry workerman_worker_ce;
 extern zend_class_entry *workerman_worker_ce_ptr;
@@ -42,27 +41,16 @@ typedef struct {
 wmWorkerObject* wm_worker_fetch_object(zend_object *obj);
 //为了通过php对象，找到上面的c++对象 end
 
-void wm_worker_init();
-void wm_worker_shutdown();
+void wmWorker_init();
+void wmWorker_shutdown();
 
 wmWorker* wmWorker_create(zval *_This, zend_string *listen);
-
 bool wmWorker_run(wmWorker *worker_obj); //启动服务器
-
 bool wmWorker_stop(wmWorker* worker); //关闭服务器
-
-void wmWorker_set_handler(wmWorker* worker, php_fci_fcc *_handler);
-
-php_fci_fcc* wmWorker_get_handler(wmWorker* worker);
-
 void wmWorker_free(wmWorker* worker);
-
-void wmWorker_checkSapiEnv();
-
+void wmWorker_checkEnv();
 wmWorker* wmWorker_find_by_fd(int fd);
-
 //loop 回调
 void _wmWorker_acceptConnection(wmWorker *worker);
-
 
 #endif

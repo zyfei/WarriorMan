@@ -4,11 +4,10 @@
 /**
  * 协程化socket
  */
-#include "bash.h"
+#include "base.h"
 
 extern zend_class_entry workerman_connection_ce;
 extern zend_class_entry *workerman_connection_ce_ptr;
-
 
 /**
  * 协程化socket结构体

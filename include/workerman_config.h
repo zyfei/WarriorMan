@@ -2,26 +2,27 @@
 #define WM_CONFIG_H_
 
 enum wmEvent_type {
-	WM_EVENT_NULL = 0,
-	WM_EVENT_READ = 1u << 9,
-	WM_EVENT_WRITE = 1u << 10,
-	WM_EVENT_ERROR = 1u << 11,
+	WM_EVENT_NULL = 0, //
+	WM_EVENT_READ = 1u << 9, //
+	WM_EVENT_WRITE = 1u << 10, //
+	WM_EVENT_ERROR = 1u << 11, //
 	WM_EVENT_ONCE = 1u << 12, //只执行一次
 	WM_EVENT_EPOLLEXCLUSIVE = 1u << 13, //防止惊群效应
 };
 
-//fd是什么类型的
-enum wmEventFd_type {
-	WM_EVENT_WORKER_FD = 0, WM_EVENT_CONNECTION_FD = 1
+enum wmWorker_status {
+	WM_WORKER_STATUS_STARTING = 1, //
+	WM_WORKER_STATUS_RUNNING = 2, //
+	WM_WORKER_STATUS_SHUTDOWN = 4, //
+	WM_WORKER_STATUS_RELOADING = 8, //
 };
 
-//fd是什么类型的
 enum wmConnection_status {
 	WM_CONNECTION_STATUS_INITIAL = 0, //没用上，作为客户端使用
 	WM_CONNECTION_STATUS_CONNECTING = 1, //没用上，作为客户端使用
-	WM_CONNECTION_STATUS_ESTABLISHED = 2,
-	WM_CONNECTION_STATUS_CLOSING = 4,
-	WM_CONNECTION_STATUS_CLOSED = 8
+	WM_CONNECTION_STATUS_ESTABLISHED = 2, //
+	WM_CONNECTION_STATUS_CLOSING = 4, //
+	WM_CONNECTION_STATUS_CLOSED = 8 //
 };
 
 //coroutine.h 默认的PHP栈页大小

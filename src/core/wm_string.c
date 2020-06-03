@@ -27,8 +27,7 @@ wmString* wmString_new(size_t size) {
  * 打印string
  */
 void wmString_print(wmString *str) {
-	printf("String[length=%zu,size=%zu,offset=%jd]=%.*s\n", str->length,
-			str->size, (intmax_t) str->offset, (int) str->length, str->str);
+	printf("String[length=%zu,size=%zu,offset=%jd]=%.*s\n", str->length, str->size, (intmax_t) str->offset, (int) str->length, str->str);
 }
 
 /**
@@ -37,7 +36,7 @@ void wmString_print(wmString *str) {
 wmString *wmString_dup2(wmString *src) {
 	wmString *dst = wmString_new(src->size);
 	if (dst) {
-		wmTrace("string dup2.  new=%p, old=%p\n", dst, src);
+		//wmTrace("string dup2.  new=%p, old=%p\n", dst, src);
 		dst->length = src->length;
 		dst->offset = src->offset;
 		memcpy(dst->str, src->str, src->length);
@@ -133,8 +132,7 @@ int wmString_write(wmString *str, size_t offset, wmString *write_str) {
 /**
  * 简单粗暴的往里写入
  */
-int wmString_write_ptr(wmString *str, off_t offset, char *write_str,
-		size_t length) {
+int wmString_write_ptr(wmString *str, off_t offset, char *write_str, size_t length) {
 	size_t new_length = offset + length;
 	if (new_length > str->size) {
 		if (wmString_extend(str, new_length * 2) < 0) {
@@ -182,7 +180,7 @@ char* wmString_alloc(wmString *str, size_t __size) {
 }
 
 void wmString_free(wmString *str) {
-	if(str){
+	if (str) {
 		wm_free(str->str);
 		wm_free(str);
 	}
@@ -254,13 +252,8 @@ size_t wmString_utf8_length(char *p, size_t n) {
 }
 
 void wmString_random_string(char *buf, size_t size) {
-	static char characters[] =
-			{ 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
-					'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y',
-					'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k',
-					'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
-					'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8',
-					'9', };
+	static char characters[] = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
+		'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', };
 	unsigned int i;
 	for (i = 0; i < size; i++) {
 		buf[i] = characters[wm_rand(0, sizeof(characters) - 1)];

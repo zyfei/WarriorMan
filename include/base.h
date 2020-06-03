@@ -156,8 +156,7 @@ extern zend_class_entry workerman_socket_ce;
 extern zend_class_entry *workerman_socket_ce_ptr;
 
 //定义一些全局方法
-static inline zval *wm_zend_read_property(zend_class_entry *ce, zval *obj,
-		const char *s, int len, int silent) {
+static inline zval *wm_zend_read_property(zend_class_entry *ce, zval *obj, const char *s, int len, int silent) {
 	zval rv, *property = zend_read_property(ce, obj, s, len, silent, &rv);
 	if (UNEXPECTED(property == &EG(uninitialized_zval))) {
 		zend_update_property_null(ce, obj, s, len);
@@ -166,9 +165,14 @@ static inline zval *wm_zend_read_property(zend_class_entry *ce, zval *obj,
 	return property;
 }
 
-static inline zval* wm_zend_read_property_not_null(zend_class_entry *ce,
-		zval *obj, const char *s, int len, int silent) {
+static inline zval* wm_zend_read_property_not_null(zend_class_entry *ce, zval *obj, const char *s, int len, int silent) {
 	zval rv, *property = zend_read_property(ce, obj, s, len, silent, &rv);
+	zend_uchar type = Z_TYPE_P(property);
+	return (type == IS_NULL || UNEXPECTED(type == IS_UNDEF)) ? NULL : property;
+}
+
+static inline zval* wm_zend_read_static_property_not_null(zend_class_entry *ce, const char *s, int len, int silent) {
+	zval *property = zend_read_static_property(ce, s, len, silent);
 	zend_uchar type = Z_TYPE_P(property);
 	return (type == IS_NULL || UNEXPECTED(type == IS_UNDEF)) ? NULL : property;
 }

@@ -5,8 +5,7 @@ void wmContext_func(void *arg);
 /**
  * 初始化Context
  */
-void wmContext_init(wmContext *ctx, size_t stack_size, coroutine_func_t fn,
-		void* private_data) {
+void wmContext_init(wmContext *ctx, size_t stack_size, coroutine_func_t fn, void* private_data) {
 	ctx->end_ = false;
 	ctx->stack_size_ = stack_size;
 	ctx->private_data_ = private_data;
@@ -21,9 +20,9 @@ void wmContext_init(wmContext *ctx, size_t stack_size, coroutine_func_t fn,
 
 	//这行代码是设置这个最底层的协程的上下文ctx_，比如栈地址，栈大小，协程的入口函数context_func。
 	//而make_fcontext这个设置上下文的函数式用的boost.asm里面的库。
-	ctx->ctx_ = make_fcontext(sp, ctx->stack_size_,
-			(void (*)(intptr_t))&wmContext_func); //
-};
+	ctx->ctx_ = make_fcontext(sp, ctx->stack_size_, (void (*)(intptr_t)) &wmContext_func); //
+}
+;
 
 /**
  * 执行php协程，并且切换上下文

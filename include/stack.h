@@ -56,8 +56,7 @@ static inline int wmStack_push(wmStack *stack, void* data) {
 	//如果溢出则增加内存分配
 	if (stack->num == stack->size) {
 		//重新调整大小，也就是加WM_STACK_CRE个
-		stack->node = (wmStack_Node*) realloc(stack->node,
-				(stack->size + WM_STACK_CRE) * sizeof(wmStack_Node));
+		stack->node = (wmStack_Node*) realloc(stack->node, (stack->size + WM_STACK_CRE) * sizeof(wmStack_Node));
 		if (stack->node == NULL) {
 			printf("wmStack_push error \n");
 			return 0;

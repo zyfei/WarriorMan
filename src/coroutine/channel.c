@@ -29,13 +29,11 @@ bool wmChannel_push(wmChannel* channel, void *data, double timeout) {
 		WmChannelCoroutineType* wct = NULL;
 		//如果设置了超时时间
 		if (timeout > 0) {
-			wct = (WmChannelCoroutineType *) wm_malloc(
-					sizeof(WmChannelCoroutineType));
+			wct = (WmChannelCoroutineType *) wm_malloc(sizeof(WmChannelCoroutineType));
 			wct->co = co;
 			wct->type = true;
 			//就添加到定时器中,定时器到时间，会把当前这个协程再唤醒
-			wmTimerWheel_add_quick(&WorkerG.timer, wmChannel_sleep_timeout,
-					(void*) wct, timeout * 1000);
+			wmTimerWheel_add_quick(&WorkerG.timer, wmChannel_sleep_timeout, (void*) wct, timeout * 1000);
 		}
 		//把当前协程，加入生产者协程等待队列中
 		wmQueue_push(channel->producer_queue, co);
@@ -88,13 +86,11 @@ void* wmChannel_pop(wmChannel* channel, double timeout) {
 		WmChannelCoroutineType* wct = NULL;
 		//如果设置了超时时间
 		if (timeout > 0) {
-			wct = (WmChannelCoroutineType *) wm_malloc(
-					sizeof(WmChannelCoroutineType));
+			wct = (WmChannelCoroutineType *) wm_malloc(sizeof(WmChannelCoroutineType));
 			wct->co = co;
 			wct->type = true;
 			//就添加到定时器中,定时器到时间，会把这个协程再唤醒
-			wmTimerWheel_add_quick(&WorkerG.timer, wmChannel_sleep_timeout,
-					(void*) co, timeout * 1000);
+			wmTimerWheel_add_quick(&WorkerG.timer, wmChannel_sleep_timeout, (void*) co, timeout * 1000);
 		}
 		//加入消费者等待队列中
 		wmQueue_push(channel->consumer_queue, co);

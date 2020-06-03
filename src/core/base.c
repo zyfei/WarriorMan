@@ -1,4 +1,4 @@
-#include "bash.h"
+#include "base.h"
 #include "coroutine.h"
 
 wmGlobal_t WorkerG;
@@ -66,8 +66,7 @@ int wm_event_wait() {
 		int timeout = 1;
 		struct epoll_event *events;
 		events = WorkerG.poll->events;
-		n = epoll_wait(WorkerG.poll->epollfd, events, WorkerG.poll->ncap,
-				timeout);
+		n = epoll_wait(WorkerG.poll->epollfd, events, WorkerG.poll->ncap, timeout);
 		//循环处理epoll请求
 		for (int i = 0; i < n; i++) {
 			int fd;

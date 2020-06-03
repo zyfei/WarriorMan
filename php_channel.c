@@ -1,7 +1,7 @@
 /**
  * channel入口文件
  */
-#include "bash.h"
+#include "base.h"
 #include "channel.h"
 
 zend_class_entry workerman_channel_ce;
@@ -31,8 +31,7 @@ static zend_object* wmChannel_create_object(zend_class_entry *ce) {
 	//向PHP申请一块内存,大小是一个coro_chan的大小+
 	//至于为什么不根据size来直接申请内存，因为zend_object最后一个元素是一个数组下标，后面不一定申请了多少个
 	//如果我们直接分配zend_object的大小，就会把PHP对象的属性给漏掉。这是实现自定义对象需要特别关注的问题。如果还是不理解，小伙伴们可以先去学习C语言的柔性数组。
-	wmChannelObject *chan_t = (wmChannelObject *) ecalloc(1,
-			sizeof(wmChannelObject) + zend_object_properties_size(ce));
+	wmChannelObject *chan_t = (wmChannelObject *) ecalloc(1, sizeof(wmChannelObject) + zend_object_properties_size(ce));
 	//std之前的一个指针位置，就是我们的wmChannel指针
 
 	//初始化php对象，根据ce
@@ -48,8 +47,7 @@ static zend_object* wmChannel_create_object(zend_class_entry *ce) {
  * 释放php对象的方法
  */
 static void wmChannel_free_object(zend_object *object) {
-	wmChannelObject *chan_t = (wmChannelObject *) wmChannel_fetch_object(
-			object);
+	wmChannelObject *chan_t = (wmChannelObject *) wmChannel_fetch_object(object);
 	wmChannel *chan = chan_t->chan;
 	if (chan) {
 		wmChannel_free(chan);
@@ -86,8 +84,7 @@ PHP_METHOD(workerman_channel, __construct) {
 	chan_t = (wmChannelObject *) wmChannel_fetch_object(Z_OBJ_P(getThis()));
 	chan_t->chan = wmChannel_create(capacity);
 
-	zend_update_property_long(workerman_channel_ce_ptr, getThis(),
-			ZEND_STRL("capacity"), capacity);
+	zend_update_property_long(workerman_channel_ce_ptr, getThis(), ZEND_STRL("capacity"), capacity);
 }
 
 static PHP_METHOD(workerman_channel, push) {
@@ -140,25 +137,22 @@ static PHP_METHOD(workerman_channel, pop) {
 }
 
 static const zend_function_entry workerman_channel_methods[] = { //
-						PHP_ME(workerman_channel, __construct, arginfo_workerman_channel_construct, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR) //
-						PHP_ME(workerman_channel, push, arginfo_workerman_channel_push, ZEND_ACC_PUBLIC) //
-						PHP_ME(workerman_channel, pop, arginfo_workerman_channel_pop, ZEND_ACC_PUBLIC) //
-				PHP_FE_END };
+	PHP_ME(workerman_channel, __construct, arginfo_workerman_channel_construct, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR) //
+		PHP_ME(workerman_channel, push, arginfo_workerman_channel_push, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_channel, pop, arginfo_workerman_channel_pop, ZEND_ACC_PUBLIC) //
+		PHP_FE_END };
 
 /**
  * 注册我们的WorkerMan\Server这个类
  */
 void workerman_channel_init() {
 	//定义好一个类
-	INIT_NS_CLASS_ENTRY(workerman_channel_ce, "Corkerman", "Channel",
-			workerman_channel_methods);
+	INIT_NS_CLASS_ENTRY(workerman_channel_ce, "Corkerman", "Channel", workerman_channel_methods);
 	//在zedn中注册类
-	workerman_channel_ce_ptr = zend_register_internal_class(
-			&workerman_channel_ce TSRMLS_CC); // 在 Zend Engine 中注册
+	workerman_channel_ce_ptr = zend_register_internal_class(&workerman_channel_ce TSRMLS_CC); // 在 Zend Engine 中注册
 
 	//替换掉PHP默认的handler
-	memcpy(&workerman_channel_handlers, zend_get_std_object_handlers(),
-			sizeof(zend_object_handlers));
+	memcpy(&workerman_channel_handlers, zend_get_std_object_handlers(), sizeof(zend_object_handlers));
 	//php对象实例化已经由我们自己的代码接管了
 //	ST_SET_CLASS_CUSTOM_OBJECT(workerman_channel,
 //			wmChannel_create_object,wmChannel_free_object,
@@ -166,12 +160,9 @@ void workerman_channel_init() {
 	//上面的宏翻译一下，就是下面的
 	workerman_channel_ce_ptr->create_object = wmChannel_create_object;
 	workerman_channel_handlers.free_obj = wmChannel_free_object;
-	workerman_channel_handlers.offset =
-			(zend_long) (((char *) (&(((wmChannelObject*) NULL)->std)))
-					- ((char *) NULL));
+	workerman_channel_handlers.offset = (zend_long) (((char *) (&(((wmChannelObject*) NULL)->std))) - ((char *) NULL));
 
 	//类进行初始化的时候设置变量
-	zend_declare_property_long(workerman_channel_ce_ptr, ZEND_STRL("capacity"),
-			1, ZEND_ACC_PUBLIC);
+	zend_declare_property_long(workerman_channel_ce_ptr, ZEND_STRL("capacity"), 1, ZEND_ACC_PUBLIC);
 
 }

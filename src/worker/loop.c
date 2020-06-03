@@ -105,8 +105,7 @@ void wmWorkerLoop_loop() {
 		int timeout = 1;
 		struct epoll_event *events;
 		events = WorkerG.poll->events;
-		n = epoll_wait(WorkerG.poll->epollfd, events, WorkerG.poll->ncap,
-				timeout);
+		n = epoll_wait(WorkerG.poll->epollfd, events, WorkerG.poll->ncap, timeout);
 		//循环处理epoll请求
 		for (int i = 0; i < n; i++) {
 			int fd, coro_id;
@@ -129,12 +128,10 @@ void wmWorkerLoop_loop() {
 			//error  以后完善
 			if (events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) {
 				//ignore ERR and HUP, because event is already processed at IN and OUT handler.
-				if ((events[i].events & EPOLLIN)
-						|| (events[i].events & EPOLLOUT)) {
+				if ((events[i].events & EPOLLIN) || (events[i].events & EPOLLOUT)) {
 					continue;
 				}
-				wmWarn("Error has occurred: (errno %d) %s", errno,
-						strerror(errno));
+				wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 			}
 		}
 		//有定时器才更新

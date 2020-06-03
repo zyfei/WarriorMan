@@ -8,10 +8,8 @@ extern PHP_METHOD(workerman_coroutine, sleep);
 zend_class_entry workerman_runtime_ce;
 zend_class_entry *workerman_runtime_ce_ptr;
 
-static void hook_func(const char *name, size_t name_len,
-		zif_handler new_handler) {
-	zend_function *ori_f = (zend_function *) zend_hash_str_find_ptr(
-			EG(function_table), name, name_len);
+static void hook_func(const char *name, size_t name_len, zif_handler new_handler) {
+	zend_function *ori_f = (zend_function *) zend_hash_str_find_ptr(EG(function_table), name, name_len);
 	ori_f->internal_function.handler = new_handler;
 }
 
@@ -23,8 +21,8 @@ PHP_METHOD(workerman_runtime, enableCoroutine) {
 }
 
 static const zend_function_entry workerman_runtime_methods[] = { //
-						PHP_ME(workerman_runtime, enableCoroutine, arginfo_workerman_runtime_void, ZEND_ACC_PUBLIC| ZEND_ACC_STATIC)
-				PHP_FE_END };
+	PHP_ME(workerman_runtime, enableCoroutine, arginfo_workerman_runtime_void, ZEND_ACC_PUBLIC| ZEND_ACC_STATIC)
+	PHP_FE_END };
 
 /**
  * 注册我们的WorkerMan\Server这个类
@@ -32,9 +30,7 @@ static const zend_function_entry workerman_runtime_methods[] = { //
 void workerman_runtime_init() {
 
 	//定义好一个类
-	INIT_NS_CLASS_ENTRY(workerman_runtime_ce, "Corkerman", "Runtime",
-			workerman_runtime_methods);
+	INIT_NS_CLASS_ENTRY(workerman_runtime_ce, "Corkerman", "Runtime", workerman_runtime_methods);
 	//在zedn中注册类
-	workerman_runtime_ce_ptr = zend_register_internal_class(
-			&workerman_runtime_ce TSRMLS_CC); // 在 Zend Engine 中注册
+	workerman_runtime_ce_ptr = zend_register_internal_class(&workerman_runtime_ce TSRMLS_CC); // 在 Zend Engine 中注册
 }

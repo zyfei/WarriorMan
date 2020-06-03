@@ -1,7 +1,7 @@
 #ifndef WM_CONTEXT_H
 #define WM_CONTEXT_H
 
-#include "bash.h"
+#include "base.h"
 #include "asm_context.h"
 
 typedef fcontext_t coroutine_context_t;
@@ -21,8 +21,7 @@ typedef struct {
 	bool end_;
 } wmContext;
 
-void wmContext_init(wmContext *ctx, size_t stack_size, coroutine_func_t fn,
-		void* private_data);
+void wmContext_init(wmContext *ctx, size_t stack_size, coroutine_func_t fn, void* private_data);
 bool wmContext_swap_out(wmContext *ctx);
 bool wmContext_swap_in(wmContext *ctx);
 void wmContext_destroy(wmContext *ctx);

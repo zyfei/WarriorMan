@@ -47,12 +47,7 @@ enum wmCode {
     exit(-1);
 
 enum wmLog_level {
-	WM_LOG_DEBUG = 0,
-	WM_LOG_TRACE,
-	WM_LOG_INFO,
-	WM_LOG_NOTICE,
-	WM_LOG_WARNING,
-	WM_LOG_ERROR,
+	WM_LOG_DEBUG = 0, WM_LOG_TRACE, WM_LOG_INFO, WM_LOG_NOTICE, WM_LOG_WARNING, WM_LOG_ERROR,
 };
 
 void wmLog_put(int level, char *cnt);

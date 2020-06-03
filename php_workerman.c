@@ -1,6 +1,6 @@
 /* workerman extension for PHP */
 #include "workerman.h"
-#include "bash.h"
+#include "base.h"
 #include "worker.h"
 
 //创建协程接口方法声明
@@ -20,7 +20,7 @@ ZEND_END_ARG_INFO()
  */
 PHP_MINIT_FUNCTION(workerman) {
 	//初始化worker
-	wm_worker_init();
+	wmWorker_init();
 
 	//初始化base相关
 	workerman_base_init();
@@ -41,7 +41,7 @@ PHP_MINIT_FUNCTION(workerman) {
  * 模块关闭阶段
  */
 PHP_MSHUTDOWN_FUNCTION(workerman) {
-	wm_worker_shutdown();
+	wmWorker_shutdown();
 	return SUCCESS;
 }
 
@@ -78,22 +78,22 @@ PHP_FUNCTION(worker_event_wait) {
 }
 
 static const zend_function_entry workerman_functions[] = { //
-						PHP_FE(workerman_coroutine_create, arginfo_workerman_coroutine_create) //
-						PHP_FALIAS(worker_go, workerman_coroutine_create, arginfo_workerman_coroutine_create) //
-				PHP_FE(worker_event_wait, arginfo_workerman_void) //
-				PHP_FE_END };
+	PHP_FE(workerman_coroutine_create, arginfo_workerman_coroutine_create) //
+		PHP_FALIAS(worker_go, workerman_coroutine_create, arginfo_workerman_coroutine_create) //
+		PHP_FE(worker_event_wait, arginfo_workerman_void) //
+		PHP_FE_END };
 
 zend_module_entry workerman_module_entry = {
 STANDARD_MODULE_HEADER, "workerman", //
-		workerman_functions, //
-		PHP_MINIT(workerman),
-		PHP_MSHUTDOWN(workerman),
-		PHP_RINIT(workerman),
-		PHP_RSHUTDOWN(workerman),
-		PHP_MINFO(workerman),
-		PHP_WORKERMAN_VERSION, //
-		STANDARD_MODULE_PROPERTIES //
-		};
+	workerman_functions, //
+	PHP_MINIT(workerman),
+	PHP_MSHUTDOWN(workerman),
+	PHP_RINIT(workerman),
+	PHP_RSHUTDOWN(workerman),
+	PHP_MINFO(workerman),
+	PHP_WORKERMAN_VERSION, //
+	STANDARD_MODULE_PROPERTIES //
+	};
 
 #ifdef COMPILE_DL_WORKERMAN
 # ifdef ZTS

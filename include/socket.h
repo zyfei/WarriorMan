@@ -5,7 +5,8 @@
 #include "log.h"
 
 enum wmSocket_type {
-	WM_SOCK_TCP = 1, WM_SOCK_UDP = 2,
+	WM_SOCK_TCP = 1, //
+	WM_SOCK_UDP = 2, //
 };
 
 /**
@@ -15,7 +16,7 @@ int wmSocket_create(int domain, int type, int protocol);
 
 int wmSocket_set_nonblock(int sock);
 
-int wmSocket_listen(int sock,int backlog);
+int wmSocket_listen(int sock, int backlog);
 
 /**
  * 对bind()函数进行了封装

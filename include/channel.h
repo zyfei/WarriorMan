@@ -3,7 +3,7 @@
 /**
  * 协程化channel
  */
-#include "bash.h"
+#include "base.h"
 
 enum wmChannel_opcode {
 	CHANNEL_PUSH = 1, CHANNEL_POP = 2,
