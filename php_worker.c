@@ -112,8 +112,13 @@ PHP_METHOD(workerman_worker, run) {
 	RETURN_TRUE
 }
 
+/**
+ * 全部运行
+ */
 PHP_METHOD(workerman_worker, runAll) {
+	//检查环境
 	wmWorker_checkSapiEnv();
+
 }
 
 static const zend_function_entry workerman_worker_methods[] = { //
@@ -128,7 +133,7 @@ static const zend_function_entry workerman_worker_methods[] = { //
  */
 void workerman_worker_init() {
 	//定义好一个类
-	INIT_NS_CLASS_ENTRY(workerman_worker_ce, "Workerman", "Worker",
+	INIT_NS_CLASS_ENTRY(workerman_worker_ce, "Corkerman", "Worker",
 			workerman_worker_methods);
 	//在zedn中注册类
 	workerman_worker_ce_ptr = zend_register_internal_class(
@@ -152,13 +157,17 @@ void workerman_worker_init() {
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onConnect"),
 			ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onMessage"),
-			ZEND_ACC_PUBLIC);
+	ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onClose"),
-			ZEND_ACC_PUBLIC);
+	ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr,
 			ZEND_STRL("onBufferFull"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr,
 			ZEND_STRL("onBufferDrain"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onError"),
-			ZEND_ACC_PUBLIC);
+	ZEND_ACC_PUBLIC);
+
+	//静态变量
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"),
+	ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
 }

@@ -1,20 +1,20 @@
 <?php
-Workerman\Runtime::enableCoroutine();
+Corkerman\Runtime::enableCoroutine();
 
 $arr[] = worker_go(function () {
-	var_dump(Workerman::getCid() . " start");
-	Workerman::yield();
-	var_dump(Workerman::getCid() . " end");
+	var_dump(Corkerman::getCid() . " start");
+	Corkerman::yield();
+	var_dump(Corkerman::getCid() . " end");
 });
 
 $arr[] = worker_go(function () {
-	var_dump(Workerman::getCid() . " start");
-	Workerman::yield();
-	var_dump(Workerman::getCid() . " end");
+	var_dump(Corkerman::getCid() . " start");
+	Corkerman::yield();
+	var_dump(Corkerman::getCid() . " end");
 });
 
 foreach ($arr as $n) {
-	Workerman::resume($n);
+	Corkerman::resume($n);
 }
 
 if (! defined("RUN_TEST")) {

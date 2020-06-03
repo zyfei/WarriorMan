@@ -14,27 +14,30 @@ void workerman_base_init() {
 
 //初始化epoll
 int init_wmPoll() {
-	size_t size;
-	WorkerG.poll = (wmPoll_t *) wm_malloc(sizeof(wmPoll_t));
-	if (WorkerG.poll == NULL) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		return -1;
+	if (!WorkerG.poll) {
+		size_t size;
+		WorkerG.poll = (wmPoll_t *) wm_malloc(sizeof(wmPoll_t));
+		if (WorkerG.poll == NULL) {
+			wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+			return -1;
+		}
+		WorkerG.poll->epollfd = epoll_create(512); //创建一个epollfd，然后保存在全局变量
+		if (WorkerG.poll->epollfd < 0) {
+			wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+			wm_free(WorkerG.poll);
+			WorkerG.poll = NULL;
+			return -1;
+		}
+		WorkerG.poll->ncap = WM_MAXEVENTS;
+		size = sizeof(struct epoll_event) * WorkerG.poll->ncap;
+		WorkerG.poll->events = (struct epoll_event *) wm_malloc(size);
+		memset(WorkerG.poll->events, 0, size);
+		WorkerG.poll->event_num = 0; // 事件的数量
 	}
-	WorkerG.poll->epollfd = epoll_create(512); //创建一个epollfd，然后保存在全局变量
-	if (WorkerG.poll->epollfd < 0) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		wm_free(WorkerG.poll);
-		WorkerG.poll = NULL;
-		return -1;
-	}
-	WorkerG.poll->ncap = WM_MAXEVENTS;
-	size = sizeof(struct epoll_event) * WorkerG.poll->ncap;
-	WorkerG.poll->events = (struct epoll_event *) wm_malloc(size);
-	memset(WorkerG.poll->events, 0, size);
-	WorkerG.poll->event_num = 0; // 事件的数量
 	return 0;
 }
 
+//释放epoll
 int free_wmPoll() {
 	if (close(WorkerG.poll->epollfd) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
@@ -43,35 +46,17 @@ int free_wmPoll() {
 	WorkerG.poll->events = NULL;
 	wm_free(WorkerG.poll);
 	WorkerG.poll = NULL;
+	WorkerG.is_running = false;
 	return 0;
 }
 
-/**
- * 初始化事件
- */
-int wm_event_init() {
+//普通调度器，server的使用不用
+int wm_event_wait() {
+	init_wmPoll();
 	if (!WorkerG.poll) {
-		init_wmPoll();
+		wmError("Need to call init_wmPoll() first.");
 	}
 	WorkerG.is_running = true;
-	return 0;
-}
-
-/**
- * 释放整个事件
- */
-int wm_event_free() {
-	WorkerG.is_running = false;
-	free_wmPoll();
-	return 0;
-}
-
-//调度器
-int wm_event_wait() {
-	wm_event_init();
-	if (!WorkerG.poll) {
-		wmError("Need to call wm_event_init first.");
-	}
 
 	long mic_time;
 	//这里应该改成死循环了
@@ -107,7 +92,7 @@ int wm_event_wait() {
 		}
 
 	}
-	wm_event_free();
+	free_wmPoll();
 
 	return 0;
 }

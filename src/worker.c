@@ -7,9 +7,6 @@ static swHashMap *_workers = NULL; //worker map
 static swHashMap *_pidMap = NULL; //worker map
 static swHashMap *_fd_workers = NULL; //worker map
 
-static zval* _wm_zval_maxSendBufferSize = NULL;
-static zval* _wm_zval_maxPackageSize = NULL;
-
 //解析地址
 void parseSocketAddress(wmWorker* worker, zend_string *listen);
 void bind_callback(zval* _This, const char* fun_name,
@@ -27,26 +24,12 @@ void wm_worker_init() {
 	if (!_fd_workers) {
 		_fd_workers = swHashMap_new(NULL);
 	}
-	if (!_wm_zval_maxSendBufferSize) {
-		_wm_zval_maxSendBufferSize = emalloc(sizeof(zval));
-		ZVAL_STR(_wm_zval_maxSendBufferSize,
-				zend_string_init( ZEND_STRL("maxSendBufferSize"), 0));
-		_wm_zval_maxSendBufferSize->value.str->gc.refcount++;
-	}
-	if (!_wm_zval_maxPackageSize) {
-		_wm_zval_maxPackageSize = emalloc(sizeof(zval));
-		ZVAL_STR(_wm_zval_maxPackageSize,
-				zend_string_init( ZEND_STRL("maxPackageSize"), 0));
-		_wm_zval_maxPackageSize->value.str->gc.refcount++;
-	}
 }
 
 /**
  * 创建
  */
 wmWorker* wmWorker_create(zval *_This, zend_string *listen) {
-	wm_worker_init();
-
 	wmWorker* worker = (wmWorker *) wm_malloc(sizeof(wmWorker));
 	bzero(worker, sizeof(wmWorker));
 	worker->_status = WM_STATUS_STARTING;
@@ -159,8 +142,13 @@ void wmWorker_checkSapiEnv() {
 	zend_string* _php_sapi = zend_string_init("PHP_SAPI", strlen("PHP_SAPI"),
 			0);
 	zval* _php_sapi_zval = zend_get_constant(_php_sapi);
-//	php_var_dump(_php_sapi_zval, 1 TSRMLS_CC);
+	if (strcmp(_php_sapi_zval->value.str->val, "cli") != 0) {
+		wmError("Only run in command line mode \n");
+		return;
+	}
+	php_var_dump(_php_sapi_zval, 1 TSRMLS_CC);
 	zend_string_free(_php_sapi);
+	efree(_php_sapi_zval);
 }
 
 //绑定回调
@@ -284,5 +272,18 @@ void parseSocketAddress(wmWorker* worker, zend_string *listen) {
 			worker->port = atoi(str);
 		}
 		str = strtok(NULL, ":");
+	}
+}
+
+//释放相关资源
+void wm_worker_shutdown() {
+	if (!_workers) {
+		swHashMap_free(_workers);
+	}
+	if (!_pidMap) {
+		swHashMap_free(_pidMap);
+	}
+	if (!_fd_workers) {
+		swHashMap_free(_fd_workers);
 	}
 }

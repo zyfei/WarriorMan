@@ -150,7 +150,7 @@ static const zend_function_entry workerman_connection_methods[] = { //
 void workerman_connection_init() {
 
 	//定义好一个类
-	INIT_NS_CLASS_ENTRY(workerman_connection_ce, "Workerman", "Connection",
+	INIT_NS_CLASS_ENTRY(workerman_connection_ce, "Corkerman", "Connection",
 			workerman_connection_methods);
 	//在zedn中注册类
 	workerman_connection_ce_ptr = zend_register_internal_class(

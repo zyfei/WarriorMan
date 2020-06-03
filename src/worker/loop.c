@@ -92,10 +92,10 @@ void wmWorkerLoop_del(int fd) {
  * 主事件循环，不同于wm_event_wait
  */
 void wmWorkerLoop_loop() {
-	wm_event_init();
-	if (!WorkerG.poll) {
-		wmError("Need to call wm_event_init first.");
+	if (init_wmPoll() < 0) {
+		wmError("Need to call init_wmPoll() first.");
 	}
+	WorkerG.is_running = true;
 
 	long mic_time;
 	//这里应该改成死循环了
@@ -144,8 +144,9 @@ void wmWorkerLoop_loop() {
 			wmTimerWheel_update(&WorkerG.timer, mic_time);
 		}
 	}
+	wmWorkerLoop_stop();
 }
 
 void wmWorkerLoop_stop() {
-	wm_event_free();
+	free_wmPoll();
 }

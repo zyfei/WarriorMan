@@ -43,6 +43,7 @@ wmWorkerObject* wm_worker_fetch_object(zend_object *obj);
 //为了通过php对象，找到上面的c++对象 end
 
 void wm_worker_init();
+void wm_worker_shutdown();
 
 wmWorker* wmWorker_create(zval *_This, zend_string *listen);
 

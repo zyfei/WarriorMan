@@ -1,5 +1,5 @@
 <?php
-$chan = new worker_channel(1);
+$chan = new Corkerman\Channel(1);
 var_dump($chan);
 worker_go(function () use ($chan) {
 	var_dump("push start");

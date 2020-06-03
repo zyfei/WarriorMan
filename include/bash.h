@@ -282,9 +282,7 @@ int init_wmPoll();
 //释放
 int free_wmPoll();
 
-int wm_event_init();
 int wm_event_wait();
-int wm_event_free();
 
 //定义的全局变量，在base.cc中
 extern wmGlobal_t WorkerG;

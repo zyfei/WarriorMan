@@ -150,13 +150,11 @@ static const zend_function_entry workerman_channel_methods[] = { //
  */
 void workerman_channel_init() {
 	//定义好一个类
-	INIT_NS_CLASS_ENTRY(workerman_channel_ce, "Workerman", "Channel",
+	INIT_NS_CLASS_ENTRY(workerman_channel_ce, "Corkerman", "Channel",
 			workerman_channel_methods);
 	//在zedn中注册类
 	workerman_channel_ce_ptr = zend_register_internal_class(
 			&workerman_channel_ce TSRMLS_CC); // 在 Zend Engine 中注册
-	//短名
-	zend_register_class_alias("worker_channel", workerman_channel_ce_ptr);
 
 	//替换掉PHP默认的handler
 	memcpy(&workerman_channel_handlers, zend_get_std_object_handlers(),

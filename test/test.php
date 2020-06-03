@@ -1,7 +1,7 @@
 <?php
-Workerman\Runtime::enableCoroutine();
+Corkerman\Runtime::enableCoroutine();
 
-$worker = new Workerman\Worker("tcp://0.0.0.0:8080", array(
+$worker = new Corkerman\Worker("tcp://0.0.0.0:8080", array(
 	"backlog" => 1234,
 	"count" => 2
 ));
@@ -38,4 +38,4 @@ $worker->onClose = function ($connection) {
 };
 
 $worker->run();
-Workerman\Worker::runAll();
+Corkerman\Worker::runAll();
