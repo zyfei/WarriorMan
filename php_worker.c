@@ -110,7 +110,7 @@ PHP_METHOD(workerman_worker, run) {
  */
 PHP_METHOD(workerman_worker, runAll) {
 	//检查环境
-	wmWorker_checkEnv();
+	wmWorker_runAll();
 }
 
 static const zend_function_entry workerman_worker_methods[] = { //
@@ -148,4 +148,5 @@ void workerman_worker_init() {
 
 	//静态变量
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
+	zend_declare_property_bool(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), IS_FALSE, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
 }

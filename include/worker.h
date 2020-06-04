@@ -46,9 +46,9 @@ void wmWorker_shutdown();
 
 wmWorker* wmWorker_create(zval *_This, zend_string *listen);
 bool wmWorker_run(wmWorker *worker_obj); //启动服务器
+void wmWorker_runAll();
 bool wmWorker_stop(wmWorker* worker); //关闭服务器
 void wmWorker_free(wmWorker* worker);
-void wmWorker_checkEnv();
 wmWorker* wmWorker_find_by_fd(int fd);
 //loop 回调
 void _wmWorker_acceptConnection(wmWorker *worker);

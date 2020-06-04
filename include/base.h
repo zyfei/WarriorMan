@@ -251,6 +251,7 @@ static inline void wm_zend_fci_cache_free(void* fci_cache) {
 
 //调用闭包函数
 int call_closure_func(php_fci_fcc* fci_fcc);
+bool set_process_title(char* process_title);
 
 //初始化base相关
 void workerman_base_init();

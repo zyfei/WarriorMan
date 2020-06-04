@@ -1,4 +1,6 @@
 <?php
+global $aa;
+$aa = 123;
 
 $worker = new Corkerman\Worker("tcp://0.0.0.0:8080", array(
 	"backlog" => 1234,

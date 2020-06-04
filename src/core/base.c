@@ -117,3 +117,23 @@ int call_closure_func(php_fci_fcc* fci_fcc) {
 	zval_ptr_dtor(retval);
 	return SUCCESS;
 }
+
+/**
+ * 设置进程标题
+ */
+bool set_process_title(char* process_title) {
+	zval function_name;
+	zval retval_ptr;
+	zval argv;
+
+	ZVAL_STRINGL(&function_name, "cli_set_process_title", sizeof("cli_set_process_title") - 1);
+	ZVAL_STRINGL(&argv, process_title, strlen(process_title));
+
+	call_user_function(EG(function_table), NULL, &function_name, &retval_ptr, 1, &argv TSRMLS_CC);
+	efree(function_name.value.str);
+	efree(argv.value.str);
+	if (Z_TYPE_INFO(retval_ptr) == IS_FALSE) {
+		return false;
+	}
+	return true;
+}
