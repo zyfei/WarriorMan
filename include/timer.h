@@ -40,12 +40,12 @@ typedef struct timernode {
 
 // 第1个轮
 typedef struct tvroot {
-	clinknode_t vec[TVR_SIZE];
+	wmListNode vec[TVR_SIZE];
 } tvroot_t;
 
 // 后面几个轮
 typedef struct tvnum {
-	clinknode_t vec[TVN_SIZE];
+	wmListNode vec[TVN_SIZE];
 } tvnum_t;
 
 // 时间轮定时器
@@ -57,7 +57,7 @@ typedef struct timerwheel {
 	uint16_t interval;             // 每个时间点的毫秒间隔
 	uint16_t remainder;            // 剩余的毫秒
 	uint32_t num;				   // 当前剩余任务数
-	clinknode_t so_long_node;      // 超出了最大时间的节点，在每次最大表盘归0的时候尝试插入
+	wmListNode so_long_node;      // 超出了最大时间的节点，在每次最大表盘归0的时候尝试插入
 } wmTimerWheel;
 
 // 初始化时间轮，interval为每帧的间隔，currtime为当前时间

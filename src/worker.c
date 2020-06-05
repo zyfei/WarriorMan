@@ -4,8 +4,7 @@
 
 static unsigned int _last_id = 0;
 static wmString *_processTitle = NULL;
-static swHashMap *_workers = NULL; //worker map
-static swHashMap *_pidMap = NULL; //worker map
+static swHashMap *_workers = NULL; //workerId=>worker
 
 /**
  * Mapping from PID to worker process ID.
@@ -20,6 +19,7 @@ static wmString* _pidFile = NULL; //pid路径
 static wmString* _runDir = NULL; //启动路径
 static int _status = WM_WORKER_STATUS_STARTING; //当前服务状态
 static bool _daemonize = false; //守护进程模式
+static int _masterPid = 0; //master进程ID
 
 //解析地址
 void parseSocketAddress(wmWorker* worker, zend_string *listen);
@@ -28,6 +28,15 @@ void resumeAccept(wmWorker *worker);
 void checkEnv();
 void parseCommand();
 void init_idMap();
+void daemonize();
+void saveMasterPid();
+void initWorkers();
+void _listen(wmWorker *worker);
+void _run(wmWorker *worker);
+void forkWorkers();
+void forkOneWorker(wmWorker* worker, int key);
+int getKey_by_pid(wmWorker* worker, int pid);
+void _unlisten(wmWorker *worker);
 
 //初始化一下参数
 void wmWorker_init() {
@@ -36,9 +45,6 @@ void wmWorker_init() {
 
 	if (!_workers) {
 		_workers = swHashMap_new(NULL);
-	}
-	if (!_pidMap) {
-		_pidMap = swHashMap_new(NULL);
 	}
 	if (!_fd_workers) {
 		_fd_workers = swHashMap_new(NULL);
@@ -51,7 +57,7 @@ void wmWorker_init() {
 /**
  * 创建
  */
-wmWorker* wmWorker_create(zval *_This, zend_string *listen) {
+wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	wmWorker* worker = (wmWorker *) wm_malloc(sizeof(wmWorker));
 	bzero(worker, sizeof(wmWorker));
 	worker->_status = WM_STATUS_STARTING;
@@ -71,39 +77,56 @@ wmWorker* wmWorker_create(zval *_This, zend_string *listen) {
 	worker->count = 0;
 	worker->transport = NULL;
 	worker->_This = _This;
-
-	parseSocketAddress(worker, listen);
+	worker->name = NULL;
+	worker->socketName = wmString_dup(socketName->val, socketName->len);
+	parseSocketAddress(worker, socketName);
 
 	//写入workers对照表
 	swHashMap_add_int(_workers, worker->id, worker);
-	swHashMap_add_int(_pidMap, worker->id, swHashMap_new(NULL));
 	swHashMap_add_int(_idMap, worker->id, NULL);
 
 	return worker;
 }
 
+//服务器监听启动
+void _listen(wmWorker *worker) {
+	if (worker->fd == 0) {
+		worker->fd = wmSocket_create(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		wmSocket_set_nonblock(worker->fd);
+
+		if (wmSocket_bind(worker->fd, worker->host, worker->port) < 0) {
+			wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+			return;
+		}
+
+		if (wmSocket_listen(worker->fd, worker->backlog) < 0) {
+			wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+			return;
+		}
+
+		swHashMap_add_int(_fd_workers, worker->fd, worker);
+
+		//绑定fd
+		zend_update_property_long(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("fd"), worker->fd);
+
+	}
+
+}
+
+//取消监听
+void _unlisten(wmWorker *worker) {
+	if (worker->fd != 0) {
+		wmSocket_close(worker->fd);
+		worker->fd = 0;
+	}
+}
+
 //启动服务器
-bool wmWorker_run(wmWorker *worker) {
+void _run(wmWorker *worker) {
 	//zval zsocket;
 	worker->_status = WM_STATUS_RUNNING;
-
-	worker->fd = wmSocket_create(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-	wmSocket_set_nonblock(worker->fd);
-
-	if (wmSocket_bind(worker->fd, worker->host, worker->port) < 0) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		return false;
-	}
-
-	if (wmSocket_listen(worker->fd, worker->backlog) < 0) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		return false;
-	}
-
-	swHashMap_add_int(_fd_workers, worker->fd, worker);
-
-	//绑定fd
-	zend_update_property_long(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("fd"), worker->fd);
+	//在这里应该注册事件回调
+	resumeAccept(worker);
 
 	//处理onWorkerStart
 	bind_callback(worker->_This, "onWorkerStart", &worker->onWorkerStart);
@@ -112,7 +135,7 @@ bool wmWorker_run(wmWorker *worker) {
 		worker->onWorkerStart->fci.params = worker->_This;
 		if (call_closure_func(worker->onWorkerStart) != SUCCESS) {
 			php_error_docref(NULL, E_ERROR, "call onWorkerStart error");
-			return false;
+			return;
 		}
 	}
 
@@ -125,17 +148,140 @@ bool wmWorker_run(wmWorker *worker) {
 	bind_callback(worker->_This, "onError", &worker->onError);
 	//设置回调方法 end
 
-	//在这里应该注册事件回调
-	resumeAccept(worker);
 	//进入loop
 	wmWorkerLoop_loop();
-	return true;
 }
 
 //全部运行
 void wmWorker_runAll() {
 	checkEnv();
-	parseCommand();
+	parseCommand(); //解析用户命令
+	daemonize(); //守护进程模式
+	initWorkers(); //初始化进程相关资料
+	saveMasterPid();
+	forkWorkers();
+}
+
+/**
+ * 向loop注册accept
+ */
+void resumeAccept(wmWorker *worker) {
+	//读 | 避免惊群
+	wmWorkerLoop_add(worker->fd, WM_EVENT_READ | WM_EVENT_EPOLLEXCLUSIVE);
+}
+
+//fork子进程
+void forkWorkers() {
+	swHashMap_rewind(_workers);
+	uint64_t key;
+	//循环_workers
+	while (1) {
+		wmWorker* worker = (wmWorker *) swHashMap_each_int(_workers, &key);
+		if (worker == NULL) {
+			break;
+		}
+		while (1) {
+			int key = getKey_by_pid(worker, 0);
+			if (key < 0) {
+				break;
+			}
+			forkOneWorker(worker, key);
+		}
+	}
+}
+
+/**
+ * 正式fork进程
+ */
+void forkOneWorker(wmWorker* worker, int key) {
+	//拿到一个未fork的进程
+	int pid = fork();
+	if (pid > 0) { // For master process.
+		int* id_arr = (int*) swHashMap_find_int(_idMap, worker->id);
+		id_arr[key] = pid;
+		return;
+	} else if (pid == 0) { // For child processes.
+		printf("child processes fork and die!\n");
+
+		swHashMap_rewind(_workers);
+		uint64_t key;
+		int delete_worker_id = 0;
+		//循环_workers
+		while (1) {
+			wmWorker* worker2 = (wmWorker *) swHashMap_each_int(_workers, &key);
+			//后删除
+			if (delete_worker_id != 0) {
+				_unlisten(worker2);
+				swHashMap_del_int(_workers, delete_worker_id);
+				delete_worker_id = 0;
+			}
+			if (worker2 == NULL) {
+				break;
+			}
+			if (worker2->id != worker->id) {
+				delete_worker_id = worker2->id;
+			}
+		}
+
+		// Process title.
+		wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%.*s: worker process %.*s %.*s", (int) _processTitle->length, _processTitle->str,
+			(int) worker->name->length, worker->name->str, (int) worker->socketName->length, worker->socketName->str);
+		if (!set_process_title(WorkerG.buffer_stack->str)) {
+			wmError("call_user_function 'cli_set_process_title' error");
+			return;
+		}
+
+		worker->id = key;
+		_run(worker);
+		wmError("event-loop exited");
+		exit(0);
+	} else {
+		wmError("forkOneWorker fail");
+	}
+}
+
+/**
+ * 在idmap中，通过value查询key
+ */
+int getKey_by_pid(wmWorker* worker, int pid) {
+	int* id_arr = (int *) swHashMap_find_int(_idMap, worker->id);
+	int id = -1;
+	for (int i = 0; i < worker->count; i++) {
+		if (id_arr[i] == pid) {
+			id = i;
+			break;
+		}
+	}
+	return id;
+}
+
+/**
+ * 初始化进程相关资料
+ */
+void initWorkers() {
+	swHashMap_rewind(_workers);
+	uint64_t key;
+	//循环_workers
+	while (1) {
+		wmWorker* worker = (wmWorker *) swHashMap_each_int(_workers, &key);
+		if (worker == NULL) {
+			break;
+		}
+		//检查worker->name
+		zval *_name = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), 0);
+		if (_name) {
+			if (Z_TYPE_INFO_P(_name) == IS_STRING) {
+				worker->name = wmString_dup(_name->value.str->val, _name->value.str->len);
+			}
+		}
+		if (!worker->name) {
+			worker->name = wmString_dup("none", 4);
+			zend_update_property_stringl(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), worker->name->str, 4);
+		}
+
+		//listen
+		_listen(worker);
+	}
 }
 
 //关闭服务器
@@ -149,14 +295,8 @@ bool wmWorker_stop(wmWorker* worker) {
  */
 void wmWorker_free(wmWorker* worker) {
 	if (worker) {
-		swHashMap* hmap = (swHashMap*) swHashMap_find_int(_pidMap, worker->id);
-		if (hmap) {
-			swHashMap_free(hmap);
-			hmap = NULL;
-		}
-
+		efree(worker->_This);
 		swHashMap_del_int(_idMap, worker->id);
-		swHashMap_del_int(_pidMap, worker->id);
 		swHashMap_del_int(_workers, worker->id);
 		swHashMap_del_int(_fd_workers, worker->fd);
 
@@ -225,10 +365,9 @@ void checkEnv() {
 	//
 
 	// Process title.
-	char process_title[512];
-	snprintf(process_title, 512, "%.*s: master process start_file=%.*s", (int) _processTitle->length, _processTitle->str, (int) _startFile->length,
-		_startFile->str);
-	if (!set_process_title(process_title)) {
+	wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%.*s: master process start_file=%.*s", (int) _processTitle->length, _processTitle->str,
+		(int) _startFile->length, _startFile->str);
+	if (!set_process_title(WorkerG.buffer_stack->str)) {
 		wmError("call_user_function 'cli_set_process_title' error");
 		return;
 	}
@@ -265,15 +404,15 @@ void parseCommand() {
 	zend_string_free(argv_str);
 	HashTable *argv_table = Z_ARRVAL_P(argv);
 
-	zend_string* start_file = NULL; //启动文件
+	//zend_string* start_file = NULL; //启动文件
 	zend_string* command = NULL; //第一个命令
 	zend_string* command2 = NULL; //第二个命令
 
 	//获取启动文件
-	zval *value = zend_hash_index_find(argv_table, 0);
-	start_file = Z_STR_P(value);
+	//zval *value = zend_hash_index_find(argv_table, 0);
+	//start_file = Z_STR_P(value);
 
-	value = zend_hash_index_find(argv_table, 1);
+	zval *value = zend_hash_index_find(argv_table, 1);
 	if (value != NULL) {
 		command = Z_STR_P(value);
 	}
@@ -283,12 +422,14 @@ void parseCommand() {
 		command2 = Z_STR_P(value);
 	}
 	int command_type = 0;
-	command_type = strcmp("start", command->val) == 0 ? 1 : command_type;
-	command_type = strcmp("stop", command->val) == 0 ? 2 : command_type;
-	command_type = strcmp("restart", command->val) == 0 ? 3 : command_type;
-	command_type = strcmp("reload", command->val) == 0 ? 4 : command_type;
-	command_type = strcmp("status", command->val) == 0 ? 5 : command_type;
-	command_type = strcmp("connections", command->val) == 0 ? 6 : command_type;
+	if (command != NULL) {
+		command_type = (strcmp("start", command->val) == 0 ? 1 : command_type);
+		command_type = (strcmp("stop", command->val) == 0 ? 2 : command_type);
+		command_type = (strcmp("restart", command->val) == 0 ? 3 : command_type);
+		command_type = (strcmp("reload", command->val) == 0 ? 4 : command_type);
+		command_type = (strcmp("status", command->val) == 0 ? 5 : command_type);
+		command_type = (strcmp("connections", command->val) == 0 ? 6 : command_type);
+	}
 
 	if (command_type == 0) {
 		if (command != NULL) {
@@ -303,7 +444,7 @@ void parseCommand() {
 	//设置守护进程模式
 	if (command2 && strcmp("-d", command2->val) == 0) {
 		_daemonize = true;
-		zend_update_static_property_bool(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), IS_TRUE);
+		zend_update_static_property_bool(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), 1);
 	}
 
 	// execute command.
@@ -319,9 +460,9 @@ void parseCommand() {
 
 //绑定回调
 void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_fcc) {
-//判断是否有workerStart
+	//判断是否有workerStart
 	zval *_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, _This, fun_name, strlen(fun_name), 0);
-//如果没有
+	//如果没有
 	if (_zval == NULL) {
 		return;
 	}
@@ -333,63 +474,55 @@ void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_f
 		php_error_docref(NULL, E_ERROR, "%s error : %s", fun_name, _error);
 		return;
 	}
-//为这个闭包增加引用计数
+	//为这个闭包增加引用计数
 	wm_zend_fci_cache_persist(&(*handle_fci_fcc)->fcc);
-}
-
-/**
- * 向loop注册accept
- */
-void resumeAccept(wmWorker *worker) {
-//读 | 避免惊群
-	wmWorkerLoop_add(worker->fd, WM_EVENT_READ | WM_EVENT_EPOLLEXCLUSIVE);
 }
 
 /**
  * accept回调函数
  */
 void _wmWorker_acceptConnection(wmWorker *worker) {
-//新的Connection对象
+	//新的Connection对象
 	zend_object *obj = wm_connection_create_object(workerman_connection_ce_ptr);
 	zval *z = emalloc(sizeof(zval));
 	ZVAL_OBJ(z, obj);
 
 	wmConnectionObject* connection_object = (wmConnectionObject *) wm_connection_fetch_object(obj);
 
-//接客
+	//接客
 	connection_object->connection = wmConnection_accept(worker->fd);
 	connection_object->connection->worker = (void*) worker;
 	connection_object->connection->_This = z;
 
-//设置属性 start
+	//设置属性 start
 	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("id"), connection_object->connection->id);
 	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("fd"), connection_object->connection->fd);
 
 	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("fd"), connection_object->connection->fd);
 
-//
+	//
 	zval* __zval = zend_read_static_property(workerman_connection_ce_ptr, ZEND_STRL("defaultMaxSendBufferSize"), 0);
 	connection_object->connection->maxSendBufferSize = __zval->value.lval;
 	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("maxSendBufferSize"), connection_object->connection->maxSendBufferSize);
 
-//
+	//
 	__zval = zend_read_static_property(workerman_connection_ce_ptr, ZEND_STRL("defaultMaxPackageSize"), 0);
 	connection_object->connection->maxPackageSize = __zval->value.lval;
 
 	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("maxPackageSize"), connection_object->connection->maxPackageSize);
 
 	zval_ptr_dtor(__zval);
-//设置属性 end
+	//设置属性 end
 
-//设置回调方法 start
+	//设置回调方法 start
 	connection_object->connection->onMessage = worker->onMessage;
 	connection_object->connection->onClose = worker->onClose;
 	connection_object->connection->onBufferFull = worker->onBufferFull;
 	connection_object->connection->onBufferDrain = worker->onBufferDrain;
 	connection_object->connection->onError = worker->onError;
-//设置回调方法 end
+	//设置回调方法 end
 
-//onConnect
+	//onConnect
 	if (worker->onConnect) {
 		wmCoroutine_create(&(worker->onConnect->fcc), 1, z); //创建新协程
 	}
@@ -426,13 +559,49 @@ void parseSocketAddress(wmWorker* worker, zend_string *listen) {
 	}
 }
 
+/**
+ * 开启守护进程模式
+ */
+void daemonize() {
+	if (_daemonize == false) {
+		return;
+	}
+	umask(0);
+	int pid = fork();
+	if (pid > 0) {
+		exit(0); //是父进程，结束父进程
+		return;
+	} else if (pid < 0) { //fork失败
+		wmError("Fork fail");
+		return;
+	}
+	if (setsid() < 0) {
+		wmError("Setsid fail");
+		return;
+	}
+
+	// Fork again avoid SVR4 system regain the control of terminal.
+	pid = fork();
+	if (pid > 0) {
+		exit(0); //是父进程，结束父进程
+	} else if (pid < 0) { //fork失败
+		wmError("Fork fail");
+	}
+}
+
+/**
+ * 保存master进程ID
+ */
+void saveMasterPid() {
+	_masterPid = getpid();
+	int ret = wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%d", _masterPid);
+	wm_file_put_contents(_pidFile->str, WorkerG.buffer_stack->str, ret); //写入PID文件
+}
+
 //释放相关资源
 void wmWorker_shutdown() {
 	if (!_workers) {
 		swHashMap_free(_workers);
-	}
-	if (!_pidMap) {
-		swHashMap_free(_pidMap);
 	}
 	if (!_fd_workers) {
 		swHashMap_free(_fd_workers);

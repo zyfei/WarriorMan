@@ -44,6 +44,9 @@ enum wmConnection_status {
 #define WM_MAX_SEND_BUFFER_SIZE 102400 //默认应用层发送缓冲区大小  1M
 #define WM_MAX_PACKAGE_SIZE 1024000   //每个连接能够接收的最大包包长 10M
 
+//file
+#define WM_MAX_FILE_CONTENT        (64*1024*1024)
+
 #define wm_malloc              malloc
 #define wm_free                free
 #define wm_calloc              calloc

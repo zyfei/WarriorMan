@@ -1,7 +1,8 @@
 #ifndef _WM_STRING_H
 #define _WM_STRING_H
 
-#include "base.h"
+#include "header.h"
+#include "log.h"
 
 typedef struct {
 	size_t length; //当前字符串长度

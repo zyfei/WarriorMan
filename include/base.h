@@ -11,6 +11,7 @@
 #include "log.h"
 #include "queue.h"
 #include "wm_string.h"
+#include "file.h"
 
 //php库
 #include "zend_closures.h"
@@ -213,7 +214,6 @@ static inline void fromuint64(uint64_t v, int *fd, int *id) {
 }
 
 static inline zval* wm_malloc_zval() {
-	php_printf("1");
 	return (zval *) emalloc(sizeof(zval));
 }
 
@@ -252,6 +252,11 @@ static inline void wm_zend_fci_cache_free(void* fci_cache) {
 //调用闭包函数
 int call_closure_func(php_fci_fcc* fci_fcc);
 bool set_process_title(char* process_title);
+/**
+ * 格式化字符串
+ */
+size_t wm_snprintf(char *buf, size_t size, const char *format, ...);
+
 
 //初始化base相关
 void workerman_base_init();
@@ -280,6 +285,7 @@ typedef struct {
 	bool is_running;
 	wmPoll_t *poll;
 	wmTimerWheel timer; //核心定时器
+	wmString *buffer_stack; //用于整个项目的临时字符串存储
 } wmGlobal_t;
 
 //初始化wmPoll_t

@@ -19,16 +19,16 @@ void wmTimerWheel_init(wmTimerWheel *tw, uint16_t interval, uint64_t currtime) {
 	//TVR_SIZE 将0000 0001 左移8位，1 0000 0000 = 2的(8)次幂 = 256
 	for (i = 0; i < TVR_SIZE; ++i) {
 		//指向一个地址,第一轮有256个刻度
-		clinklist_init(tw->tvroot.vec + i);
+		wmList_init(tw->tvroot.vec + i);
 	}
 	//初始化后面的
 	for (i = 0; i < 4; ++i) {
 		for (j = 0; j < TVN_SIZE; ++j)
-			clinklist_init(tw->tv[i].vec + j);
+			wmList_init(tw->tv[i].vec + j);
 	}
 
 	//初始化备胎区
-	clinklist_init(&tw->so_long_node);
+	wmList_init(&tw->so_long_node);
 }
 
 /**
@@ -48,7 +48,7 @@ void wmTimerWheel_node_init(wmTimerWheel_Node *node, timer_cb_t cb, void *ud) {
 static void _wmTimerWheel_add(wmTimerWheel *tw, wmTimerWheel_Node *node) {
 	uint32_t expire = node->expire;	//过期时间
 	uint32_t idx = expire - tw->currtick; //还有多少滴答超时
-	clinknode_t *head = NULL; //链表头
+	wmListNode *head = NULL; //链表头
 	//idx < 256
 	if (idx < TVR_SIZE) {
 		//获取这个轮盘中，相应的刻度链表头 ,第一个轮盘共有TVR_SIZE个刻度  从+0开始
@@ -78,9 +78,9 @@ static void _wmTimerWheel_add(wmTimerWheel *tw, wmTimerWheel_Node *node) {
 	}
 	if (head != NULL) {
 		//最后把这个节点，加入到对应表盘的对应刻度中。因为是双向循环链表，其实是加在head的上面
-		clinklist_add_back(head, (clinknode_t*) node);
+		wmList_add_back(head, (wmListNode*) node);
 	} else { //下面是超长节点
-		clinklist_add_back(&tw->so_long_node, (clinknode_t*) node);
+		wmList_add_back(&tw->so_long_node, (wmListNode*) node);
 	}
 
 }
@@ -104,8 +104,8 @@ void wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void *ud, uint32_t 
 
 // 删除结点
 //int wmTimerWheel_del(wmTimerWheel *tw, wmTimerWheel_Node *node) {
-//	if (!clinklist_is_empty((clinknode_t*) node)) {
-//		clinklist_remote((clinknode_t*) node);
+//	if (!wmList_is_empty((wmListNode*) node)) {
+//		wmList_remote((wmListNode*) node);
 //		return 1;
 //	}
 //	return 0;
@@ -117,15 +117,15 @@ void wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void *ud, uint32_t 
  */
 //tvnum_t *tv, int idx
 //tv->vec + idx
-void _timerwheel_cascade(wmTimerWheel *tw, clinknode_t *head1) {
-	clinknode_t head;
-	clinklist_init(&head);
+void _timerwheel_cascade(wmTimerWheel *tw, wmListNode *head1) {
+	wmListNode head;
+	wmList_init(&head);
 	//取出idx刻度，下面的这一条链表。需要将这一条链表打散，放入上一个表盘中
-	clinklist_splice(head1, &head);
-	while (!clinklist_is_empty(&head)) {
+	wmList_splice(head1, &head);
+	while (!wmList_is_empty(&head)) {
 		//取出对应的节点
 		wmTimerWheel_Node *node = (wmTimerWheel_Node*) head.next;
-		clinklist_remote(head.next);
+		wmList_remote(head.next);
 
 		//重新添加到时间轮中
 		_wmTimerWheel_add(tw, node);
@@ -164,19 +164,19 @@ void _wmTimerWheelick(wmTimerWheel *tw) {
 	}
 
 	//双向链表
-	clinknode_t head;
+	wmListNode head;
 	//初始化一个双向链表
-	clinklist_init(&head);
+	wmList_init(&head);
 	//将第一个表盘，对应滴答的节点取出来，放入head中。 并且初始化tw->tvroot.vec + index
-	clinklist_splice(tw->tvroot.vec + index, &head);
+	wmList_splice(tw->tvroot.vec + index, &head);
 	//现在tw->tvroot.vec + index 指向的就是一个空节点。然后head是以前那个双向链表
 
 	//循环
-	while (!clinklist_is_empty(&head)) {
+	while (!wmList_is_empty(&head)) {
 		//拿出先加入的节点
 		wmTimerWheel_Node *node = (wmTimerWheel_Node*) head.next;
 		//拿出这个节点
-		clinklist_remote(head.next);
+		wmList_remote(head.next);
 
 		tw->num--;
 		if (node->callback) {

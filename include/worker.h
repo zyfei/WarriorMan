@@ -29,7 +29,10 @@ typedef struct _wmWorker {
 	char* host;
 	int32_t port;
 	int32_t count; //进程数量
+	wmString* name; //名字
 	char* transport;
+	wmString* socketName;// tcp://127.0.0.1:8080
+
 } wmWorker;
 
 //为了通过php对象，找到上面的c++对象 start
@@ -44,9 +47,8 @@ wmWorkerObject* wm_worker_fetch_object(zend_object *obj);
 void wmWorker_init();
 void wmWorker_shutdown();
 
-wmWorker* wmWorker_create(zval *_This, zend_string *listen);
-bool wmWorker_run(wmWorker *worker_obj); //启动服务器
-void wmWorker_runAll();
+wmWorker* wmWorker_create(zval *_This, zend_string *socketName);
+void wmWorker_runAll();//启动服务器
 bool wmWorker_stop(wmWorker* worker); //关闭服务器
 void wmWorker_free(wmWorker* worker);
 wmWorker* wmWorker_find_by_fd(int fd);

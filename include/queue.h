@@ -6,8 +6,8 @@
 
 // 定时器结点
 typedef struct {
-	clinknode_t *next; // 下一个结点
-	clinknode_t *prev; // 上一个结点
+	wmListNode *next; // 下一个结点
+	wmListNode *prev; // 上一个结点
 	void *data; // 用户数据
 } wmQueueNode;
 
@@ -23,7 +23,7 @@ static inline wmQueue* wmQueue_create() {
 	bzero(queue, sizeof(wmQueue));
 
 	queue->num = 0;
-	clinklist_init((clinknode_t *) &queue->head);
+	wmList_init((wmListNode *) &queue->head);
 	return queue;
 }
 
@@ -31,22 +31,22 @@ static inline wmQueue* wmQueue_create() {
 static inline void wmQueue_push(wmQueue* queue, void *data) {
 	wmQueueNode* node = (wmQueueNode *) wm_malloc(sizeof(wmQueueNode));
 	bzero(node, sizeof(wmQueueNode));
-	clinklist_init((clinknode_t *) node);
+	wmList_init((wmListNode *) node);
 	//保存用户数据
 	node->data = data;
 	//添加到整个双向列表的最后
-	clinklist_add_back((clinknode_t *) (&queue->head), (clinknode_t *) node);
+	wmList_add_back((wmListNode *) (&queue->head), (wmListNode *) node);
 	queue->num++;
 }
 
 // pop
 static inline void * wmQueue_pop(wmQueue* queue) {
 	//如果没有元素了
-	if (clinklist_is_empty((clinknode_t *) (&queue->head)) || queue->num == 0) {
+	if (wmList_is_empty((wmListNode *) (&queue->head)) || queue->num == 0) {
 		return NULL;
 	}
-	clinknode_t* next = queue->head.next;
-	clinklist_remote(next);
+	wmListNode* next = queue->head.next;
+	wmList_remote(next);
 	//释放
 	wm_free(((wmQueueNode*) next));
 	//减少记数
@@ -64,10 +64,10 @@ static inline void wmQueue_clear(wmQueue* queue) {
 	if (queue == NULL || queue->num == 0) {
 		return;
 	}
-	clinknode_t* head = (clinknode_t *) &queue->head;
-	while (!clinklist_is_empty(head)) {
+	wmListNode* head = (wmListNode *) &queue->head;
+	while (!wmList_is_empty(head)) {
 		wmQueueNode* _wqn = (wmQueueNode*) head->next;
-		clinklist_remote(head->next);
+		wmList_remote(head->next);
 		wm_free(_wqn);
 	}
 	queue->num = 0;

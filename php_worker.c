@@ -45,22 +45,24 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_worker_void, 0, 0, 0) //
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_worker_construct, 0, 0, 2) //
-ZEND_ARG_INFO(0, listen) //
+ZEND_ARG_INFO(0, socketName) //
 ZEND_ARG_INFO(0, options)//
 ZEND_END_ARG_INFO()
 
 PHP_METHOD(workerman_worker, __construct) {
 	zval *options = NULL;
-	zend_string *listen;
+	zend_string *socketName;
 
 	ZEND_PARSE_PARAMETERS_START(1, 2)
-				Z_PARAM_STR(listen)
+				Z_PARAM_STR(socketName)
 				Z_PARAM_OPTIONAL
 				Z_PARAM_ARRAY(options)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 	wmWorkerObject *worker_obj = (wmWorkerObject *) wm_worker_fetch_object(Z_OBJ_P(getThis()));
+	zval* worker_zval = wm_malloc_zval();
+	ZVAL_OBJ(worker_zval,&worker_obj->std);
 	//初始化worker
-	worker_obj->worker = wmWorker_create(getThis(), listen);
+	worker_obj->worker = wmWorker_create(worker_zval, socketName);
 
 	//设置worker id
 	zend_update_property_long(workerman_worker_ce_ptr, getThis(), ZEND_STRL("workerId"), worker_obj->worker->id);
@@ -95,27 +97,17 @@ PHP_METHOD(workerman_worker, stop) {
 	RETURN_TRUE
 }
 
-PHP_METHOD(workerman_worker, run) {
-	wmWorkerObject *worker_obj = (wmWorkerObject *) wm_worker_fetch_object(Z_OBJ_P(getThis()));
-
-	//php_var_dump(onWorkerStart_zval, 1 TSRMLS_CC);
-	if (wmWorker_run(worker_obj->worker) == false) {
-		RETURN_FALSE
-	}
-	RETURN_TRUE
-}
-
 /**
  * 全部运行
  */
 PHP_METHOD(workerman_worker, runAll) {
 	//检查环境
 	wmWorker_runAll();
+	RETURN_TRUE
 }
 
 static const zend_function_entry workerman_worker_methods[] = { //
 	PHP_ME(workerman_worker, __construct, arginfo_workerman_worker_construct, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR) // ZEND_ACC_CTOR is used to declare that this method is a constructor of this class.
-		PHP_ME(workerman_worker, run, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC)
 		PHP_ME(workerman_worker, runAll, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC)
 		PHP_ME(workerman_worker, stop, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC)
 		PHP_FE_END };
@@ -145,8 +137,9 @@ void workerman_worker_init() {
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onBufferFull"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onBufferDrain"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onError"), ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("name"), ZEND_ACC_PUBLIC);
 
 	//静态变量
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
-	zend_declare_property_bool(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), IS_FALSE, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
+	zend_declare_property_bool(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), 0, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
 }
