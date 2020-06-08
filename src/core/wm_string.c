@@ -13,13 +13,13 @@ wmString* wmString_new(size_t size) {
 	str->length = 0;
 	str->size = size;
 	str->offset = 0;
-	str->str = (char*) wm_malloc(size);
-
+	str->str = (char*) wm_malloc(size + 1); //多加一个字节，给\0用
 	if (str->str == NULL) {
 		wmWarn("wm_malloc[2](%ld) failed", size);
 		wm_free(str);
 		return NULL;
 	}
+	str->str[0] = '\0';
 	return str;
 }
 
@@ -39,14 +39,14 @@ wmString *wmString_dup2(wmString *src) {
 		//wmTrace("string dup2.  new=%p, old=%p\n", dst, src);
 		dst->length = src->length;
 		dst->offset = src->offset;
-		memcpy(dst->str, src->str, src->length);
+		memcpy(dst->str, src->str, src->length + 1); //把\0也复制过来
 	}
 
 	return dst;
 }
 
 /**
- * 复制字符串
+ * 创建
  */
 wmString *wmString_dup(const char *src_str, size_t length) {
 	//创建一个新的
@@ -55,6 +55,7 @@ wmString *wmString_dup(const char *src_str, size_t length) {
 		//字符串长度
 		str->length = length;
 		memcpy(str->str, src_str, length);
+		str->str[length] = '\0';
 	}
 	return str;
 }
@@ -74,6 +75,7 @@ int wmString_append(wmString *str, wmString *append_str) {
 	//追加字符串
 	memcpy(str->str + str->length, append_str->str, append_str->length);
 	str->length += append_str->length;
+	str->str[str->length] = '\0'; //追加\0
 	return WM_OK;
 }
 
@@ -94,6 +96,8 @@ int wmString_append_int(wmString *str, int value) {
 
 	memcpy(str->str + str->length, buf, s_len);
 	str->length += s_len;
+
+	str->str[str->length] = '\0'; //追加\0
 	return WM_OK;
 }
 
@@ -109,6 +113,8 @@ int wmString_append_ptr(wmString *str, const char *append_str, size_t length) {
 	}
 	memcpy(str->str + str->length, append_str, length);
 	str->length += length;
+
+	str->str[str->length] = '\0'; //追加\0
 	return WM_OK;
 }
 
@@ -125,6 +131,7 @@ int wmString_write(wmString *str, size_t offset, wmString *write_str) {
 	memcpy(str->str + offset, write_str->str, write_str->length);
 	if (new_length > str->length) {
 		str->length = new_length;
+		str->str[str->length] = '\0'; //追加\0
 	}
 	return WM_OK;
 }
@@ -142,6 +149,7 @@ int wmString_write_ptr(wmString *str, off_t offset, char *write_str, size_t leng
 	memcpy(str->str + offset, write_str, length);
 	if (new_length > str->length) {
 		str->length = new_length;
+		str->str[str->length] = '\0'; //追加\0
 	}
 	return WM_OK;
 }
@@ -152,7 +160,7 @@ int wmString_write_ptr(wmString *str, off_t offset, char *write_str, size_t leng
 int wmString_extend(wmString *str, size_t new_size) {
 	assert(new_size > str->size);
 	//动态调整内存
-	char *new_str = (char*) realloc(str->str, new_size);
+	char *new_str = (char*) realloc(str->str, new_size + 1);
 	if (new_str == NULL) {
 		wmWarn("realloc(%ld) failed", new_size);
 		return WM_ERR;
@@ -252,8 +260,9 @@ size_t wmString_utf8_length(char *p, size_t n) {
 }
 
 void wmString_random_string(char *buf, size_t size) {
-	static char characters[] = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
-		'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', };
+	static char characters[] = { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y',
+		'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2',
+		'3', '4', '5', '6', '7', '8', '9', };
 	unsigned int i;
 	for (i = 0; i < size; i++) {
 		buf[i] = characters[wm_rand(0, sizeof(characters) - 1)];
