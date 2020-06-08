@@ -75,6 +75,7 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	worker->host = NULL;
 	worker->port = 0;
 	worker->count = 0;
+	worker->key = 0;
 	worker->transport = NULL;
 	worker->_This = _This;
 	worker->name = NULL;
@@ -93,17 +94,15 @@ void _listen(wmWorker *worker) {
 	if (worker->fd == 0) {
 		worker->fd = wmSocket_create(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		wmSocket_set_nonblock(worker->fd);
-
 		if (wmSocket_bind(worker->fd, worker->host, worker->port) < 0) {
-			wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+			wmWarn("Error has occurred: port=%d (errno %d) %s", worker->port, errno, strerror(errno));
 			return;
 		}
 
 		if (wmSocket_listen(worker->fd, worker->backlog) < 0) {
-			wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+			wmWarn("Error has occurred: fd=%d (errno %d) %s", worker->fd, errno, strerror(errno));
 			return;
 		}
-
 		swHashMap_add_int(_fd_workers, worker->fd, worker);
 
 		//绑定fd
@@ -160,6 +159,7 @@ void wmWorker_runAll() {
 	initWorkers(); //初始化进程相关资料
 	saveMasterPid();
 	forkWorkers();
+	sleep(3000000);
 }
 
 /**
@@ -201,27 +201,28 @@ void forkOneWorker(wmWorker* worker, int key) {
 		id_arr[key] = pid;
 		return;
 	} else if (pid == 0) { // For child processes.
-		printf("child processes fork and die!\n");
 
 		swHashMap_rewind(_workers);
 		uint64_t key;
-		int delete_worker_id = 0;
+		wmWorker* delete_worker = NULL;
 		//循环_workers
 		while (1) {
 			wmWorker* worker2 = (wmWorker *) swHashMap_each_int(_workers, &key);
 			//后删除
-			if (delete_worker_id != 0) {
-				_unlisten(worker2);
-				swHashMap_del_int(_workers, delete_worker_id);
-				delete_worker_id = 0;
+			if (delete_worker != NULL) {
+				_unlisten(delete_worker);
+				swHashMap_del_int(_workers, delete_worker->id);
+				swHashMap_del_int(_fd_workers, delete_worker->fd);
+				delete_worker = NULL;
 			}
 			if (worker2 == NULL) {
 				break;
 			}
 			if (worker2->id != worker->id) {
-				delete_worker_id = worker2->id;
+				delete_worker = worker2;
 			}
 		}
+
 
 		// Process title.
 		wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%.*s: worker process %.*s %.*s", (int) _processTitle->length, _processTitle->str,
@@ -230,8 +231,7 @@ void forkOneWorker(wmWorker* worker, int key) {
 			wmError("call_user_function 'cli_set_process_title' error");
 			return;
 		}
-
-		worker->id = key;
+		worker->key = key;
 		_run(worker);
 		wmError("event-loop exited");
 		exit(0);
@@ -278,7 +278,6 @@ void initWorkers() {
 			worker->name = wmString_dup("none", 4);
 			zend_update_property_stringl(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), worker->name->str, 4);
 		}
-
 		//listen
 		_listen(worker);
 	}
@@ -482,49 +481,71 @@ void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_f
  * accept回调函数
  */
 void _wmWorker_acceptConnection(wmWorker *worker) {
-	//新的Connection对象
-	zend_object *obj = wm_connection_create_object(workerman_connection_ce_ptr);
-	zval *z = emalloc(sizeof(zval));
-	ZVAL_OBJ(z, obj);
+	int connfd;
+	wmConnection* _conn;
+	zval* __zval;
+	for (int i = 0; i < WM_ACCEPT_MAX_COUNT; i++) {
+		connfd = wmSocket_accept(worker->fd);
+		if (connfd < 0) {
+			switch (errno) {
+			case EAGAIN: //队列空了，没有信息要读了
+				return;
+			case EINTR: //被信号中断了，但是还有信息要读
+				continue;
+			default:
+				wmWarn("accept() failed")
+				return;
+			}
+		}
+		_conn = wmConnection_create(connfd);
+		_conn->events = WM_EVENT_READ;
+		//添加读监听
+		wmWorkerLoop_add(_conn->fd, _conn->events);
 
-	wmConnectionObject* connection_object = (wmConnectionObject *) wm_connection_fetch_object(obj);
+		//新的Connection对象
+		zend_object *obj = wm_connection_create_object(workerman_connection_ce_ptr);
+		zval *z = emalloc(sizeof(zval));
+		ZVAL_OBJ(z, obj);
 
-	//接客
-	connection_object->connection = wmConnection_accept(worker->fd);
-	connection_object->connection->worker = (void*) worker;
-	connection_object->connection->_This = z;
+		wmConnectionObject* connection_object = (wmConnectionObject *) wm_connection_fetch_object(obj);
 
-	//设置属性 start
-	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("id"), connection_object->connection->id);
-	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("fd"), connection_object->connection->fd);
+		//接客
+		connection_object->connection = _conn;
+		connection_object->connection->worker = (void*) worker;
+		connection_object->connection->_This = z;
 
-	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("fd"), connection_object->connection->fd);
+		//设置属性 start
+		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("id"), connection_object->connection->id);
+		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("fd"), connection_object->connection->fd);
 
-	//
-	zval* __zval = zend_read_static_property(workerman_connection_ce_ptr, ZEND_STRL("defaultMaxSendBufferSize"), 0);
-	connection_object->connection->maxSendBufferSize = __zval->value.lval;
-	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("maxSendBufferSize"), connection_object->connection->maxSendBufferSize);
+		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("fd"), connection_object->connection->fd);
 
-	//
-	__zval = zend_read_static_property(workerman_connection_ce_ptr, ZEND_STRL("defaultMaxPackageSize"), 0);
-	connection_object->connection->maxPackageSize = __zval->value.lval;
+		//
+		__zval = zend_read_static_property(workerman_connection_ce_ptr, ZEND_STRL("defaultMaxSendBufferSize"), 0);
+		connection_object->connection->maxSendBufferSize = __zval->value.lval;
+		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("maxSendBufferSize"), connection_object->connection->maxSendBufferSize);
 
-	zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("maxPackageSize"), connection_object->connection->maxPackageSize);
+		//
+		__zval = zend_read_static_property(workerman_connection_ce_ptr, ZEND_STRL("defaultMaxPackageSize"), 0);
+		connection_object->connection->maxPackageSize = __zval->value.lval;
 
-	zval_ptr_dtor(__zval);
-	//设置属性 end
+		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("maxPackageSize"), connection_object->connection->maxPackageSize);
 
-	//设置回调方法 start
-	connection_object->connection->onMessage = worker->onMessage;
-	connection_object->connection->onClose = worker->onClose;
-	connection_object->connection->onBufferFull = worker->onBufferFull;
-	connection_object->connection->onBufferDrain = worker->onBufferDrain;
-	connection_object->connection->onError = worker->onError;
-	//设置回调方法 end
+		//设置属性 end
 
-	//onConnect
-	if (worker->onConnect) {
-		wmCoroutine_create(&(worker->onConnect->fcc), 1, z); //创建新协程
+		//设置回调方法 start
+		connection_object->connection->onMessage = worker->onMessage;
+		connection_object->connection->onClose = worker->onClose;
+		connection_object->connection->onBufferFull = worker->onBufferFull;
+		connection_object->connection->onBufferDrain = worker->onBufferDrain;
+		connection_object->connection->onError = worker->onError;
+		//设置回调方法 end
+
+		//onConnect
+		if (worker->onConnect) {
+			wmCoroutine_create(&(worker->onConnect->fcc), 1, z); //创建新协程
+		}
+		zval_ptr_dtor(__zval);
 	}
 }
 

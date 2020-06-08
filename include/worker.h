@@ -13,6 +13,7 @@ extern zend_class_entry *workerman_worker_ce_ptr;
 
 typedef struct _wmWorker {
 	uint32_t id; //worker id
+	uint32_t key; //worker key,在idMap中的下标
 	uint32_t fd;
 	zval* _This; //指向当前类的指针
 	php_fci_fcc *onWorkerStart;

@@ -28,6 +28,8 @@ void wmWorkerLoop_add(int fd, int events) {
 	if (!WorkerG.poll) {
 		init_wmPoll();
 	}
+
+
 	//没有事件
 	if (events == WM_EVENT_NULL) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
@@ -102,7 +104,7 @@ void wmWorkerLoop_loop() {
 	while (WorkerG.is_running) {
 		int n;
 		//毫秒级定时器，必须是1
-		int timeout = 1;
+		int timeout = 5000;
 		struct epoll_event *events;
 		events = WorkerG.poll->events;
 		n = epoll_wait(WorkerG.poll->epollfd, events, WorkerG.poll->ncap, timeout);

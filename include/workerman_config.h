@@ -47,6 +47,9 @@ enum wmConnection_status {
 //file
 #define WM_MAX_FILE_CONTENT        (64*1024*1024)
 
+//worker
+#define WM_ACCEPT_MAX_COUNT              12  //swoole设置的64，我们是多进程模型，不需要设置一次读取那么多
+
 #define wm_malloc              malloc
 #define wm_free                free
 #define wm_calloc              calloc

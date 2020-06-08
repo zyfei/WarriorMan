@@ -55,7 +55,7 @@ wmConnection* wmConnection_find_by_fd(int fd);
 
 ssize_t wmConnection_recv(wmConnection *socket, int32_t length);
 
-wmConnection* wmConnection_accept(uint32_t fd);
+wmConnection * wmConnection_create(int fd);
 
 bool wmConnection_send(wmConnection *connection, const void *buf, size_t len);
 

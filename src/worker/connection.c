@@ -10,7 +10,7 @@ void checkBufferWillFull(wmConnection *connection);
 bool bufferIsFull(wmConnection *connection, size_t len);
 int _close(wmConnection *connection);
 
-wmConnection * create(int fd) {
+wmConnection * wmConnection_create(int fd) {
 	if (!wm_connections) {
 		wm_connections = swHashMap_new(NULL);
 	}
@@ -49,19 +49,7 @@ wmConnection* wmConnection_find_by_fd(int fd) {
 	return connection;
 }
 
-wmConnection* wmConnection_accept(uint32_t fd) {
-	int connfd = wmSocket_accept(fd);
-	//如果队列满了，或者读取失败，直接返回
-	if (connfd < 0 || errno == EAGAIN) {
-		return NULL;
-	}
-	wmConnection* conn = create(connfd);
-	conn->events = WM_EVENT_READ;
 
-	//添加读监听
-	wmWorkerLoop_add(conn->fd, conn->events);
-	return conn;
-}
 
 /**
  * onMessage协程调用结束一次，就触发一次
@@ -153,7 +141,8 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 	checkBufferWillFull(connection);
 	bool _add_Loop = false;
 	while (1) {
-		ret = wmSocket_send(connection->fd, connection->write_buffer->str + connection->write_buffer->offset, connection->write_buffer->length - connection->write_buffer->offset, 0);
+		ret = wmSocket_send(connection->fd, connection->write_buffer->str + connection->write_buffer->offset,
+			connection->write_buffer->length - connection->write_buffer->offset, 0);
 		//如果发生错误
 		if (ret < 0) {
 			if (errno != EAGAIN) { // 不是缓冲区错误，就返回报错

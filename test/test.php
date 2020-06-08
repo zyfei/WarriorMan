@@ -6,16 +6,16 @@ $aa = 123;
 
 $worker = new Corkerman\Worker("tcp://0.0.0.0:8080", array(
 	"backlog" => 1234,
-	"count" => 2
+	"count" => 4
 ));
 
-// $worker2 = new Corkerman\Worker("tcp://0.0.0.0:8081", array(
-// 	"backlog" => 1234,
-// 	"count" => 6
-// ));
+$worker2 = new Corkerman\Worker("tcp://0.0.0.0:8081", array(
+	"backlog" => 1234,
+	"count" => 3
+));
 
 $worker->onWorkerStart = function ($worker) {
-	var_dump("onWorkerStart ->" . $worker->workerId);
+	//var_dump("onWorkerStart ->" . $worker->workerId);
 };
 
 $worker->onConnect = function ($connection) {
@@ -26,8 +26,13 @@ $worker->onConnect = function ($connection) {
 	echo "new connection id {$connection->id} \n";
 };
 $worker->onMessage = function ($connection, $data) {
-	var_dump($connection);
-	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello world\r\n";
+	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worla\r\n";
+	$connection->send($responseStr);
+	// sleep(0.01);
+};
+
+$worker2->onMessage = function ($connection, $data) {
+	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";
 	$connection->send($responseStr);
 	// sleep(0.01);
 };
@@ -43,7 +48,7 @@ $worker->onError = function ($connection, $code, $msg) {
 };
 
 $worker->onClose = function ($connection) {
-	echo "connection closed\n";
+	//echo "connection closed\n";
 };
 
 Corkerman\Worker::runAll();
