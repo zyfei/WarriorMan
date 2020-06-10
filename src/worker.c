@@ -46,7 +46,6 @@ void forkWorkers();
 void forkOneWorker(wmWorker* worker, int key);
 int getKey_by_pid(wmWorker* worker, int pid);
 void _unlisten(wmWorker *worker);
-void signalHandler(); //信号处理函数
 void installSignal(); //装载信号
 void reinstallSignal(); //针对子进程，使用epoll重新装载信号
 void getAllWorkerPids(); //获取所有子进程pid
@@ -834,10 +833,10 @@ void installSignal() {
 	signal(SIGPIPE, SIG_IGN); //忽略由于对端连接关闭，导致进程退出的问题
 }
 
-/**
- * 子进程重新装载epoll版本信号
- */
+////////////////////////////////////////////////////// 测试
+
 void reinstallSignal() {
+	php_printf("子进程重设信号处理\n");
 	// 忽略 stop
 	signal(SIGINT, SIG_IGN);
 	// 忽略 reload
@@ -845,11 +844,15 @@ void reinstallSignal() {
 	// 忽略 status
 	signal(SIGUSR2, SIG_IGN);
 
-	//wmWorkerLoop_add()
+	wmWorkerLoop_add_sigal(SIGINT, signalHandler);
+	wmWorkerLoop_add_sigal(SIGUSR1, signalHandler);
+	wmWorkerLoop_add_sigal(SIGUSR2, signalHandler);
 }
 
+///////////////////////////////////////////////////////// 测试 end
+
 void displayUI() {
-	php_printf("======CorkerMan Start=====\n");
+	php_printf("\n\n======CorkerMan Start=====\n");
 	swHashMap_rewind(_workers);
 	uint64_t key;
 	//循环_workers
@@ -860,6 +863,7 @@ void displayUI() {
 		}
 		php_printf("name:%s  count:%d  listen:%s \n", worker->name->str, worker->count, worker->socketName->str);
 	}
+	php_printf("======CorkerMan Start=====\n\n\n");
 }
 
 //释放相关资源

@@ -1,5 +1,58 @@
 #include "loop.h"
 
+/**
+ * 创建的信号通道
+ * 载epoll版本信号
+ * [0] 是读
+ * [1] 是写
+ */
+static int signal_fd[2] = { 0, 0 };
+static wmArray* signal_handler_array = NULL;
+static char signals[1024];
+/**
+ * 一旦出现信号，写入signal_fd中
+ */
+void sig_handler(int sigalno) {
+	php_printf("capture signal,signal is %d \n", sigalno);
+	//保留原来的errno，在函数最后回复，以保证函数的可重入性
+	int save_errno = errno;
+	int msg = sigalno;
+
+	//将信号值写入管代，通知主循环。
+	//向1里面写，从0里面读
+	if (wmSocket_send(signal_fd[1], (char*) &msg, 1, 0) <= 0) {
+		php_printf("The message sent to the server failed\n");
+	}
+	php_printf("signal is send to server\n");
+	errno = save_errno;
+}
+
+/**
+ * 读信号，并且处理信号
+ */
+void sig_callback(int fd) {
+	int recv_ret_value;
+	do {
+		recv_ret_value = wmSocket_recv(signal_fd[0], signals, sizeof(signals), 0);
+	} while (recv_ret_value < 0 && errno == EAGAIN);
+
+	if (recv_ret_value == 0) { //信号fd被关闭了
+		wmError("signal_fd be closed");
+		exit(1);
+	}
+	if (recv_ret_value < 0) { //信号fd被关闭了
+		wmWarn("signal_fd read error");
+	} else {
+		//每个信号值占1字节，所以按字节来逐个接收信号
+		for (int i = 0; i < recv_ret_value; ++i) {
+			loop_func_t fn = wmArray_find(signal_handler_array, signals[i]);
+			if (fn) {
+				fn(signals[i]);
+			}
+		}
+	}
+}
+
 //把我们自己的events转换成epoll的
 static inline int event_decode(int events) {
 	uint32_t flag = 0;
@@ -23,12 +76,50 @@ static inline int event_decode(int events) {
 	return flag;
 }
 
+void wmWorkerLoop_add_sigal(int sigal, loop_func_t fn) {
+	if (signal_fd[0] == 0) {
+		//创建一对互相连接的，全双工管道
+		if (socketpair(PF_UNIX, SOCK_STREAM, 0, signal_fd) == -1) {
+			wmError("socketpair");
+			exit(1);
+		}
+		/* sockpair函数创建的管道是全双工的，不区分读写端
+		 * 此处我们假设pipe_fd[1]为写端，非阻塞
+		 * pipe_fd[0]为读端
+		 */
+		wmSocket_set_nonblock(signal_fd[0]);
+		wmSocket_set_nonblock(signal_fd[1]);
+
+		//最后加入loop
+		wmWorkerLoop_add(signal_fd[0], WM_EVENT_READ);
+	}
+
+	if (signal_handler_array == NULL) {
+		signal_handler_array = wmArray_new(64, sizeof(loop_func_t));
+		signal_handler_array->page_num = 64;
+	}
+
+	struct sigaction act;
+	bzero(&act, sizeof(act));
+	act.sa_handler = sig_handler; //设置信号处理函数
+	sigfillset(&act.sa_mask); //初始化信号屏蔽集
+	act.sa_flags |= SA_RESTART; //由此信号中断的系统调用自动重启动
+
+	//初始化信号处理函数
+	if (sigaction(sigal, &act, NULL) == -1) {
+		php_printf("capture signal,but to deal with failure\n");
+		return;
+	}
+
+	//加入信号数组中
+	wmArray_set(signal_handler_array, sigal, fn);
+}
+
 void wmWorkerLoop_add(int fd, int events) {
 	//初始化epoll
 	if (!WorkerG.poll) {
 		init_wmPoll();
 	}
-
 
 	//没有事件
 	if (events == WM_EVENT_NULL) {
@@ -99,10 +190,10 @@ void wmWorkerLoop_loop() {
 	}
 	WorkerG.is_running = true;
 
+	int n;
 	long mic_time;
 	//这里应该改成死循环了
 	while (WorkerG.is_running) {
-		int n;
 		//毫秒级定时器，必须是1
 		int timeout = 5000;
 		struct epoll_event *events;
@@ -112,6 +203,13 @@ void wmWorkerLoop_loop() {
 		for (int i = 0; i < n; i++) {
 			int fd, coro_id;
 			fromuint64(events[i].data.u64, &fd, &coro_id);
+			//先判断是不是信号fd,不用判断是不是读事件，因为只添加了读事件~
+			if (fd == signal_fd[0]) {
+				sig_callback(fd);
+				continue;
+			}
+
+			//再判断是否是worker的
 			wmWorker* worker = wmWorker_find_by_fd(fd);
 			//这个是worker Accept的
 			if (worker) {
