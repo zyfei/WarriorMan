@@ -17,6 +17,7 @@ typedef struct _wmWorker {
 	uint32_t fd;
 	zval* _This; //指向当前类的指针
 	php_fci_fcc *onWorkerStart;
+	php_fci_fcc *onWorkerStop;
 	php_fci_fcc *onWorkerReload;
 	php_fci_fcc *onConnect;
 	php_fci_fcc *onMessage;
@@ -33,6 +34,7 @@ typedef struct _wmWorker {
 	wmString* name; //名字
 	char* transport;
 	wmString* socketName;// tcp://127.0.0.1:8080
+	bool stopping;
 
 } wmWorker;
 

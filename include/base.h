@@ -12,6 +12,7 @@
 #include "queue.h"
 #include "wm_string.h"
 #include "file.h"
+#include "array.h"
 
 //php库
 #include "zend_closures.h"
@@ -256,7 +257,6 @@ bool set_process_title(char* process_title);
  * 格式化字符串
  */
 size_t wm_snprintf(char *buf, size_t size, const char *format, ...);
-
 
 //初始化base相关
 void workerman_base_init();

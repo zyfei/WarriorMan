@@ -207,3 +207,56 @@ void wmTimerWheel_update(wmTimerWheel *tw, uint64_t currtime) {
 		tw->remainder = diff;
 	}
 }
+
+/**
+ * 清空定时器
+ */
+void wmTimerWheel_clear(wmTimerWheel *tw) {
+	int i, j;
+	wmListNode head;
+	//清空第一个轮
+	//TVR_SIZE 将0000 0001 左移8位，1 0000 0000 = 2的(8)次幂 = 256
+	for (i = 0; i < TVR_SIZE; ++i) {
+		//双向链表
+		wmList_init(&head);
+		wmList_splice(tw->tvroot.vec + i, &head);
+		//循环清空
+		while (!wmList_is_empty(&head)) {
+			//拿出先加入的节点
+			wmTimerWheel_Node *node = (wmTimerWheel_Node*) head.next;
+			//拿出这个节点
+			wmList_remote(head.next);
+			wm_free(node);
+		}
+	}
+	//清空后面几个轮
+	for (i = 0; i < 4; ++i) {
+		for (j = 0; j < TVN_SIZE; ++j) {
+			//双向链表
+			wmList_init(&head);
+			wmList_splice(tw->tvroot.vec + j, &head);
+			//循环清空
+			while (!wmList_is_empty(&head)) {
+				//拿出先加入的节点
+				wmTimerWheel_Node *node = (wmTimerWheel_Node*) head.next;
+				//拿出这个节点
+				wmList_remote(head.next);
+				wm_free(node);
+			}
+		}
+	}
+
+	//清空备胎区
+	wmList_init(&head);
+	wmList_splice(&tw->so_long_node, &head);
+	//循环清空
+	while (!wmList_is_empty(&head)) {
+		//拿出先加入的节点
+		wmTimerWheel_Node *node = (wmTimerWheel_Node*) head.next;
+		//拿出这个节点
+		wmList_remote(head.next);
+		wm_free(node);
+	}
+	//元素设置为0
+	tw->num = 0;
+}

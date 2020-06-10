@@ -6,12 +6,14 @@ $aa = 123;
 
 $worker = new Corkerman\Worker("tcp://0.0.0.0:8080", array(
 	"backlog" => 1234,
-	"count" => 4
+	"count" => 1
 ));
+
+$worker->name = "tcpServer";
 
 $worker2 = new Corkerman\Worker("tcp://0.0.0.0:8081", array(
 	"backlog" => 1234,
-	"count" => 3
+	"count" => 1
 ));
 
 $worker->onWorkerStart = function ($worker) {

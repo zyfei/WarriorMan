@@ -4,16 +4,25 @@
 
 static unsigned int _last_id = 0;
 static wmString *_processTitle = NULL;
-static swHashMap *_workers = NULL; //workerId=>worker
 
 /**
- * Mapping from PID to worker process ID.
- * The format is like this [worker_id=>[0=>$pid, 1=>$pid, ..], ..].
- * @var array
+ * 保存所有的worker
  */
-static swHashMap *_idMap = NULL;
+static swHashMap *_workers = NULL;
 
-static swHashMap *_fd_workers = NULL; //worker map
+static wmWorker* _main_worker = NULL; //当前子进程所属的worker
+
+/**
+ * 记录着每个worker，fork的所有pid
+ */
+static swHashMap * _worker_pids = NULL;
+static wmArray* _pid_array_tmp = NULL; //临时存放pid数组的
+
+/**
+ * key是fd,value是对应的worker
+ */
+static swHashMap *_fd_workers = NULL;
+
 static wmString* _startFile = NULL; //启动文件
 static wmString* _pidFile = NULL; //pid路径
 static wmString* _runDir = NULL; //启动路径
@@ -27,7 +36,7 @@ void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_f
 void resumeAccept(wmWorker *worker);
 void checkEnv();
 void parseCommand();
-void init_idMap();
+void initWorkerPids();
 void daemonize();
 void saveMasterPid();
 void initWorkers();
@@ -37,6 +46,16 @@ void forkWorkers();
 void forkOneWorker(wmWorker* worker, int key);
 int getKey_by_pid(wmWorker* worker, int pid);
 void _unlisten(wmWorker *worker);
+void signalHandler(); //信号处理函数
+void installSignal(); //装载信号
+void reinstallSignal(); //针对子进程，使用epoll重新装载信号
+void getAllWorkerPids(); //获取所有子进程pid
+void stopAll(); //停止服务
+void _reload(); //重启
+void signalHandler(int signal);
+void monitorWorkers();
+void alarm_wait();
+void displayUI();
 
 //初始化一下参数
 void wmWorker_init() {
@@ -49,8 +68,11 @@ void wmWorker_init() {
 	if (!_fd_workers) {
 		_fd_workers = swHashMap_new(NULL);
 	}
-	if (!_idMap) {
-		_idMap = swHashMap_new(NULL);
+	if (!_worker_pids) {
+		_worker_pids = swHashMap_new(NULL);
+	}
+	if (!_pid_array_tmp) {
+		_pid_array_tmp = wmArray_new(64, sizeof(int));
 	}
 }
 
@@ -62,6 +84,7 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	bzero(worker, sizeof(wmWorker));
 	worker->_status = WM_STATUS_STARTING;
 	worker->onWorkerStart = NULL;
+	worker->onWorkerStop = NULL;
 	worker->onWorkerReload = NULL;
 	worker->onConnect = NULL;
 	worker->onMessage = NULL;
@@ -80,11 +103,11 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	worker->_This = _This;
 	worker->name = NULL;
 	worker->socketName = wmString_dup(socketName->val, socketName->len);
+	worker->stopping = false;
 	parseSocketAddress(worker, socketName);
 
 	//写入workers对照表
 	swHashMap_add_int(_workers, worker->id, worker);
-	swHashMap_add_int(_idMap, worker->id, NULL);
 
 	return worker;
 }
@@ -127,6 +150,8 @@ void _run(wmWorker *worker) {
 	//在这里应该注册事件回调
 	resumeAccept(worker);
 
+	reinstallSignal(); //重新注册信号检测
+
 	//处理onWorkerStart
 	bind_callback(worker->_This, "onWorkerStart", &worker->onWorkerStart);
 	if (worker->onWorkerStart) {
@@ -139,6 +164,7 @@ void _run(wmWorker *worker) {
 	}
 
 	//设置回调方法 start
+	bind_callback(worker->_This, "onWorkerStop", &worker->onWorkerStop);
 	bind_callback(worker->_This, "onConnect", &worker->onConnect);
 	bind_callback(worker->_This, "onMessage", &worker->onMessage);
 	bind_callback(worker->_This, "onClose", &worker->onClose);
@@ -154,12 +180,78 @@ void _run(wmWorker *worker) {
 //全部运行
 void wmWorker_runAll() {
 	checkEnv();
+	//设置定时器
+	signal(SIGALRM, alarm_wait);
+	alarm(1);
+
+	initWorkerPids(); //根据count初始化pid数组
 	parseCommand(); //解析用户命令
 	daemonize(); //守护进程模式
 	initWorkers(); //初始化进程相关资料
+	installSignal(); //装载信号
 	saveMasterPid();
+	displayUI();
 	forkWorkers();
-	sleep(3000000);
+	monitorWorkers(); //监听子进程
+}
+
+/**
+ * 查看子进程信息，并且处理master定时器
+ */
+void monitorWorkers() {
+	_status = WM_WORKER_STATUS_RUNNING;
+	while (1) {
+		php_printf("=======> monitorWorkers \n");
+
+		int zero = 0;
+		int status = 0;
+		int pid;
+		do {
+			pid = waitpid(-1, &status, WUNTRACED); //子进程已经退出并且其状态未报告时返回。
+		} while (pid < 0 && errno == EINTR);
+
+		if (pid > 0) {
+			if (WIFEXITED(status)) {
+				php_printf("子进程 %d 退出,返回信息码:%d\n", pid, WEXITSTATUS(status));
+			} else if (WIFSIGNALED(status)) {
+				php_printf("子进程 %d 退出,返回信息码:%d\n", pid, WTERMSIG(status));
+			} else if (WIFSTOPPED(status)) {
+				php_printf("子进程 %d 退出,返回信息码:%d\n", pid, WSTOPSIG(status));
+			} else {
+				php_printf("子进程 %d 退出,未知信息码\n", pid);
+			}
+			//处理PID唤醒问题
+			swHashMap_rewind(_worker_pids);
+			uint64_t key;
+			//循环_workers
+			while (1) {
+				wmArray* pid_arr = (wmArray *) swHashMap_each_int(_worker_pids, &key);
+				if (pid_arr == NULL) {
+					break;
+				}
+				for (int i = 0; i < pid_arr->offset; i++) {
+					int *_pid = wmArray_find(pid_arr, i);
+					if (*_pid == pid) { //找到正主了，就是这个孙子自己先退出了，办他
+						wmArray_set(pid_arr, i, &zero);
+						break;
+					}
+				}
+				//
+				if (_status != WM_WORKER_STATUS_SHUTDOWN) {
+					forkWorkers();
+				}
+			}
+
+		}
+		//等待子进程全部退出
+		if (_status == WM_WORKER_STATUS_SHUTDOWN) {
+			getAllWorkerPids();
+			if (_pid_array_tmp->offset == 0) {
+				php_printf("Workerman[%s] has been stopped \n", _startFile->str);
+				exit(0); //直接退出，不给php反应的机会，否则会弹出警告
+			}
+		}
+	}
 }
 
 /**
@@ -197,8 +289,8 @@ void forkOneWorker(wmWorker* worker, int key) {
 	//拿到一个未fork的进程
 	int pid = fork();
 	if (pid > 0) { // For master process.
-		int* id_arr = (int*) swHashMap_find_int(_idMap, worker->id);
-		id_arr[key] = pid;
+		wmArray* pid_arr = (wmArray*) swHashMap_find_int(_worker_pids, worker->id);
+		wmArray_set(pid_arr, key, &pid);
 		return;
 	} else if (pid == 0) { // For child processes.
 
@@ -222,7 +314,14 @@ void forkOneWorker(wmWorker* worker, int key) {
 				delete_worker = worker2;
 			}
 		}
+		//设置当前子进程运行的是哪个worker
+		_main_worker = worker;
+		php_printf("child pid = %d\n", getpid());
 
+		//取消闹钟
+		alarm(0);
+		//清空定时器,为了不遗传给下一代
+		wmTimerWheel_clear(&WorkerG.timer);
 
 		// Process title.
 		wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%.*s: worker process %.*s %.*s", (int) _processTitle->length, _processTitle->str,
@@ -233,10 +332,30 @@ void forkOneWorker(wmWorker* worker, int key) {
 		}
 		worker->key = key;
 		_run(worker);
-		wmError("event-loop exited");
+		wmTrace("event-loop exited");
 		exit(0);
 	} else {
 		wmError("forkOneWorker fail");
+	}
+}
+
+//获取所有的pids
+void getAllWorkerPids() {
+	wmArray_clear(_pid_array_tmp);
+	swHashMap_rewind(_worker_pids);
+	uint64_t key;
+	//循环_workers
+	while (1) {
+		wmArray* pid_arr = (wmArray *) swHashMap_each_int(_worker_pids, &key);
+		if (pid_arr == NULL) {
+			break;
+		}
+		for (int i = 0; i < pid_arr->offset; i++) {
+			int *pid = wmArray_find(pid_arr, i);
+			if (*pid > 0) {
+				wmArray_add(_pid_array_tmp, pid);
+			}
+		}
 	}
 }
 
@@ -244,10 +363,11 @@ void forkOneWorker(wmWorker* worker, int key) {
  * 在idmap中，通过value查询key
  */
 int getKey_by_pid(wmWorker* worker, int pid) {
-	int* id_arr = (int *) swHashMap_find_int(_idMap, worker->id);
+	wmArray* pid_arr = (wmArray *) swHashMap_find_int(_worker_pids, worker->id);
 	int id = -1;
-	for (int i = 0; i < worker->count; i++) {
-		if (id_arr[i] == pid) {
+	for (int i = 0; i < pid_arr->offset; i++) {
+		int* _pid = (int*) wmArray_find(pid_arr, i);
+		if (pid == *_pid) {
 			id = i;
 			break;
 		}
@@ -283,19 +403,81 @@ void initWorkers() {
 	}
 }
 
+/**
+ * 直接杀死进程，我是冷酷的杀手
+ */
+void _kill(void* _pid) {
+	int* pid = (int*) _pid;
+	kill(*pid, SIGKILL);
+}
+
+//worker简易调度器/定时器，由alarm实现
+void alarm_wait() {
+	long mic_time;
+	//检查定时器
+	if (WorkerG.timer.num > 0) {
+		//获取毫秒
+		wmGetMilliTime(&mic_time);
+		wmTimerWheel_update(&WorkerG.timer, mic_time);
+	}
+	alarm(1);
+}
+
+//停止全部
+void stopAll() {
+	_status = WM_WORKER_STATUS_SHUTDOWN;
+	if (_masterPid == getpid()) { //主进程
+		php_printf("Workerman[%s] stopping ...\n", _startFile->str);
+		getAllWorkerPids(); //获取所有子进程
+		for (int i = 0; i < _pid_array_tmp->offset; i++) {
+			int* pid = wmArray_find(_pid_array_tmp, i);
+			kill(*pid, SIGINT);
+			//设置一下两秒后强制杀死
+			wmTimerWheel_add_quick(&WorkerG.timer, _kill, (void*) pid, WM_KILL_WORKER_TIMER_TIME);
+
+			//创建定时器，检查状态
+
+		}
+	} else { //如果是子进程收到了去世信号
+		//循环workers
+		if (!_main_worker->stopping) {
+			wmWorker_stop(_main_worker);
+			_main_worker->stopping = true;
+		}
+		//停止loop，也就是结束了
+		wmWorkerLoop_stop();
+		//子进程在这里退出
+		exit(0);
+	}
+}
+
 //关闭服务器
 bool wmWorker_stop(wmWorker* worker) {
+	php_printf("wmWorker_stop \n");
 	worker->_status = WM_STATUS_SHUTDOWN;
+	if (worker->onWorkerStop) {
+		worker->onWorkerStop->fci.param_count = 1;
+		worker->onWorkerStop->fci.params = worker->_This;
+		if (call_closure_func(worker->onWorkerStop) != SUCCESS) {
+			php_error_docref(NULL, E_ERROR, "call onWorkerStop error");
+			return false;
+		}
+	}
+	_unlisten(worker);
+	//关闭所有连接
+	wmConnection_close_connections();
 	return true;
 }
 
 /**
- * 其实也没有必要去释放
+ * 象征性的施放一下，不完全
  */
 void wmWorker_free(wmWorker* worker) {
 	if (worker) {
+		_unlisten(worker);
+
 		efree(worker->_This);
-		swHashMap_del_int(_idMap, worker->id);
+		swHashMap_del_int(_worker_pids, worker->id);
 		swHashMap_del_int(_workers, worker->id);
 		swHashMap_del_int(_fd_workers, worker->fd);
 
@@ -316,7 +498,7 @@ void wmWorker_free(wmWorker* worker) {
 
 //检查环境
 void checkEnv() {
-	//检查是否是cli模式
+//检查是否是cli模式
 	zend_string* _php_sapi = zend_string_init("PHP_SAPI", strlen("PHP_SAPI"), 0);
 	zval* _php_sapi_zval = zend_get_constant(_php_sapi);
 	if (strcmp(_php_sapi_zval->value.str->val, "cli") != 0) {
@@ -325,7 +507,7 @@ void checkEnv() {
 	}
 	zend_string_free(_php_sapi);
 
-	//获取启动文件
+//获取启动文件
 	const char* executed_filename = zend_get_executed_filename();
 	_startFile = wmString_dup(executed_filename, sizeof(char) * strlen(executed_filename));
 
@@ -336,10 +518,10 @@ void checkEnv() {
 	char* executed_filename_i = strrchr(executed_filename, '/');
 	int run_dir_len = executed_filename_i - executed_filename + 1;
 
-	//设置启动路径
+//设置启动路径
 	_runDir = wmString_dup(executed_filename, sizeof(char) * (run_dir_len));
 
-	//检查,并且设置pid文件位置
+//检查,并且设置pid文件位置
 	zval* _pidFile_zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), 0);
 	if (!_pidFile_zval) {
 		_pidFile = wmString_dup2(_runDir);
@@ -349,21 +531,21 @@ void checkEnv() {
 	} else {
 		_pidFile = wmString_dup(_pidFile_zval->value.str->val, _pidFile_zval->value.str->len);
 	}
-	//
+//
 
-	// State.
+// State.
 	_status = WM_WORKER_STATUS_STARTING;
 
-	//检查守护进程模式
+//检查守护进程模式
 	zval* _daemonize_zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), 0);
 	if (_daemonize_zval) {
 		if (Z_TYPE_INFO_P(_daemonize_zval) == IS_TRUE) {
 			_daemonize = true;
 		}
 	}
-	//
+//
 
-	// Process title.
+// Process title.
 	wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%.*s: master process start_file=%.*s", (int) _processTitle->length, _processTitle->str,
 		(int) _startFile->length, _startFile->str);
 	if (!set_process_title(WorkerG.buffer_stack->str)) {
@@ -371,15 +553,13 @@ void checkEnv() {
 		return;
 	}
 
-	//为fork进程做准备
-	init_idMap();
 }
 
 //初始化idMap
-void init_idMap() {
+void initWorkerPids() {
 	swHashMap_rewind(_workers);
 	uint64_t key;
-	//循环_workers
+//循环_workers
 	while (1) {
 		wmWorker* worker = (wmWorker *) swHashMap_each_int(_workers, &key);
 		if (worker == NULL) {
@@ -387,29 +567,30 @@ void init_idMap() {
 		}
 		//创建一个新map
 		worker->count = worker->count < 1 ? 1 : worker->count;
-		int* new_id_map = wm_malloc(sizeof(int) * worker->count);
+		wmArray* new_ids = wmArray_new(64, sizeof(int));
+		int value = 0;
 		for (int i = 0; i < worker->count; i++) {
-			new_id_map[i] = 0;
+			wmArray_add(new_ids, &value);
 		}
-		swHashMap_add_int(_idMap, worker->id, new_id_map);
+		swHashMap_add_int(_worker_pids, worker->id, new_ids);
 	}
 }
 
 //解析用户输入
 void parseCommand() {
-	//从全局变量中查用户输入argv
+//从全局变量中查用户输入argv
 	zend_string* argv_str = zend_string_init(ZEND_STRL("argv"), 0);
 	zval *argv = zend_hash_find(&EG(symbol_table), argv_str);
 	zend_string_free(argv_str);
 	HashTable *argv_table = Z_ARRVAL_P(argv);
 
-	//zend_string* start_file = NULL; //启动文件
+//zend_string* start_file = NULL; //启动文件
 	zend_string* command = NULL; //第一个命令
 	zend_string* command2 = NULL; //第二个命令
 
-	//获取启动文件
-	//zval *value = zend_hash_index_find(argv_table, 0);
-	//start_file = Z_STR_P(value);
+//获取启动文件
+//zval *value = zend_hash_index_find(argv_table, 0);
+//start_file = Z_STR_P(value);
 
 	zval *value = zend_hash_index_find(argv_table, 1);
 	if (value != NULL) {
@@ -440,13 +621,13 @@ void parseCommand() {
 		return;
 	}
 
-	//设置守护进程模式
+//设置守护进程模式
 	if (command2 && strcmp("-d", command2->val) == 0) {
 		_daemonize = true;
 		zend_update_static_property_bool(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), 1);
 	}
 
-	// execute command.
+// execute command.
 	switch (command_type) {
 	case 1: //如果是start，就继续运行
 		break;
@@ -459,9 +640,9 @@ void parseCommand() {
 
 //绑定回调
 void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_fcc) {
-	//判断是否有workerStart
+//判断是否有workerStart
 	zval *_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, _This, fun_name, strlen(fun_name), 0);
-	//如果没有
+//如果没有
 	if (_zval == NULL) {
 		return;
 	}
@@ -473,7 +654,7 @@ void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_f
 		php_error_docref(NULL, E_ERROR, "%s error : %s", fun_name, _error);
 		return;
 	}
-	//为这个闭包增加引用计数
+//为这个闭包增加引用计数
 	wm_zend_fci_cache_persist(&(*handle_fci_fcc)->fcc);
 }
 
@@ -517,20 +698,14 @@ void _wmWorker_acceptConnection(wmWorker *worker) {
 		//设置属性 start
 		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("id"), connection_object->connection->id);
 		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("fd"), connection_object->connection->fd);
-
-		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("fd"), connection_object->connection->fd);
-
-		//
 		__zval = zend_read_static_property(workerman_connection_ce_ptr, ZEND_STRL("defaultMaxSendBufferSize"), 0);
+
 		connection_object->connection->maxSendBufferSize = __zval->value.lval;
 		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("maxSendBufferSize"), connection_object->connection->maxSendBufferSize);
 
-		//
 		__zval = zend_read_static_property(workerman_connection_ce_ptr, ZEND_STRL("defaultMaxPackageSize"), 0);
 		connection_object->connection->maxPackageSize = __zval->value.lval;
-
 		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("maxPackageSize"), connection_object->connection->maxPackageSize);
-
 		//设置属性 end
 
 		//设置回调方法 start
@@ -601,7 +776,7 @@ void daemonize() {
 		return;
 	}
 
-	// Fork again avoid SVR4 system regain the control of terminal.
+// Fork again avoid SVR4 system regain the control of terminal.
 	pid = fork();
 	if (pid > 0) {
 		exit(0); //是父进程，结束父进程
@@ -615,8 +790,76 @@ void daemonize() {
  */
 void saveMasterPid() {
 	_masterPid = getpid();
+	printf("masterPid=%d \n", _masterPid);
 	int ret = wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%d", _masterPid);
 	wm_file_put_contents(_pidFile->str, WorkerG.buffer_stack->str, ret); //写入PID文件
+}
+
+/**
+ * 信号处理函数
+ */
+void signalHandler(int signal) {
+	php_printf("get new signal ========> pid=%d,signal=%d \n", getpid(), signal);
+	switch (signal) {
+	// Stop.
+	case SIGINT:
+		stopAll();
+		break;
+		// Reload.
+	case SIGUSR1:
+		php_printf("Reload haven't started to do\n");
+		//static::$_pidsToRestart = static::getAllWorkerPids();
+		//_reload();
+		break;
+		// Show status.
+	case SIGUSR2:
+		php_printf("Status haven't started to do\n");
+		//static::writeStatisticsToStatusFile();
+		break;
+		// Show connection status.
+	}
+}
+
+/**
+ * 装载信号
+ */
+void installSignal() {
+	// stop
+	signal(SIGINT, signalHandler);
+	// reload
+	signal(SIGUSR1, signalHandler);
+	// status
+	signal(SIGUSR2, signalHandler);
+	// ignore
+	signal(SIGPIPE, SIG_IGN); //忽略由于对端连接关闭，导致进程退出的问题
+}
+
+/**
+ * 子进程重新装载epoll版本信号
+ */
+void reinstallSignal() {
+	// 忽略 stop
+	signal(SIGINT, SIG_IGN);
+	// 忽略 reload
+	signal(SIGUSR1, SIG_IGN);
+	// 忽略 status
+	signal(SIGUSR2, SIG_IGN);
+
+	//wmWorkerLoop_add()
+}
+
+void displayUI() {
+	php_printf("======CorkerMan Start=====\n");
+	swHashMap_rewind(_workers);
+	uint64_t key;
+	//循环_workers
+	while (1) {
+		wmWorker* worker = (wmWorker *) swHashMap_each_int(_workers, &key);
+		if (worker == NULL) {
+			break;
+		}
+		php_printf("name:%s  count:%d  listen:%s \n", worker->name->str, worker->count, worker->socketName->str);
+	}
 }
 
 //释放相关资源
@@ -627,7 +870,7 @@ void wmWorker_shutdown() {
 	if (!_fd_workers) {
 		swHashMap_free(_fd_workers);
 	}
-	if (!_idMap) {
-		swHashMap_free(_idMap);
+	if (!_worker_pids) {
+		swHashMap_free(_worker_pids);
 	}
 }

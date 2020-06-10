@@ -130,6 +130,7 @@ void workerman_worker_init() {
 
 	//注册变量和初始值
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onWorkerStart"), ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onWorkerStop"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onWorkerReload"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onConnect"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onMessage"), ZEND_ACC_PUBLIC);

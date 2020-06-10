@@ -58,6 +58,7 @@ if test "$PHP_WM" != "no"; then
     	src/core/timer.c \
     	src/core/wm_string.c \
     	src/core/file.c \
+    	src/core/array.c \
     	src/coroutine/channel.c \
     	src/coroutine/context.c \
     	src/coroutine/coroutine.c \

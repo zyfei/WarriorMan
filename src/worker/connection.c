@@ -49,8 +49,6 @@ wmConnection* wmConnection_find_by_fd(int fd) {
 	return connection;
 }
 
-
-
 /**
  * onMessage协程调用结束一次，就触发一次
  * 这里得研究一下，引用计数这块不太懂
@@ -223,6 +221,27 @@ bool bufferIsFull(wmConnection *connection, size_t len) {
 //这是一个用户调用的方法
 int wmConnection_close(wmConnection *connection) {
 	return _close(connection);
+}
+
+/**
+ * 关闭所有的连接
+ */
+void wmConnection_close_connections() {
+	swHashMap_rewind(wm_connections);
+	uint64_t key;
+	//循环_workers
+	wmConnection* need_close_conn = NULL;
+	while (1) {
+		wmConnection* conn = (wmConnection *) swHashMap_each_int(wm_connections, &key);
+		if (need_close_conn != NULL) {
+			_close(need_close_conn);
+			need_close_conn = NULL;
+		}
+		if (conn == NULL) {
+			break;
+		}
+		need_close_conn = conn;
+	}
 }
 
 /**

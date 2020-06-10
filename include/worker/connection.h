@@ -63,6 +63,9 @@ int wmConnection_close(wmConnection *connection);
 
 void wmConnection_free(wmConnection *socket);
 
+//关闭所有连接
+void wmConnection_close_connections();
+
 //专门给loop回调用的
 void _wmConnection_read_callback(int fd);
 void _wmConnection_write_callback(int fd, int coro_id);

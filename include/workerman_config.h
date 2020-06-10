@@ -39,6 +39,7 @@ enum wmConnection_status {
 #define WM_STATUS_RUNNING 2
 #define WM_STATUS_SHUTDOWN 4
 #define WM_STATUS_RELOADING 8
+#define WM_KILL_WORKER_TIMER_TIME 2000  //2000毫秒后杀死进程
 
 //worker connection
 #define WM_MAX_SEND_BUFFER_SIZE 102400 //默认应用层发送缓冲区大小  1M
@@ -49,6 +50,9 @@ enum wmConnection_status {
 
 //worker
 #define WM_ACCEPT_MAX_COUNT              12  //swoole设置的64，我们是多进程模型，不需要设置一次读取那么多
+
+//array
+#define WM_ARRAY_PAGE_MAX  1024 //数组初始化大小
 
 #define wm_malloc              malloc
 #define wm_free                free

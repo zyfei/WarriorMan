@@ -40,14 +40,16 @@ int init_wmPoll() {
 
 //释放epoll
 int free_wmPoll() {
-	if (close(WorkerG.poll->epollfd) < 0) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+	if (WorkerG.poll) {
+		if (close(WorkerG.poll->epollfd) < 0) {
+			wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		}
+		wm_free(WorkerG.poll->events);
+		WorkerG.poll->events = NULL;
+		wm_free(WorkerG.poll);
+		WorkerG.poll = NULL;
+		WorkerG.is_running = false;
 	}
-	wm_free(WorkerG.poll->events);
-	WorkerG.poll->events = NULL;
-	wm_free(WorkerG.poll);
-	WorkerG.poll = NULL;
-	WorkerG.is_running = false;
 	return 0;
 }
 
