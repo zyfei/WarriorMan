@@ -74,7 +74,7 @@ Corkerman\Worker::runAll();
 
 ## Available commands
 ```php start.php start  ```  
-```php start.php start -d  ``` 
+```php start.php start -d  ```  
 ```php start.php stop  ```
 
 ## Documentation
