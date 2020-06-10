@@ -91,7 +91,7 @@ Corkerman\Worker::runAll();
 
 感谢Swoole项目 [Swoole](https://github.com/swoole/swoole-src)，我直接copy了不少Swoole的代码
 
-最后感谢 [Study](https://github.com/php-extension-research/study) 项目，我是学习这个教学项目之后，才有了此项目
+最后特别感谢 [Study](https://github.com/php-extension-research/study) 项目，我是学习这个教学项目之后，才有了此项目
 
 
 
