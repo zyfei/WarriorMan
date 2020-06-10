@@ -60,18 +60,19 @@ PHP_METHOD(workerman_worker, __construct) {
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 	wmWorkerObject *worker_obj = (wmWorkerObject *) wm_worker_fetch_object(Z_OBJ_P(getThis()));
 	zval* worker_zval = wm_malloc_zval();
-	ZVAL_OBJ(worker_zval,&worker_obj->std);
+	ZVAL_OBJ(worker_zval, &worker_obj->std);
 	//初始化worker
 	worker_obj->worker = wmWorker_create(worker_zval, socketName);
 
 	//设置worker id
 	zend_update_property_long(workerman_worker_ce_ptr, getThis(), ZEND_STRL("workerId"), worker_obj->worker->id);
-
-	//解析options
-	HashTable *vht = Z_ARRVAL_P(options);
+	HashTable *vht;
 	zval *ztmp = NULL;
+	if (options != NULL) {
+		vht = Z_ARRVAL_P(options);
+	}
 	//backlog
-	if (php_workerman_array_get_value(vht, "backlog", ztmp)) {
+	if (options != NULL && php_workerman_array_get_value(vht, "backlog", ztmp)) {
 		zend_long v = zval_get_long(ztmp);
 		worker_obj->worker->backlog = v;
 		zend_update_property_long(workerman_worker_ce_ptr, getThis(), ZEND_STRL("backlog"), v);
@@ -79,7 +80,7 @@ PHP_METHOD(workerman_worker, __construct) {
 
 	//count
 	worker_obj->worker->count = 1;
-	if (php_workerman_array_get_value(vht, "count", ztmp)) {
+	if (options != NULL && php_workerman_array_get_value(vht, "count", ztmp)) {
 		zend_long v = zval_get_long(ztmp);
 		worker_obj->worker->count = v;
 	}

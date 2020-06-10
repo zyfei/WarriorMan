@@ -1,13 +1,14 @@
 <?php
-Corkerman\Runtime::enableCoroutine();
-
-$arr[] = worker_go(function () {
+/**
+ * 展示协程切换
+ */
+$arr[] = Corkerman::create(function () {
 	var_dump(Corkerman::getCid() . " start");
 	Corkerman::yield();
 	var_dump(Corkerman::getCid() . " end");
 });
 
-$arr[] = worker_go(function () {
+$arr[] = Corkerman::create(function () {
 	var_dump(Corkerman::getCid() . " start");
 	Corkerman::yield();
 	var_dump(Corkerman::getCid() . " end");

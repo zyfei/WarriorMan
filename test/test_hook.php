@@ -1,16 +1,22 @@
 <?php
+/**
+ * hook了系统函数
+ * 目前支持
+ * 	sleep
+ */
 Corkerman\Runtime::enableCoroutine();
 
-worker_go(function () {
+Corkerman::create(function () {
 	var_dump(Corkerman::getCid());
-	sleep(3);
+	sleep(1);
 	worker_go(function () {
 		var_dump(Corkerman::getCid());
 	});
 	var_dump(Corkerman::getCid());
 });
 
-worker_go(function () {
+Corkerman::create(function () {
+	sleep(1);
 	var_dump(Corkerman::getCid());
 });
 

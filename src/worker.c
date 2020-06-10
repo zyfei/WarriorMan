@@ -517,10 +517,10 @@ void checkEnv() {
 	char* executed_filename_i = strrchr(executed_filename, '/');
 	int run_dir_len = executed_filename_i - executed_filename + 1;
 
-//设置启动路径
+	//设置启动路径
 	_runDir = wmString_dup(executed_filename, sizeof(char) * (run_dir_len));
 
-//检查,并且设置pid文件位置
+	//检查,并且设置pid文件位置
 	zval* _pidFile_zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), 0);
 	if (!_pidFile_zval) {
 		_pidFile = wmString_dup2(_runDir);
@@ -530,21 +530,21 @@ void checkEnv() {
 	} else {
 		_pidFile = wmString_dup(_pidFile_zval->value.str->val, _pidFile_zval->value.str->len);
 	}
-//
+	//
 
-// State.
+	// State.
 	_status = WM_WORKER_STATUS_STARTING;
 
-//检查守护进程模式
+	//检查守护进程模式
 	zval* _daemonize_zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), 0);
 	if (_daemonize_zval) {
 		if (Z_TYPE_INFO_P(_daemonize_zval) == IS_TRUE) {
 			_daemonize = true;
 		}
 	}
-//
+	//
 
-// Process title.
+	// Process title.
 	wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%.*s: master process start_file=%.*s", (int) _processTitle->length, _processTitle->str,
 		(int) _startFile->length, _startFile->str);
 	if (!set_process_title(WorkerG.buffer_stack->str)) {
@@ -558,7 +558,7 @@ void checkEnv() {
 void initWorkerPids() {
 	swHashMap_rewind(_workers);
 	uint64_t key;
-//循环_workers
+	//循环_workers
 	while (1) {
 		wmWorker* worker = (wmWorker *) swHashMap_each_int(_workers, &key);
 		if (worker == NULL) {
@@ -577,21 +577,21 @@ void initWorkerPids() {
 
 //解析用户输入
 void parseCommand() {
-//从全局变量中查用户输入argv
+	//从全局变量中查用户输入argv
 	zend_string* argv_str = zend_string_init(ZEND_STRL("argv"), 0);
 	zval *argv = zend_hash_find(&EG(symbol_table), argv_str);
 	zend_string_free(argv_str);
 	HashTable *argv_table = Z_ARRVAL_P(argv);
 
-//zend_string* start_file = NULL; //启动文件
+	//zend_string* start_file = NULL; //启动文件
 	zend_string* command = NULL; //第一个命令
 	zend_string* command2 = NULL; //第二个命令
 
-//获取启动文件
-//zval *value = zend_hash_index_find(argv_table, 0);
-//start_file = Z_STR_P(value);
+	//获取启动文件
+	zval *value = zend_hash_index_find(argv_table, 0);
+	zend_string* start_file = Z_STR_P(value);
 
-	zval *value = zend_hash_index_find(argv_table, 1);
+	value = zend_hash_index_find(argv_table, 1);
 	if (value != NULL) {
 		command = Z_STR_P(value);
 	}
@@ -620,16 +620,59 @@ void parseCommand() {
 		return;
 	}
 
-//设置守护进程模式
+	//设置守护进程模式
 	if (command2 && strcmp("-d", command2->val) == 0) {
 		_daemonize = true;
 		zend_update_static_property_bool(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), 1);
 	}
 
-// execute command.
+	// Get master process PID.
+	if (access(_pidFile->str, F_OK) == 0) {
+		wmString* _masterPidFile = wm_file_get_contents(_pidFile->str);
+		_masterPid = atoi(_masterPidFile->str);
+		wmString_free(_masterPidFile);
+		if (_masterPid <= 0) {
+			_masterPid = 0;
+		}
+	}
+	printf("masterPid=%d \n", _masterPid);
+	printf("aaaaa=%d \n", kill(_masterPid, 0));
+	int master_is_alive = 0;
+	if (_masterPid && (kill(_masterPid, 0) != -1) && (getpid() != _masterPid)) {
+		master_is_alive = 1;
+	}
+	if (master_is_alive) {
+		if (command_type == 1) {
+			php_printf("Workerman[%s] already running ...\n", start_file->val);
+			exit(0);
+		}
+	} else if (command_type != 1 && command_type != 3) {
+		php_printf("Workerman[%s] not run\n", start_file->val);
+		exit(0);
+	}
+	int i;
+	int command_ret = 0;
+	// execute command.
 	switch (command_type) {
 	case 1: //如果是start，就继续运行
 		break;
+	case 2: //stop
+		php_printf("Workerman[%s] is stopping ...\n", start_file->val);
+		kill(_masterPid, SIGINT); //给主进程发送信号
+		for (i = 0; i < 5; i++) {
+			if (kill(_masterPid, 0) == -1) { //如果死亡了，那么跳出
+				command_ret = 1;
+				break;
+			}
+			sleep(1);
+		}
+		if (command_ret == 1) {
+			php_printf("Workerman[%s] stop success\n", start_file->val);
+		} else {
+			php_printf("Workerman[%s] stop fail\n", start_file->val);
+		}
+		exit(0);
+		return;
 	default:
 		php_printf("Unknown command: %s\n", command->val);
 		exit(0);
