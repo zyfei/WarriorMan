@@ -31,7 +31,6 @@ zend_object* wm_connection_create_object(zend_class_entry *ce) {
 
 /**
  * 释放php对象的方法
- * 最新 问题找到了，是因为malloc申请了的地址重复了，现在的解决办法是，这里可以释放，但是不可以关。只能在其他地方关
  */
 static void wm_connection_free_object(zend_object *object) {
 	wmConnectionObject *sock = (wmConnectionObject *) wm_connection_fetch_object(object);

@@ -68,15 +68,15 @@ int wmString_append(wmString *str, wmString *append_str) {
 	//如果字符串不够了，动态调整大小
 	if (new_size > str->size) {
 		//动态调整内存,调整为两倍于新内存
-		if (wmString_extend(str, new_size * 2) < 0) {
-			return WM_ERR;
+		if (wmString_extend(str, new_size * 2) == false) {
+			return false;
 		}
 	}
 	//追加字符串
 	memcpy(str->str + str->length, append_str->str, append_str->length);
 	str->length += append_str->length;
 	str->str[str->length] = '\0'; //追加\0
-	return WM_OK;
+	return true;
 }
 
 /**
@@ -89,8 +89,8 @@ int wmString_append_int(wmString *str, int value) {
 
 	size_t new_size = str->length + s_len;
 	if (new_size > str->size) {
-		if (wmString_extend(str, new_size * 2) < 0) {
-			return WM_ERR;
+		if (wmString_extend(str, new_size * 2) == false) {
+			return false;
 		}
 	}
 
@@ -98,7 +98,7 @@ int wmString_append_int(wmString *str, int value) {
 	str->length += s_len;
 
 	str->str[str->length] = '\0'; //追加\0
-	return WM_OK;
+	return true;
 }
 
 /**
@@ -107,15 +107,15 @@ int wmString_append_int(wmString *str, int value) {
 int wmString_append_ptr(wmString *str, const char *append_str, size_t length) {
 	size_t new_size = str->length + length;
 	if (new_size > str->size) {
-		if (wmString_extend(str, new_size * 2) < 0) {
-			return WM_ERR;
+		if (wmString_extend(str, new_size * 2) == false) {
+			return false;
 		}
 	}
 	memcpy(str->str + str->length, append_str, length);
 	str->length += length;
 
 	str->str[str->length] = '\0'; //追加\0
-	return WM_OK;
+	return true;
 }
 
 /**
@@ -124,8 +124,8 @@ int wmString_append_ptr(wmString *str, const char *append_str, size_t length) {
 int wmString_write(wmString *str, size_t offset, wmString *write_str) {
 	size_t new_length = offset + write_str->length;
 	if (new_length > str->size) {
-		if (wmString_extend(str, new_length * 2) < 0) {
-			return WM_ERR;
+		if (wmString_extend(str, new_length * 2) == false) {
+			return false;
 		}
 	}
 	memcpy(str->str + offset, write_str->str, write_str->length);
@@ -133,7 +133,7 @@ int wmString_write(wmString *str, size_t offset, wmString *write_str) {
 		str->length = new_length;
 		str->str[str->length] = '\0'; //追加\0
 	}
-	return WM_OK;
+	return true;
 }
 
 /**
@@ -142,8 +142,8 @@ int wmString_write(wmString *str, size_t offset, wmString *write_str) {
 int wmString_write_ptr(wmString *str, off_t offset, char *write_str, size_t length) {
 	size_t new_length = offset + length;
 	if (new_length > str->size) {
-		if (wmString_extend(str, new_length * 2) < 0) {
-			return WM_ERR;
+		if (wmString_extend(str, new_length * 2) == false) {
+			return false;
 		}
 	}
 	memcpy(str->str + offset, write_str, length);
@@ -151,7 +151,7 @@ int wmString_write_ptr(wmString *str, off_t offset, char *write_str, size_t leng
 		str->length = new_length;
 		str->str[str->length] = '\0'; //追加\0
 	}
-	return WM_OK;
+	return true;
 }
 
 /**
@@ -160,14 +160,14 @@ int wmString_write_ptr(wmString *str, off_t offset, char *write_str, size_t leng
 int wmString_extend(wmString *str, size_t new_size) {
 	assert(new_size > str->size);
 	//动态调整内存
-	char *new_str = (char*) realloc(str->str, new_size + 1);
+	char *new_str = (char*) wm_realloc(str->str, new_size + 1);
 	if (new_str == NULL) {
 		wmWarn("realloc(%ld) failed", new_size);
-		return WM_ERR;
+		return false;
 	}
 	str->str = new_str;
 	str->size = new_size;
-	return WM_OK;
+	return true;
 }
 
 /**
@@ -177,7 +177,7 @@ char* wmString_alloc(wmString *str, size_t __size) {
 	//如果加完之后的长度，大于实际内存
 	if (str->length + __size > str->size) {
 		size_t new_length = str->size + __size;
-		if (wmString_extend(str, new_length) < 0) {
+		if (wmString_extend(str, new_length) == false) {
 			return NULL;
 		}
 	}

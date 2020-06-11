@@ -47,17 +47,17 @@ int wmArray_extend(wmArray *array) {
 	//已经达到最大页数，不给申请内存了
 	if (array->page_num == WM_ARRAY_PAGE_MAX) {
 		wmWarn("max page_num is %d", array->page_num);
-		return WM_ERR;
+		return false;
 	}
 	//给第array->page_num页申请内存
 	array->pages[array->page_num] = wm_calloc(array->page_size, array->item_size);
 	if (array->pages[array->page_num] == NULL) {
 		wmWarn("malloc[1] failed");
-		return WM_ERR;
+		return false;
 	}
 	//页数增加
 	array->page_num++;
-	return WM_OK;
+	return true;
 }
 
 /**
@@ -80,8 +80,8 @@ int wmArray_add(wmArray *array, void *data) {
 	int n = array->offset++; //下标
 	int page = wmArray_page(array, n); //对应页数
 	//如果是新页，申请内存
-	if (page >= array->page_num && wmArray_extend(array) < 0) {
-		return WM_ERR;
+	if (page >= array->page_num && wmArray_extend(array) == false) {
+		return false;
 	}
 	//元素数量
 	array->item_num++;
@@ -96,10 +96,10 @@ int wmArray_set(wmArray *array, uint32_t n, void *data) {
 	int page = wmArray_page(array, n);
 	if (page >= array->page_num) {
 		wmWarn("find index[%d] out of array", n);
-		return WM_ERR;
+		return false;
 	}
 	memcpy((char*) array->pages[page] + (wmArray_offset(array, n) * array->item_size), data, array->item_size);
-	return WM_OK;
+	return true;
 }
 
 void wmArray_printf(wmArray *array) {
@@ -114,7 +114,7 @@ void wmArray_printf(wmArray *array) {
  */
 void *wmArray_alloc(wmArray *array, uint32_t n) {
 	while (n >= array->page_num * array->page_size) {
-		if (wmArray_extend(array) < 0) {
+		if (wmArray_extend(array) == false) {
 			return NULL;
 		}
 	}

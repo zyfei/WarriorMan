@@ -30,8 +30,8 @@ static int _status = WM_WORKER_STATUS_STARTING; //当前服务状态
 static bool _daemonize = false; //守护进程模式
 static int _masterPid = 0; //master进程ID
 
-//解析地址
-void parseSocketAddress(wmWorker* worker, zend_string *listen);
+void init(); //初始化一些参数
+void parseSocketAddress(wmWorker* worker, zend_string *listen); //解析地址
 void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_fcc);
 void resumeAccept(wmWorker *worker);
 void checkEnv();
@@ -57,10 +57,11 @@ void alarm_wait();
 void displayUI();
 
 //初始化一下参数
-void wmWorker_init() {
-	//初始化进程头
-	_processTitle = wmString_dup("WorkerMan", 9);
-
+void init() {
+	//初始化进程标题
+	if (!_processTitle) {
+		_processTitle = wmString_dup("WorkerMan", 9);
+	}
 	if (!_workers) {
 		_workers = swHashMap_new(NULL);
 	}
@@ -73,15 +74,19 @@ void wmWorker_init() {
 	if (!_pid_array_tmp) {
 		_pid_array_tmp = wmArray_new(64, sizeof(int));
 	}
+	if (WorkerG.buffer_stack == NULL) {
+		WorkerG.buffer_stack = wmString_new(512);
+	}
 }
 
 /**
  * 创建
  */
 wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
+	init();
 	wmWorker* worker = (wmWorker *) wm_malloc(sizeof(wmWorker));
 	bzero(worker, sizeof(wmWorker));
-	worker->_status = WM_STATUS_STARTING;
+	worker->_status = WM_WORKER_STATUS_STARTING;
 	worker->onWorkerStart = NULL;
 	worker->onWorkerStop = NULL;
 	worker->onWorkerReload = NULL;
@@ -97,7 +102,6 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	worker->host = NULL;
 	worker->port = 0;
 	worker->count = 0;
-	worker->key = 0;
 	worker->transport = NULL;
 	worker->_This = _This;
 	worker->name = NULL;
@@ -145,7 +149,7 @@ void _unlisten(wmWorker *worker) {
 //启动服务器
 void _run(wmWorker *worker) {
 	//zval zsocket;
-	worker->_status = WM_STATUS_RUNNING;
+	worker->_status = WM_WORKER_STATUS_RUNNING;
 	//在这里应该注册事件回调
 	resumeAccept(worker);
 
@@ -329,7 +333,6 @@ void forkOneWorker(wmWorker* worker, int key) {
 			wmError("call_user_function 'cli_set_process_title' error");
 			return;
 		}
-		worker->key = key;
 		_run(worker);
 		wmTrace("event-loop exited");
 		exit(0);
@@ -453,7 +456,7 @@ void stopAll() {
 //关闭服务器
 bool wmWorker_stop(wmWorker* worker) {
 	php_printf("wmWorker_stop \n");
-	worker->_status = WM_STATUS_SHUTDOWN;
+	worker->_status = WM_WORKER_STATUS_SHUTDOWN;
 	if (worker->onWorkerStop) {
 		worker->onWorkerStop->fci.param_count = 1;
 		worker->onWorkerStop->fci.params = worker->_This;
@@ -468,36 +471,9 @@ bool wmWorker_stop(wmWorker* worker) {
 	return true;
 }
 
-/**
- * 象征性的施放一下，不完全
- */
-void wmWorker_free(wmWorker* worker) {
-	if (worker) {
-		_unlisten(worker);
-
-		efree(worker->_This);
-		swHashMap_del_int(_worker_pids, worker->id);
-		swHashMap_del_int(_workers, worker->id);
-		swHashMap_del_int(_fd_workers, worker->fd);
-
-		if (worker->onWorkerStart) {
-			//减少引用计数
-			wm_zend_fci_cache_discard(&worker->onWorkerStart->fcc);
-			efree(worker->onWorkerStart);
-		}
-		if (worker->onConnect) {
-			//减少引用计数
-			wm_zend_fci_cache_discard(&worker->onConnect->fcc);
-			efree(worker->onConnect);
-		}
-		wm_free(worker);
-		worker = NULL;
-	}
-}
-
 //检查环境
 void checkEnv() {
-//检查是否是cli模式
+	//检查是否是cli模式
 	zend_string* _php_sapi = zend_string_init("PHP_SAPI", strlen("PHP_SAPI"), 0);
 	zval* _php_sapi_zval = zend_get_constant(_php_sapi);
 	if (strcmp(_php_sapi_zval->value.str->val, "cli") != 0) {
@@ -506,7 +482,7 @@ void checkEnv() {
 	}
 	zend_string_free(_php_sapi);
 
-//获取启动文件
+	//获取启动文件
 	const char* executed_filename = zend_get_executed_filename();
 	_startFile = wmString_dup(executed_filename, sizeof(char) * strlen(executed_filename));
 
@@ -543,6 +519,7 @@ void checkEnv() {
 		}
 	}
 	//
+	wmString_print(WorkerG.buffer_stack);
 
 	// Process title.
 	wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%.*s: master process start_file=%.*s", (int) _processTitle->length, _processTitle->str,
@@ -682,9 +659,9 @@ void parseCommand() {
 
 //绑定回调
 void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_fcc) {
-//判断是否有workerStart
+	//判断是否有workerStart
 	zval *_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, _This, fun_name, strlen(fun_name), 0);
-//如果没有
+	//如果没有
 	if (_zval == NULL) {
 		return;
 	}
@@ -696,7 +673,7 @@ void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_f
 		php_error_docref(NULL, E_ERROR, "%s error : %s", fun_name, _error);
 		return;
 	}
-//为这个闭包增加引用计数
+	//为这个闭包增加引用计数
 	wm_zend_fci_cache_persist(&(*handle_fci_fcc)->fcc);
 }
 
@@ -818,7 +795,7 @@ void daemonize() {
 		return;
 	}
 
-// Fork again avoid SVR4 system regain the control of terminal.
+	// Fork again avoid SVR4 system regain the control of terminal.
 	pid = fork();
 	if (pid > 0) {
 		exit(0); //是父进程，结束父进程
@@ -876,8 +853,6 @@ void installSignal() {
 	signal(SIGPIPE, SIG_IGN); //忽略由于对端连接关闭，导致进程退出的问题
 }
 
-////////////////////////////////////////////////////// 测试
-
 void reinstallSignal() {
 	php_printf("子进程重设信号处理\n");
 	// 忽略 stop
@@ -892,8 +867,6 @@ void reinstallSignal() {
 	wmWorkerLoop_add_sigal(SIGUSR2, signalHandler);
 }
 
-///////////////////////////////////////////////////////// 测试 end
-
 void displayUI() {
 	php_printf("\n\n======CorkerMan Start=====\n");
 	swHashMap_rewind(_workers);
@@ -907,17 +880,4 @@ void displayUI() {
 		php_printf("name:%s  count:%d  listen:%s \n", worker->name->str, worker->count, worker->socketName->str);
 	}
 	php_printf("======CorkerMan Start=====\n\n\n");
-}
-
-//释放相关资源
-void wmWorker_shutdown() {
-	if (!_workers) {
-		swHashMap_free(_workers);
-	}
-	if (!_fd_workers) {
-		swHashMap_free(_fd_workers);
-	}
-	if (!_worker_pids) {
-		swHashMap_free(_worker_pids);
-	}
 }

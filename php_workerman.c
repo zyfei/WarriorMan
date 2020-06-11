@@ -1,7 +1,6 @@
 /* workerman extension for PHP */
 #include "workerman.h"
 #include "base.h"
-#include "worker.h"
 
 //创建协程接口方法声明
 PHP_FUNCTION(workerman_coroutine_create);
@@ -17,11 +16,9 @@ ZEND_END_ARG_INFO()
 
 /**
  * 模块初始化阶段
+ * 这个阶段不要使用php内存管理，比如emalloc申请内存。
  */
 PHP_MINIT_FUNCTION(workerman) {
-	//初始化worker
-	wmWorker_init();
-
 	//初始化base相关
 	workerman_base_init();
 	//初始化协程定义
@@ -41,7 +38,6 @@ PHP_MINIT_FUNCTION(workerman) {
  * 模块关闭阶段
  */
 PHP_MSHUTDOWN_FUNCTION(workerman) {
-	wmWorker_shutdown();
 	return SUCCESS;
 }
 

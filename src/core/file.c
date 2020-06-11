@@ -8,7 +8,7 @@ int wm_tmpfile(char *filename) {
 #endif
 	if (tmp_fd < 0) {
 		wmWarn("mkstemp(%s) failed", filename);
-		return WM_ERR;
+		return -1;
 	} else {
 		return tmp_fd;
 	}
@@ -17,11 +17,11 @@ int wm_tmpfile(char *filename) {
 long wm_file_get_size(FILE *fp) {
 	long pos = ftell(fp);
 	if (fseek(fp, 0L, SEEK_END) < 0) {
-		return WM_ERR;
+		return -1;
 	}
 	long size = ftell(fp);
 	if (fseek(fp, pos, SEEK_SET) < 0) {
-		return WM_ERR;
+		return -1;
 	}
 	return size;
 }
@@ -87,17 +87,17 @@ wmString* wm_file_get_contents(const char *filename) {
 int wm_file_put_contents(const char *filename, const char *content, size_t length) {
 	if (length <= 0) {
 		wmTrace("wm_file_put_contents(%s) content is empty", filename);
-		return WM_ERR;
+		return false;
 	}
 	if (length > WM_MAX_FILE_CONTENT) {
 		wmWarn("wm_file_put_contents(%s) content is too large", filename);
-		return WM_ERR;
+		return false;
 	}
 
 	int fd = open(filename, O_WRONLY | O_TRUNC | O_CREAT, 0666);
 	if (fd < 0) {
 		wmWarn("open(%s) failed", filename);
-		return WM_ERR;
+		return false;
 	}
 
 	int n, chunk_size, written = 0;
@@ -114,11 +114,11 @@ int wm_file_put_contents(const char *filename, const char *content, size_t lengt
 			} else {
 				wmWarn("write(%d, %d) failed", fd, chunk_size);
 				close(fd);
-				return -1;
+				return false;
 			}
 		}
 		written += n;
 	}
 	close(fd);
-	return WM_OK;
+	return true;
 }

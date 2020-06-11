@@ -5,10 +5,6 @@
  */
 #include "base.h"
 
-enum wmChannel_opcode {
-	CHANNEL_PUSH = 1, CHANNEL_POP = 2,
-};
-
 typedef struct {
 	uint32_t capacity; //容量
 	//生产者协程等待队列
@@ -20,25 +16,11 @@ typedef struct {
 } wmChannel;
 
 extern swHashMap *wm_channels;
-
 wmChannel* wmChannel_create(uint32_t _capacity);
-
-//插入
-bool wmChannel_push(wmChannel* channel, void *data, double timeout);
-
-//弹出
-void* wmChannel_pop(wmChannel* channel, double timeout);
-
-//插入
-int wmChannel_num(wmChannel* channel);
-
-//情况这个协程的所有元素
-void wmChannel_clear(wmChannel* channel);
-
-//销毁
-void wmChannel_free(wmChannel* channel);
-
-//超时回调
-void wmChannel_sleep_timeout(void *param);
+bool wmChannel_push(wmChannel* channel, void *data, double timeout);//插入
+void* wmChannel_pop(wmChannel* channel, double timeout);//弹出
+int wmChannel_num(wmChannel* channel);//协程内多少元素
+void wmChannel_clear(wmChannel* channel);//清空这个协程的所有元素
+void wmChannel_free(wmChannel* channel);//销毁
 
 #endif

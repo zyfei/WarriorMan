@@ -3,9 +3,6 @@
 
 #include "header.h"
 
-#define WM_OK 0
-#define WM_ERR -1
-
 #define WM_LOG_BUFFER_SIZE 1024
 #define WM_LOG_DATE_WMRLEN  64
 

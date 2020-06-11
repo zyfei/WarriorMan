@@ -22,7 +22,8 @@ PHP_METHOD(workerman_runtime, enableCoroutine) {
 
 static const zend_function_entry workerman_runtime_methods[] = { //
 	PHP_ME(workerman_runtime, enableCoroutine, arginfo_workerman_runtime_void, ZEND_ACC_PUBLIC| ZEND_ACC_STATIC)
-	PHP_FE_END };
+	PHP_FE_END //
+};
 
 /**
  * 注册我们的WorkerMan\Server这个类

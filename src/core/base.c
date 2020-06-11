@@ -3,6 +3,9 @@
 
 wmGlobal_t WorkerG;
 
+/**
+ * 需要注意，在这里不要申请内存。php自带的内存分配，会在初始化阶段之后回收
+ */
 void workerman_base_init() {
 	//初始化timer
 	long now_time;
@@ -10,7 +13,7 @@ void workerman_base_init() {
 	wmTimerWheel_init(&WorkerG.timer, 1, now_time);
 	WorkerG.is_running = false;
 	WorkerG.poll = NULL;
-	WorkerG.buffer_stack = wmString_new(512);
+	WorkerG.buffer_stack = NULL;
 }
 
 //初始化epoll
@@ -139,22 +142,4 @@ bool set_process_title(char* process_title) {
 		return false;
 	}
 	return true;
-}
-
-/**
- * 格式化字符串
- */
-size_t wm_snprintf(char *buf, size_t size, const char *format, ...) {
-	va_list args;
-	va_start(args, format);
-	int retval = vsnprintf(buf, size, format, args);
-	va_end(args);
-	if (retval < 0) {
-		retval = 0;
-		buf[0] = '\0';
-	} else if (retval >= size) {
-		retval = size - 1;
-		buf[retval] = '\0';
-	}
-	return retval;
 }

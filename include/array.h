@@ -4,34 +4,12 @@
 #include "header.h"
 #include "log.h"
 
-/**
- * The default wmArray->pages pointer array is WM_ARRAY_PAGE_MAX,
- * it means you can manage up to (WM_ARRAY_PAGE_MAX*page_size) elements
- */
-#define WM_ARRAY_PAGE_MAX      1024
-
 typedef struct _wmArray {
 	void **pages;
-
-	/**
-	 * number of page
-	 */
-	uint16_t page_num;
-
-	/**
-	 * 每页的数量多少
-	 */
-	uint16_t page_size;
-
-	/**
-	 * 每个元素的大小
-	 */
-	uint32_t item_size;
-
-	/**
-	 * number of data
-	 */
-	uint32_t item_num;
+	uint16_t page_num; //当前的页数
+	uint16_t page_size; //每页的数量多少
+	uint32_t item_size; //每个元素的大小
+	uint32_t item_num; //有多少元素了
 	uint32_t offset;
 } wmArray;
 

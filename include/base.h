@@ -1,9 +1,10 @@
 #ifndef _WM_BASH_H
 #define _WM_BASH_H
 
-//只引入自己做的基础库
+/**
+ * 引入一些自己做的基础库
+ */
 #include "header.h"
-#include "workerman_config.h"
 #include "hashmap.h"
 #include "timer.h"
 #include "socket.h"
@@ -14,10 +15,6 @@
 #include "file.h"
 #include "array.h"
 
-//php库
-#include "zend_closures.h"
-#include "zend_exceptions.h"
-#include "zend_object_handlers.h"
 
 //构造函数用到
 typedef struct {
@@ -179,41 +176,6 @@ static inline zval* wm_zend_read_static_property_not_null(zend_class_entry *ce, 
 	return (type == IS_NULL || UNEXPECTED(type == IS_UNDEF)) ? NULL : property;
 }
 
-//获取当前时间
-static inline void wmGetTime(long *seconds, long *microseconds) {
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	*seconds = tv.tv_sec;
-	*microseconds = tv.tv_usec;
-}
-
-//只获取毫秒
-static inline void wmGetMilliTime(long *microseconds) {
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	*microseconds = tv.tv_sec * 1000 + (long) tv.tv_usec / 1000;
-}
-
-//只获取微妙
-static inline void wmGetMicroTime(long *microseconds) {
-	struct timeval tv;
-	gettimeofday(&tv, NULL);
-	*microseconds = tv.tv_usec;
-}
-
-static inline uint64_t touint64(int fd, int id) {
-	uint64_t ret = 0;
-	ret |= ((uint64_t) fd) << 32;
-	ret |= ((uint64_t) id);
-
-	return ret;
-}
-
-static inline void fromuint64(uint64_t v, int *fd, int *id) {
-	*fd = (int) (v >> 32);
-	*id = (int) (v & 0xffffffff);
-}
-
 static inline zval* wm_malloc_zval() {
 	return (zval *) emalloc(sizeof(zval));
 }
@@ -253,10 +215,6 @@ static inline void wm_zend_fci_cache_free(void* fci_cache) {
 //调用闭包函数
 int call_closure_func(php_fci_fcc* fci_fcc);
 bool set_process_title(char* process_title);
-/**
- * 格式化字符串
- */
-size_t wm_snprintf(char *buf, size_t size, const char *format, ...);
 
 //初始化base相关
 void workerman_base_init();
@@ -276,8 +234,8 @@ void workerman_runtime_init();
 //定义的一些结构体
 typedef struct {
 	int epollfd; //创建的epollfd。
-	int ncap; //events数组的大小。
-	int event_num; // 事件的数量
+	int ncap; //epoll回调可以接收最多事件数量
+	int event_num; // 当前在监听的事件的数量
 	struct epoll_event *events; //是用来保存epoll返回的事件。
 } wmPoll_t;
 

@@ -1,20 +1,20 @@
 # Corkerman
 ## What is it
-协程版本的Workerman，完全按照Workerman的文档制作，支持协程的创建和切换。虽然目前还在还发中，但是有兴趣的同学可以给在下提提建议，找找BUG。  
+协程版本的Workerman，完全按照Workerman的文档制作，支持协程的创建和切换。虽然目前还在开发中，但是有兴趣的同学可以给在下提提建议，找找BUG。  
 
 此项目将会长期维护
 
 ## Requires
-PHP 7or Higher
+PHP7 or Higher
 
 应该没有然后了
 
 ## Installation
 
 ```
-//首先修改make.sh，将里面路径修改为自己php的相关路径
-./make.sh
-//最后别忘了将workerman.so添加到php.ini
+1 首先修改make.sh，将里面路径修改为自己php的相关路径
+2 执行./make.sh
+3 最后别忘了将workerman.so添加到php.ini
 ```
 
 ## Basic Usage

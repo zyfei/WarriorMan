@@ -90,7 +90,7 @@ void _wmConnection_read_callback(int fd) {
 		_close(connection);
 		return;
 	}
-
+	//再试一次，等待epoll回调
 	if (ret < 0) {
 		wmWarn("Error has occurred: (fd=%d,errno %d) %s", connection->fd, errno, strerror(errno));
 		php_error_docref(NULL, E_WARNING, "recv error");

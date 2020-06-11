@@ -29,15 +29,12 @@ static zend_object* wmWorker_create_object(zend_class_entry *ce) {
 }
 
 /**
- * 释放php对象的方法
- * 最新 问题找到了，是因为malloc申请了的地址重复了，现在的解决办法是，这里可以释放，但是不可以关。只能在其他地方关
+ * 释放php对象
+ * PS:针对Worker对象，程序是走不到这里的，都是通过exit(1)在合适的地方终止了，所以没有过多释放worker内存的操作
  */
 static void wmWorker_free_object(zend_object *object) {
 	wmWorkerObject *worker_obj = (wmWorkerObject *) wm_worker_fetch_object(object);
-
-	wmWorker_free(worker_obj->worker);
-
-	//free obj
+	//这里应该释放worker内存的，但是程序是走不到这里
 	zend_object_std_dtor(&worker_obj->std);
 }
 

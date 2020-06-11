@@ -45,7 +45,7 @@ void sig_callback(int fd) {
 	} else {
 		//每个信号值占1字节，所以按字节来逐个接收信号
 		for (int i = 0; i < recv_ret_value; ++i) {
-			loop_func_t fn = wmArray_find(signal_handler_array, signals[i]);
+			loop_sigal_func_t fn = wmArray_find(signal_handler_array, signals[i]);
 			if (fn) {
 				fn(signals[i]);
 			}
@@ -76,7 +76,7 @@ static inline int event_decode(int events) {
 	return flag;
 }
 
-void wmWorkerLoop_add_sigal(int sigal, loop_func_t fn) {
+void wmWorkerLoop_add_sigal(int sigal, loop_sigal_func_t fn) {
 	if (signal_fd[0] == 0) {
 		//创建一对互相连接的，全双工管道
 		if (socketpair(PF_UNIX, SOCK_STREAM, 0, signal_fd) == -1) {
@@ -95,7 +95,7 @@ void wmWorkerLoop_add_sigal(int sigal, loop_func_t fn) {
 	}
 
 	if (signal_handler_array == NULL) {
-		signal_handler_array = wmArray_new(64, sizeof(loop_func_t));
+		signal_handler_array = wmArray_new(64, sizeof(loop_sigal_func_t));
 		signal_handler_array->page_num = 64;
 	}
 
