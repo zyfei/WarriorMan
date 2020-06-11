@@ -115,7 +115,7 @@ static const zend_function_entry workerman_worker_methods[] = { //
  */
 void workerman_worker_init() {
 	//定义好一个类
-	INIT_NS_CLASS_ENTRY(workerman_worker_ce, "Corkerman", "Worker", workerman_worker_methods);
+	INIT_NS_CLASS_ENTRY(workerman_worker_ce, "Warriorman", "Worker", workerman_worker_methods);
 	//在zedn中注册类
 	workerman_worker_ce_ptr = zend_register_internal_class(&workerman_worker_ce TSRMLS_CC); // 在 Zend Engine 中注册
 

@@ -147,7 +147,7 @@ static const zend_function_entry workerman_channel_methods[] = { //
  */
 void workerman_channel_init() {
 	//定义好一个类
-	INIT_NS_CLASS_ENTRY(workerman_channel_ce, "Corkerman", "Channel", workerman_channel_methods);
+	INIT_NS_CLASS_ENTRY(workerman_channel_ce, "Warriorman", "Channel", workerman_channel_methods);
 	//在zedn中注册类
 	workerman_channel_ce_ptr = zend_register_internal_class(&workerman_channel_ce TSRMLS_CC); // 在 Zend Engine 中注册
 

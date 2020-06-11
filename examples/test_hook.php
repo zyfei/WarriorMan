@@ -4,20 +4,20 @@
  * 目前支持
  * 	sleep
  */
-Corkerman\Runtime::enableCoroutine();
+Warriorman\Runtime::enableCoroutine();
 
-Corkerman::create(function () {
-	var_dump(Corkerman::getCid());
+Warriorman::create(function () {
+	var_dump(Warriorman::getCid());
 	sleep(1);
 	worker_go(function () {
-		var_dump(Corkerman::getCid());
+		var_dump(Warriorman::getCid());
 	});
-	var_dump(Corkerman::getCid());
+	var_dump(Warriorman::getCid());
 });
 
-Corkerman::create(function () {
+Warriorman::create(function () {
 	sleep(1);
-	var_dump(Corkerman::getCid());
+	var_dump(Warriorman::getCid());
 });
 
 if (! defined("RUN_TEST")) {

@@ -1,6 +1,6 @@
-# Corkerman
+# Warriorman
 ## What is it
-协程版本的Workerman，完全按照Workerman的文档制作，支持协程的创建和切换。虽然目前还在开发中，但是有兴趣的同学可以给在下提提建议，找找BUG。  
+协程版本的WarriorMan，完全按照WarriorMan的文档制作，支持协程的创建和切换。虽然目前还在开发中，但是有兴趣的同学可以给在下提提建议，找找BUG。  
 
 此项目将会长期维护
 
@@ -23,9 +23,9 @@ PHP7 or Higher
 ```php
 <?php
 // hook系统函数，目前只hook了sleep函数
-Corkerman\Runtime::enableCoroutine();
+Warriorman\Runtime::enableCoroutine();
 
-$worker = new Corkerman\Worker("tcp://0.0.0.0:8080", array(
+$worker = new Warriorman\Worker("tcp://0.0.0.0:8080", array(
 	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
 	"count" => 2 // 进程数量
 ));
@@ -61,13 +61,13 @@ $worker->onClose = function ($connection) {
 };
 
 // 监听另外一个端口
-$worker2 = new Corkerman\Worker("tcp://0.0.0.0:8081");
+$worker2 = new Warriorman\Worker("tcp://0.0.0.0:8081");
 $worker2->onMessage = function ($connection, $data) {
 	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";
 	$connection->send($responseStr);
 };
 
-Corkerman\Worker::runAll();
+Warriorman\Worker::runAll();
 
 //更多协程例子在examples文件夹下
 ```
@@ -87,7 +87,7 @@ Corkerman\Worker::runAll();
 
 ## 特别鸣谢
 
-感谢Workerman项目 [Workerman](https://github.com/walkor/Workerman)，我完全仿照Workerman源码和文档制作。
+感谢WarriorMan项目 [WarriorMan](https://github.com/walkor/WarriorMan)，我完全仿照WarriorMan源码和文档制作。
 
 感谢Swoole项目 [Swoole](https://github.com/swoole/swoole-src)，我直接copy了不少Swoole的代码
 

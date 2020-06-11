@@ -250,7 +250,7 @@ void monitorWorkers() {
 		if (_status == WM_WORKER_STATUS_SHUTDOWN) {
 			getAllWorkerPids();
 			if (_pid_array_tmp->offset == 0) {
-				php_printf("Workerman[%s] has been stopped \n", _startFile->str);
+				php_printf("WarriorMan[%s] has been stopped \n", _startFile->str);
 				exit(0); //直接退出，不给php反应的机会，否则会弹出警告
 			}
 		}
@@ -429,7 +429,7 @@ void alarm_wait() {
 void stopAll() {
 	_status = WM_WORKER_STATUS_SHUTDOWN;
 	if (_masterPid == getpid()) { //主进程
-		php_printf("Workerman[%s] stopping ...\n", _startFile->str);
+		php_printf("WarriorMan[%s] stopping ...\n", _startFile->str);
 		getAllWorkerPids(); //获取所有子进程
 		for (int i = 0; i < _pid_array_tmp->offset; i++) {
 			int* pid = wmArray_find(_pid_array_tmp, i);
@@ -620,11 +620,11 @@ void parseCommand() {
 	}
 	if (master_is_alive) {
 		if (command_type == 1) {
-			php_printf("Workerman[%s] already running ...\n", start_file->val);
+			php_printf("WarriorMan[%s] already running ...\n", start_file->val);
 			exit(0);
 		}
 	} else if (command_type != 1 && command_type != 3) {
-		php_printf("Workerman[%s] not run\n", start_file->val);
+		php_printf("WarriorMan[%s] not run\n", start_file->val);
 		exit(0);
 	}
 	int i;
@@ -634,7 +634,7 @@ void parseCommand() {
 	case 1: //如果是start，就继续运行
 		break;
 	case 2: //stop
-		php_printf("Workerman[%s] is stopping ...\n", start_file->val);
+		php_printf("WarriorMan[%s] is stopping ...\n", start_file->val);
 		kill(_masterPid, SIGINT); //给主进程发送信号
 		for (i = 0; i < 5; i++) {
 			if (kill(_masterPid, 0) == -1) { //如果死亡了，那么跳出
@@ -644,9 +644,9 @@ void parseCommand() {
 			sleep(1);
 		}
 		if (command_ret == 1) {
-			php_printf("Workerman[%s] stop success\n", start_file->val);
+			php_printf("WarriorMan[%s] stop success\n", start_file->val);
 		} else {
-			php_printf("Workerman[%s] stop fail\n", start_file->val);
+			php_printf("WarriorMan[%s] stop fail\n", start_file->val);
 		}
 		exit(0);
 		return;
@@ -868,7 +868,7 @@ void reinstallSignal() {
 }
 
 void displayUI() {
-	php_printf("\n\n======CorkerMan Start=====\n");
+	php_printf("\n\n======WarriorMan Start=====\n");
 	swHashMap_rewind(_workers);
 	uint64_t key;
 	//循环_workers
@@ -879,5 +879,5 @@ void displayUI() {
 		}
 		php_printf("name:%s  count:%d  listen:%s \n", worker->name->str, worker->count, worker->socketName->str);
 	}
-	php_printf("======CorkerMan Start=====\n\n\n");
+	php_printf("======WarriorMan Start=====\n\n\n");
 }

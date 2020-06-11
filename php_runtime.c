@@ -31,7 +31,7 @@ static const zend_function_entry workerman_runtime_methods[] = { //
 void workerman_runtime_init() {
 
 	//定义好一个类
-	INIT_NS_CLASS_ENTRY(workerman_runtime_ce, "Corkerman", "Runtime", workerman_runtime_methods);
+	INIT_NS_CLASS_ENTRY(workerman_runtime_ce, "Warriorman", "Runtime", workerman_runtime_methods);
 	//在zedn中注册类
 	workerman_runtime_ce_ptr = zend_register_internal_class(&workerman_runtime_ce TSRMLS_CC); // 在 Zend Engine 中注册
 }

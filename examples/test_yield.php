@@ -2,20 +2,20 @@
 /**
  * 展示协程切换
  */
-$arr[] = Corkerman::create(function () {
-	var_dump(Corkerman::getCid() . " start");
-	Corkerman::yield();
-	var_dump(Corkerman::getCid() . " end");
+$arr[] = Warriorman::create(function () {
+	var_dump(Warriorman::getCid() . " start");
+	Warriorman::yield();
+	var_dump(Warriorman::getCid() . " end");
 });
 
-$arr[] = Corkerman::create(function () {
-	var_dump(Corkerman::getCid() . " start");
-	Corkerman::yield();
-	var_dump(Corkerman::getCid() . " end");
+$arr[] = Warriorman::create(function () {
+	var_dump(Warriorman::getCid() . " start");
+	Warriorman::yield();
+	var_dump(Warriorman::getCid() . " end");
 });
 
 foreach ($arr as $n) {
-	Corkerman::resume($n);
+	Warriorman::resume($n);
 }
 
 if (! defined("RUN_TEST")) {

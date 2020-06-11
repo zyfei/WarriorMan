@@ -171,7 +171,7 @@ zend_class_entry *workerman_coroutine_ce_ptr;
  */
 void workerman_coroutine_init() {
 	//定义好一个类
-	INIT_CLASS_ENTRY(workerman_coroutine_ce, "Corkerman", workerman_coroutine_methods);
+	INIT_CLASS_ENTRY(workerman_coroutine_ce, "Warriorman", workerman_coroutine_methods);
 	//在zedn中注册类
 	workerman_coroutine_ce_ptr = zend_register_internal_class(&workerman_coroutine_ce TSRMLS_CC); // 在 Zend Engine 中注册
 

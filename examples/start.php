@@ -1,8 +1,8 @@
 <?php
 // hook系统函数，目前只hook了sleep函数
-Corkerman\Runtime::enableCoroutine();
+Warriorman\Runtime::enableCoroutine();
 
-$worker = new Corkerman\Worker("tcp://0.0.0.0:8080", array(
+$worker = new Warriorman\Worker("tcp://0.0.0.0:8080", array(
 	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
 	"count" => 2 // 进程数量
 ));
@@ -38,11 +38,11 @@ $worker->onClose = function ($connection) {
 };
 
 // 监听另外一个端口
-$worker2 = new Corkerman\Worker("tcp://0.0.0.0:8081");
+$worker2 = new Warriorman\Worker("tcp://0.0.0.0:8081");
 $worker2->onMessage = function ($connection, $data) {
 	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";
 	$connection->send($responseStr);
 };
 
-Corkerman\Worker::runAll();
+Warriorman\Worker::runAll();
 
