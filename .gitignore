@@ -26,6 +26,7 @@ missing
 mkinstalldirs
 modules
 run-tests.php
+tests
 tests/*/*.diff
 tests/*/*.out
 tests/*/*.php
