@@ -69,7 +69,7 @@ $worker2->onMessage = function ($connection, $data) {
 
 Corkerman\Worker::runAll();
 
-//更多协程例子在test文件夹下
+//更多协程例子在examples文件夹下
 ```
 
 ## Available commands
