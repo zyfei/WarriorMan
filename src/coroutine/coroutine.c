@@ -1,8 +1,8 @@
 #include "coroutine.h"
 
 static long last_cid = 0; //自增id
-static swHashMap *coroutines = NULL; //保存所有协程
-static swHashMap *user_yield_coros = NULL; //被yield的协程
+static wmHash_INT_PTR *coroutines = NULL; //保存所有协程
+static wmHash_INT_PTR *user_yield_coros = NULL; //被yield的协程
 
 static wmCoroutine main_task = { 0 }; //主协程
 static wmCoroutine* current_task = NULL; //当前协程
@@ -17,16 +17,22 @@ wmCoroutine* get_task();
 void restore_vm_stack(wmCoroutine *task);
 void sleep_callback(void* co);
 
+void coroutines_add(wmCoroutine* task);
+void coroutines_del(long cid);
+wmCoroutine* user_yield_coros_get(long _cid);
+void user_yield_coros_add(wmCoroutine* task);
+void user_yield_coros_del(long cid);
+
+
+void wmCoroutine_init(){
+	coroutines = wmHash_init(WM_HASH_INT_STR);
+	user_yield_coros = wmHash_init(WM_HASH_INT_STR);
+}
+
 /**
  * 创建一个协程
  */
 long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc, zval *argv) {
-	if (!coroutines) {
-		coroutines = swHashMap_new(NULL); //保存所有协程
-	}
-	if (!user_yield_coros) {
-		user_yield_coros = swHashMap_new(NULL);
-	}
 
 	php_coro_args php_coro_args;
 	php_coro_args.fci_cache = fci_cache;
@@ -46,7 +52,7 @@ long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc, zval *a
 
 	task->cid = ++last_cid;
 	task->_defer = NULL;
-	swHashMap_add_int(coroutines, task->cid, task);
+	coroutines_add(task);
 
 	return run(task);
 }
@@ -255,7 +261,7 @@ void wmCoroutine_yield() {
 	wmCoroutine* task = wmCoroutine_get_current();
 	assert(current_task == task); //是否具备切换资格
 	//放入协程切换队列
-	swHashMap_add_int(user_yield_coros, task->cid, task);
+	user_yield_coros_add(task);
 
 	wmCoroutine *origin_task = task->origin;
 
@@ -275,11 +281,11 @@ bool wmCoroutine_resume(wmCoroutine *task) {
 	assert(current_task != task);
 
 	//判断是否之前yield过
-	wmCoroutine* yield_co = (wmCoroutine*) swHashMap_find_int(user_yield_coros, task->cid);
+	wmCoroutine* yield_co = user_yield_coros_get(task->cid);
 	if (yield_co == NULL) {
 		return false;
 	}
-	swHashMap_del_int(user_yield_coros, task->cid);
+	user_yield_coros_del(task->cid);
 
 	wmCoroutine *_current_task = get_task();
 	//这里要注意，不是保存的父协程，是谁唤醒他的，就保存谁保存当前的协程
@@ -304,10 +310,10 @@ bool wmCoroutine_resume(wmCoroutine *task) {
 
 void close_coro(wmCoroutine *task) {
 	//在hash表中删除
-	swHashMap_del_int(coroutines, task->cid);
+	coroutines_del(task->cid);
 
 	//yield表中删除
-	swHashMap_del_int(user_yield_coros, task->cid);
+	user_yield_coros_del(task->cid);
 
 	//获取他的唤起
 	wmCoroutine *origin_task = get_origin_task(task);
@@ -350,11 +356,6 @@ void vm_stack_destroy() {
 	}
 }
 
-wmCoroutine* wmCoroutine_get_by_cid(long _cid) {
-	wmCoroutine* _co = (wmCoroutine*) swHashMap_find_int(coroutines, _cid);
-	return _co;
-}
-
 void wmCoroutine_defer(php_fci_fcc *defer_fci_fcc) {
 	if (current_task->defer_tasks == NULL) {
 		current_task->defer_tasks = wmStack_create();
@@ -365,6 +366,65 @@ void wmCoroutine_defer(php_fci_fcc *defer_fci_fcc) {
 //返回当前协程任务
 wmCoroutine* wmCoroutine_get_current() {
 	return current_task;
+}
+wmCoroutine* wmCoroutine_get_by_cid(long _cid) {
+	wmHashKey iter = wmHash_get(WM_HASH_INT_STR, coroutines, _cid);
+	if (iter == kh_end(coroutines)) {
+		return NULL;
+	}
+	return wmHash_value(coroutines, iter);
+}
+
+void coroutines_add(wmCoroutine* task) {
+	//添加到map中 start
+	int ret;
+	int iter = wmHash_put(WM_HASH_INT_STR, coroutines, task->cid, &ret);
+	if (ret) {
+		wmHash_value(coroutines, iter) = task;
+	} else {
+		wmWarn("coroutines_add , wmHash_put fail");
+	}
+}
+
+void coroutines_del(long cid) {
+	wmHashKey iter = wmHash_get(WM_HASH_INT_STR, coroutines, cid);
+	if (iter != kh_end(coroutines)) {
+		wmHash_del(WM_HASH_INT_STR, coroutines, iter);
+	}
+}
+
+wmCoroutine* user_yield_coros_get(long _cid) {
+	wmHashKey iter = wmHash_get(WM_HASH_INT_STR, user_yield_coros, _cid);
+	if (iter == kh_end(user_yield_coros)) {
+		return NULL;
+	}
+	return wmHash_value(user_yield_coros, iter);
+}
+
+void user_yield_coros_add(wmCoroutine* task) {
+	//添加到map中 start
+	int ret;
+	int iter = wmHash_put(WM_HASH_INT_STR, user_yield_coros, task->cid, &ret);
+	if (ret) {
+		wmHash_value(user_yield_coros, iter) = task;
+	} else {
+		wmWarn("user_yield_coros_add , wmHash_put fail");
+	}
+}
+
+void user_yield_coros_del(long cid) {
+	wmHashKey iter = wmHash_get(WM_HASH_INT_STR, user_yield_coros, cid);
+	if (iter != kh_end(user_yield_coros)) {
+		wmHash_del(WM_HASH_INT_STR, user_yield_coros, iter);
+	}
+}
+
+/**
+ * 释放申请相关内存
+ */
+void wmCoroutine_shutdown() {
+	kh_destroy(WM_HASH_INT_STR, coroutines);
+	kh_destroy(WM_HASH_INT_STR, user_yield_coros);
 }
 
 void wmCoroutine_sleep(double seconds) {

@@ -40,5 +40,7 @@ void wmCoroutine_defer(php_fci_fcc *defer_fci_fcc);
 void wmCoroutine_sleep(double seconds);
 void wmCoroutine_set_callback(long cid, coroutine_func_t _defer, void *_defer_data);
 wmCoroutine* wmCoroutine_get_current();
+void wmCoroutine_init();
+void wmCoroutine_shutdown();
 
 #endif	/* WM_COROUTINE_H */

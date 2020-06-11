@@ -3,18 +3,23 @@
 #include "loop.h"
 
 static long wm_coroutine_socket_last_id = 0;
-static swHashMap *wm_connections = NULL; //记录着正在连接状态的conn
+static wmHash_INT_PTR *wm_connections = NULL; //记录着正在连接状态的conn
 
 //检查是否发送缓存区慢
 void checkBufferWillFull(wmConnection *connection);
 bool bufferIsFull(wmConnection *connection, size_t len);
 int _close(wmConnection *connection);
+void connections_add(wmConnection* connection);
+void connections_del(int fd);
 
 wmConnection * wmConnection_create(int fd) {
 	if (!wm_connections) {
-		wm_connections = swHashMap_new(NULL);
+		wm_connections = wmHash_init(WM_HASH_INT_STR);
 	}
-	swHashMap_del_int(wm_connections, fd);
+
+	//查找并且删除key为fd的连接
+	connections_del(fd);
+
 	wmConnection *connection = (wmConnection *) wm_malloc(sizeof(wmConnection));
 	connection->fd = fd;
 	connection->read_buffer = NULL;
@@ -36,17 +41,36 @@ wmConnection * wmConnection_create(int fd) {
 		wm_coroutine_socket_last_id = 0;
 		connection->id = ++wm_coroutine_socket_last_id;
 	}
-
 	wmSocket_set_nonblock(connection->fd);
 
-	//添加到map中
-	swHashMap_add_int(wm_connections, connection->fd, connection);
+	connections_add(connection);
 	return connection;
 }
 
+void connections_add(wmConnection* connection) {
+	//添加到map中 start
+	int ret;
+	int iter = wmHash_put(WM_HASH_INT_STR, wm_connections, connection->fd, &ret);
+	if (ret) {
+		wmHash_value(wm_connections, iter) = connection;
+	} else {
+		wmWarn("wmHash_put fail");
+	}
+}
+
 wmConnection* wmConnection_find_by_fd(int fd) {
-	wmConnection* connection = (wmConnection*) swHashMap_find_int(wm_connections, fd);
-	return connection;
+	wmHashKey iter = wmHash_get(WM_HASH_INT_STR, wm_connections, fd);
+	if (iter == kh_end(wm_connections)) {
+		return NULL;
+	}
+	return wmHash_value(wm_connections, iter);
+}
+
+void connections_del(int fd) {
+	wmHashKey iter = wmHash_get(WM_HASH_INT_STR, wm_connections, fd);
+	if (iter != kh_end(wm_connections)) {
+		wmHash_del(WM_HASH_INT_STR, wm_connections, iter);
+	}
 }
 
 /**
@@ -56,7 +80,7 @@ wmConnection* wmConnection_find_by_fd(int fd) {
 void onMessage_callback(void* _mess_data) {
 	zval* md = (zval*) _mess_data;
 	zval* md2 = (zval*) ((char *) _mess_data + sizeof(zval));
-	////php_printf("aaa %d \n",md->value.counted->gc.refcount);
+	//php_printf("aaa %d \n",md->value.counted->gc.refcount);
 	zval_ptr_dtor(md2);
 	efree(md);
 }
@@ -73,6 +97,7 @@ void _wmConnection_read_callback(int fd) {
 	wmConnection* connection = wmConnection_find_by_fd(fd);
 	if (connection == NULL) {
 		wmWarn("Error has occurred: _wmConnection_read_callback fd=%d wmConnection is NULL", fd);
+		exit(0);
 		return;
 	}
 
@@ -224,23 +249,16 @@ int wmConnection_close(wmConnection *connection) {
 }
 
 /**
- * 关闭所有的连接
+ * 关闭&删除所有的连接
  */
 void wmConnection_close_connections() {
-	swHashMap_rewind(wm_connections);
-	uint64_t key;
-	//循环_workers
-	wmConnection* need_close_conn = NULL;
-	while (1) {
-		wmConnection* conn = (wmConnection *) swHashMap_each_int(wm_connections, &key);
-		if (need_close_conn != NULL) {
-			_close(need_close_conn);
-			need_close_conn = NULL;
+	for (int k = wmHash_begin(wm_connections); k != wmHash_end(wm_connections); k++) {
+		if (!wmHash_exist(wm_connections, k)) {
+			continue;
 		}
-		if (conn == NULL) {
-			break;
-		}
-		need_close_conn = conn;
+		wmConnection* conn = wmHash_value(wm_connections, k);
+		wmHash_del(WM_HASH_INT_STR, wm_connections, k);
+		_close(conn);
 	}
 }
 
@@ -261,7 +279,8 @@ int _close(wmConnection *connection) {
 		wmCoroutine_create(&(connection->onClose->fcc), 1, connection->_This); //创建新协程
 	}
 
-	swHashMap_del_int(wm_connections, connection->fd); //从hash表删除
+	//查找并且删除key为fd的连接
+	connections_del(connection->fd);
 
 	//释放connection,摧毁这个类，如果顺利的话会触发wmConnection_free
 	zval_ptr_dtor(connection->_This);

@@ -4,7 +4,7 @@
 wmGlobal_t WorkerG;
 
 /**
- * 需要注意，在这里不要申请内存。php自带的内存分配，会在初始化阶段之后回收
+ * 请求初始化调用
  */
 void workerman_base_init() {
 	//初始化timer
@@ -13,7 +13,14 @@ void workerman_base_init() {
 	wmTimerWheel_init(&WorkerG.timer, 1, now_time);
 	WorkerG.is_running = false;
 	WorkerG.poll = NULL;
-	WorkerG.buffer_stack = NULL;
+	WorkerG.buffer_stack = wmString_new(512);
+}
+
+/**
+ * 请求结束调用
+ */
+void workerman_base_shutdown() {
+	wmString_free(WorkerG.buffer_stack);
 }
 
 //初始化epoll

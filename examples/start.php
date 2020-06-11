@@ -4,7 +4,7 @@ Warriorman\Runtime::enableCoroutine();
 
 $worker = new Warriorman\Worker("tcp://0.0.0.0:8080", array(
 	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
-	"count" => 2 // 进程数量
+	"count" => 1 // 进程数量
 ));
 $worker->name = "tcpServer"; // 设置名字
 $worker->onWorkerStart = function ($worker) {

@@ -14,6 +14,7 @@
 #include "wm_string.h"
 #include "file.h"
 #include "array.h"
+#include "wm_hash.h"
 
 
 //构造函数用到
@@ -218,6 +219,8 @@ bool set_process_title(char* process_title);
 
 //初始化base相关
 void workerman_base_init();
+void workerman_base_shutdown();
+
 //定义协程注册方法
 void workerman_coroutine_init();
 //协程类静态create方法，封装为方法

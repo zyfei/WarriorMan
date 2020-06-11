@@ -518,8 +518,6 @@ void checkEnv() {
 			_daemonize = true;
 		}
 	}
-	//
-	wmString_print(WorkerG.buffer_stack);
 
 	// Process title.
 	wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%.*s: master process start_file=%.*s", (int) _processTitle->length, _processTitle->str,
