@@ -6,6 +6,12 @@ enum wmSocket_type {
 	WM_SOCK_UDP = 2, //
 };
 
+enum wmLoop_type {
+	WM_LOOP_WORKER = 1, //
+	WM_LOOP_CONNECTION = 2, //
+	WM_LOOP_SIGAL = 3, //
+};
+
 enum wmChannel_opcode {
 	CHANNEL_PUSH = 1, //
 	CHANNEL_POP = 2,

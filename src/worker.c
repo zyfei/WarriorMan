@@ -30,30 +30,32 @@ static int _status = WM_WORKER_STATUS_STARTING; //当前服务状态
 static bool _daemonize = false; //守护进程模式
 static int _masterPid = 0; //master进程ID
 
-void parseSocketAddress(wmWorker* worker, zend_string *listen); //解析地址
-void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_fcc);
-void resumeAccept(wmWorker *worker);
-void checkEnv();
-void parseCommand();
-void initWorkerPids();
-void daemonize();
-void saveMasterPid();
-void initWorkers();
-void _listen(wmWorker *worker);
-void _run(wmWorker *worker);
-void forkWorkers();
-void forkOneWorker(wmWorker* worker, int key);
-int getKey_by_pid(wmWorker* worker, int pid);
-void _unlisten(wmWorker *worker);
-void installSignal(); //装载信号
-void reinstallSignal(); //针对子进程，使用epoll重新装载信号
-void getAllWorkerPids(); //获取所有子进程pid
-void stopAll(); //停止服务
-void _reload(); //重启
-void signalHandler(int signal);
-void monitorWorkers();
-void alarm_wait();
-void displayUI();
+static void acceptConnection(int fd, int coro_id);
+static void parseSocketAddress(wmWorker* worker, zend_string *listen); //解析地址
+static void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_fcc);
+static void resumeAccept(wmWorker *worker);
+static void checkEnv();
+static void parseCommand();
+static void initWorkerPids();
+static void daemonize();
+static void saveMasterPid();
+static void initWorkers();
+static void _listen(wmWorker *worker);
+static void _run(wmWorker *worker);
+static void forkWorkers();
+static void forkOneWorker(wmWorker* worker, int key);
+static int getKey_by_pid(wmWorker* worker, int pid);
+static void _unlisten(wmWorker *worker);
+static void installSignal(); //装载信号
+static void reinstallSignal(); //针对子进程，使用epoll重新装载信号
+static void getAllWorkerPids(); //获取所有子进程pid
+static void stopAll(); //停止服务
+static void _reload(); //重启
+static void signalHandler(int signal);
+static void monitorWorkers();
+static void alarm_wait();
+static void displayUI();
+static void error_callback(int fd, int coro_id);
 
 //初始化一下参数
 void wmWorker_init() {
@@ -63,6 +65,9 @@ void wmWorker_init() {
 	_fd_workers = wmHash_init(WM_HASH_INT_STR);
 	_worker_pids = wmHash_init(WM_HASH_INT_STR);
 	_pid_array_tmp = wmArray_new(64, sizeof(int));
+
+	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_WORKER, acceptConnection);
+	wmWorkerLoop_set_handler(WM_EVENT_ERROR, WM_LOOP_WORKER, error_callback);
 }
 
 /**
@@ -247,7 +252,7 @@ void monitorWorkers() {
  */
 void resumeAccept(wmWorker *worker) {
 	//读 | 避免惊群
-	wmWorkerLoop_add(worker->fd, WM_EVENT_READ | WM_EVENT_EPOLLEXCLUSIVE);
+	wmWorkerLoop_add(worker->fd, WM_EVENT_READ | WM_EVENT_EPOLLEXCLUSIVE, WM_LOOP_WORKER);
 }
 
 //fork子进程
@@ -275,7 +280,7 @@ void forkOneWorker(wmWorker* worker, int key) {
 	//拿到一个未fork的进程
 	int pid = fork();
 	if (pid > 0) { // For master process.
-		wmArray* pid_arr = WM_HASH_GET(WM_HASH_INT_STR,_worker_pids,worker->id);
+		wmArray* pid_arr = WM_HASH_GET(WM_HASH_INT_STR, _worker_pids, worker->id);
 		wmArray_set(pid_arr, key, &pid);
 		return;
 	} else if (pid == 0) { // For child processes.
@@ -335,7 +340,7 @@ void getAllWorkerPids() {
  * 在idmap中，通过value查询key
  */
 int getKey_by_pid(wmWorker* worker, int pid) {
-	wmArray* pid_arr = WM_HASH_GET(WM_HASH_INT_STR,_worker_pids,worker->id);
+	wmArray* pid_arr = WM_HASH_GET(WM_HASH_INT_STR, _worker_pids, worker->id);
 	int id = -1;
 	for (int i = 0; i < pid_arr->offset; i++) {
 		int* _pid = (int*) wmArray_find(pid_arr, i);
@@ -641,9 +646,10 @@ void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_f
 }
 
 /**
- * accept回调函数
+ * 由epoll调用
  */
-void _wmWorker_acceptConnection(wmWorker *worker) {
+void acceptConnection(int fd, int coro_id) {
+	wmWorker* worker = wmWorker_find_by_fd(fd);
 	int connfd;
 	wmConnection* _conn;
 	zval* __zval;
@@ -668,7 +674,7 @@ void _wmWorker_acceptConnection(wmWorker *worker) {
 
 		_conn->events = WM_EVENT_READ;
 		//添加读监听
-		wmWorkerLoop_add(_conn->fd, _conn->events);
+		wmWorkerLoop_add(_conn->fd, _conn->events, WM_LOOP_CONNECTION);
 
 		//新的Connection对象
 		zend_object *obj = wm_connection_create_object(workerman_connection_ce_ptr);
@@ -841,9 +847,8 @@ void displayUI() {
 }
 
 wmWorker* wmWorker_find_by_fd(int fd) {
-	return WM_HASH_GET(WM_HASH_INT_STR,_fd_workers,fd);
+	return WM_HASH_GET(WM_HASH_INT_STR, _fd_workers, fd);
 }
-
 
 void wmWorker_free(wmWorker* worker) {
 	_unlisten(worker);
@@ -896,11 +901,18 @@ void wmWorker_free(wmWorker* worker) {
 	wmConnection_close_connections();
 
 	//从workers中删除
-	WM_HASH_DEL(WM_HASH_INT_STR,_workers,worker->id);
-	WM_HASH_DEL(WM_HASH_INT_STR,_fd_workers,worker->fd);
+	WM_HASH_DEL(WM_HASH_INT_STR, _workers, worker->id);
+	WM_HASH_DEL(WM_HASH_INT_STR, _fd_workers, worker->fd);
 
 	wm_free(worker);
 	worker = NULL;
+}
+
+/**
+ * epoll发生错误，直接关闭
+ */
+void error_callback(int fd, int coro_id) {
+	wmError("Worker_error_callback error,child worker exit(1)");
 }
 
 void wmWorker_shutdown() {

@@ -1,6 +1,6 @@
 #include "context.h"
 
-void wmContext_func(void *arg);
+static void wmContext_func(void *arg);
 
 /**
  * 初始化Context

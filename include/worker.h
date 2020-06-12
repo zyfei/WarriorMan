@@ -53,7 +53,5 @@ void wmWorker_runAll(); //启动服务器
 bool wmWorker_stop(wmWorker* worker); //关闭服务器
 void wmWorker_free(wmWorker* worker);
 wmWorker* wmWorker_find_by_fd(int fd);
-//loop 回调
-void _wmWorker_acceptConnection(wmWorker *worker);
 
 #endif

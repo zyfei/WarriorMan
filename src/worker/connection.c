@@ -6,12 +6,20 @@ static long wm_coroutine_socket_last_id = 0;
 static wmHash_INT_PTR *wm_connections = NULL; //记录着正在连接状态的conn
 
 //检查是否发送缓存区慢
-void checkBufferWillFull(wmConnection *connection);
-bool bufferIsFull(wmConnection *connection, size_t len);
-int _close(wmConnection *connection);
+static void checkBufferWillFull(wmConnection *connection);
+static bool bufferIsFull(wmConnection *connection, size_t len);
+static int _close(wmConnection *connection);
+//专门给loop回调用的
+static void read_callback(int fd, int coro_id);
+static void write_callback(int fd, int coro_id);
+static void error_callback(int fd, int coro_id);
 
 void wmConnection_init() {
 	wm_connections = wmHash_init(WM_HASH_INT_STR);
+
+	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_CONNECTION, read_callback);
+	wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_CONNECTION, write_callback);
+	wmWorkerLoop_set_handler(WM_EVENT_ERROR, WM_LOOP_CONNECTION, error_callback);
 }
 
 wmConnection * wmConnection_create(int fd) {
@@ -73,7 +81,7 @@ void onError_callback(void* _mess_data) {
 }
 
 //已经可以读消息了
-void _wmConnection_read_callback(int fd) {
+void read_callback(int fd, int coro_id) {
 	wmConnection* connection = wmConnection_find_by_fd(fd);
 	if (connection == NULL) {
 		wmWarn("Error has occurred: _wmConnection_read_callback fd=%d wmConnection is NULL", fd);
@@ -161,7 +169,7 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 			//在这里取消事件注册，使用修改的方式
 			if (_add_Loop) {
 				connection->events = connection->events - WM_EVENT_WRITE;
-				wmWorkerLoop_update(connection->fd, connection->events);
+				wmWorkerLoop_update(connection->fd, connection->events, WM_LOOP_CONNECTION);
 			}
 			connection->write_buffer->offset = 0;
 			connection->write_buffer->length = 0;
@@ -170,9 +178,9 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 		if (!_add_Loop) {
 			connection->events |= WM_EVENT_WRITE;
 			if (connection->events & WM_EVENT_READ) {
-				wmWorkerLoop_update(connection->fd, connection->events);
+				wmWorkerLoop_update(connection->fd, connection->events, WM_LOOP_CONNECTION);
 			} else {
-				wmWorkerLoop_add(connection->fd, connection->events);
+				wmWorkerLoop_add(connection->fd, connection->events, WM_LOOP_CONNECTION);
 			}
 			_add_Loop = true;
 		}
@@ -182,7 +190,7 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 	return true;
 }
 
-void _wmConnection_write_callback(int fd, int coro_id) {
+void write_callback(int fd, int coro_id) {
 	wmCoroutine* co = wmCoroutine_get_by_cid(coro_id);
 	if (co == NULL) {
 		wmWarn("Error has occurred: _wmConnection_write_callback wmCoroutine is NULL");
@@ -240,6 +248,17 @@ void wmConnection_close_connections() {
 		wmHash_del(WM_HASH_INT_STR, wm_connections, k);
 		_close(conn);
 	}
+}
+
+/**
+ * 处理epoll失败的情况
+ */
+void error_callback(int fd, int coro_id) {
+	wmConnection* conn = wmConnection_find_by_fd(fd);
+	if (conn == NULL) {
+		return;
+	}
+	_close(conn);
 }
 
 /**

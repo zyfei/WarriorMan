@@ -1,5 +1,9 @@
 #include "loop.h"
 
+static loop_callback_func_t read_handler[7];
+static loop_callback_func_t write_handler[7];
+static loop_callback_func_t error_handler[7];
+
 /**
  * 创建的信号通道
  * 载epoll版本信号
@@ -9,6 +13,7 @@
 static int signal_fd[2] = { 0, 0 };
 static wmArray* signal_handler_array = NULL;
 static char signals[1024];
+
 /**
  * 一旦出现信号，写入signal_fd中
  */
@@ -43,7 +48,7 @@ void sig_callback(int fd) {
 	} else {
 		//每个信号值占1字节，所以按字节来逐个接收信号
 		for (int i = 0; i < recv_ret_value; ++i) {
-			loop_sigal_func_t fn = wmArray_find(signal_handler_array, signals[i]);
+			loop_func_t fn = wmArray_find(signal_handler_array, signals[i]);
 			if (fn) {
 				fn(signals[i]);
 			}
@@ -70,11 +75,10 @@ static inline int event_decode(int events) {
 	if (events & WM_EVENT_ERROR) {
 		flag |= (EPOLLRDHUP | EPOLLHUP | EPOLLERR);
 	}
-
 	return flag;
 }
 
-void wmWorkerLoop_add_sigal(int sigal, loop_sigal_func_t fn) {
+void wmWorkerLoop_add_sigal(int sigal, loop_func_t fn) {
 	if (signal_fd[0] == 0) {
 		//创建一对互相连接的，全双工管道
 		if (socketpair(PF_UNIX, SOCK_STREAM, 0, signal_fd) == -1) {
@@ -89,11 +93,11 @@ void wmWorkerLoop_add_sigal(int sigal, loop_sigal_func_t fn) {
 		wmSocket_set_nonblock(signal_fd[1]);
 
 		//最后加入loop
-		wmWorkerLoop_add(signal_fd[0], WM_EVENT_READ);
+		wmWorkerLoop_add(signal_fd[0], WM_EVENT_READ, WM_LOOP_SIGAL);
 	}
 
 	if (signal_handler_array == NULL) {
-		signal_handler_array = wmArray_new(64, sizeof(loop_sigal_func_t));
+		signal_handler_array = wmArray_new(64, sizeof(loop_func_t));
 		signal_handler_array->page_num = 64;
 	}
 
@@ -113,7 +117,48 @@ void wmWorkerLoop_add_sigal(int sigal, loop_sigal_func_t fn) {
 	wmArray_set(signal_handler_array, sigal, fn);
 }
 
-void wmWorkerLoop_add(int fd, int events) {
+/**
+ *	设置event处理方式
+ */
+bool wmWorkerLoop_set_handler(int event, int type, loop_callback_func_t fn) {
+	loop_callback_func_t *handlers;
+	switch (event) {
+	case WM_EVENT_READ:
+		handlers = read_handler;
+		break;
+	case WM_EVENT_WRITE:
+		handlers = write_handler;
+		break;
+	case WM_EVENT_ERROR:
+		handlers = error_handler;
+		break;
+	default:
+		return false;
+	}
+	handlers[type] = fn;
+	return true;
+}
+
+loop_callback_func_t loop_get_handler(int event, int type) {
+	loop_callback_func_t *handlers;
+	switch (event) {
+	case EPOLLIN:
+		handlers = read_handler;
+		break;
+	case EPOLLOUT:
+		handlers = write_handler;
+		break;
+	default:
+		handlers = error_handler;
+	}
+	if (handlers[type] != NULL) {
+		return handlers[type];
+	}
+	return NULL;
+}
+
+static int LOOP_TYPE = EPOLL_CTL_ADD;
+void wmWorkerLoop_add(int fd, int events, int fdtype) {
 	//初始化epoll
 	if (!WorkerG.poll) {
 		init_wmPoll();
@@ -125,52 +170,35 @@ void wmWorkerLoop_add(int fd, int events) {
 		return;
 	}
 
-	int co_id = 0;
+	long coro_id = 0;
 	wmCoroutine* co = wmCoroutine_get_current();
 	if (co != NULL) {
-		co_id = co->cid;
+		coro_id = co->cid;
 	}
 
 	struct epoll_event *ev;
 	ev = WorkerG.poll->events;
 	//转换epoll能看懂的事件类型
 	ev->events = event_decode(events);
-	ev->data.u64 = touint64(fd, co_id);
+
+	//将三个数构建在一起前3位是type，然后后29位是fd，最后32位是co_id
+	uint64_t ret = 0;
+	ret |= ((uint64_t) fdtype) << 61;
+	ret |= ((uint64_t) fd) << 32;
+	ret |= ((uint64_t) coro_id);
+
+	ev->data.u64 = ret;
 	//注册到全局的epollfd上面。
-	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_ADD, fd, ev) < 0) {
+	if (epoll_ctl(WorkerG.poll->epollfd, LOOP_TYPE, fd, ev) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 		return;
 	}
 }
 
-void wmWorkerLoop_update(int fd, int events) {
-	//初始化epoll
-	if (!WorkerG.poll) {
-		init_wmPoll();
-	}
-	//没有事件
-	if (events == WM_EVENT_NULL) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		return;
-	}
-
-	int co_id = 0;
-	wmCoroutine* co = wmCoroutine_get_current();
-	if (co != NULL) {
-		co_id = co->cid;
-	}
-
-	struct epoll_event *ev;
-	ev = WorkerG.poll->events;
-	//转换epoll能看懂的事件类型
-	ev->events = event_decode(events);
-	ev->data.u64 = touint64(fd, co_id);
-
-	//注册到全局的epollfd上面。
-	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_MOD, fd, ev) < 0) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		return;
-	}
+void wmWorkerLoop_update(int fd, int events, int fdtype) {
+	LOOP_TYPE = EPOLL_CTL_MOD;
+	wmWorkerLoop_add(fd, events, fdtype);
+	LOOP_TYPE = EPOLL_CTL_ADD;
 }
 
 void wmWorkerLoop_del(int fd) {
@@ -190,47 +218,61 @@ void wmWorkerLoop_loop() {
 
 	int n;
 	long mic_time;
-	//这里应该改成死循环了
+	loop_callback_func_t fn;
+	int _c = 0; //是否可以处理这个epoll信号，不能处理就del他
 	while (WorkerG.is_running) {
 		//毫秒级定时器，必须是1
-		int timeout = 1000;
+		int timeout = 1;
 		struct epoll_event *events;
 		events = WorkerG.poll->events;
 		n = epoll_wait(WorkerG.poll->epollfd, events, WorkerG.poll->ncap, timeout);
 		//循环处理epoll请求
 		for (int i = 0; i < n; i++) {
-			int fd, coro_id;
-			fromuint64(events[i].data.u64, &fd, &coro_id);
-			//先判断是不是信号fd,不用判断是不是读事件，因为只添加了读事件~
+			_c = 0;
+			uint64_t v = events[i].data.u64;
+			int fdtype = (int) (v >> 61);
+			//成功的把头三位卡没了
+			v = (v << 3) >> 3;
+			int fd = (int) (v >> 32);
+			int coro_id = (int) (v & 0xffffffff);
 
 			if (fd == signal_fd[0]) {
 				sig_callback(fd);
-				continue;
 			}
 
 			//再判断是否是worker的
-			wmWorker* worker = wmWorker_find_by_fd(fd);
-			//这个是worker Accept的
-			if (worker) {
-				_wmWorker_acceptConnection(worker);
-				continue;
-			}
 
 			//read
 			if (events[i].events & EPOLLIN) {
-				_wmConnection_read_callback(fd);
+				fn = loop_get_handler(EPOLLIN, fdtype);
+				if (fn != NULL) {
+					_c = 1;
+					fn(fd, coro_id);
+				}
 			}
 			//write
 			if (events[i].events & EPOLLOUT) {
-				_wmConnection_write_callback(fd, coro_id);
-			}
-			//error  以后完善
-			if (events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) {
-				//ignore ERR and HUP, because event is already processed at IN and OUT handler.
-				if ((events[i].events & EPOLLIN) || (events[i].events & EPOLLOUT)) {
-					continue;
+				fn = loop_get_handler(EPOLLOUT, fdtype);
+				if (fn != NULL) {
+					_c = 1;
+					fn(fd, coro_id);
 				}
-				wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+			}
+			//error
+			if ((events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) && _c == 0) {
+				fn = loop_get_handler(0, fdtype);
+				if (fn != NULL) {
+					_c = 1;
+					fn(fd, coro_id);
+				}
+				wmWarn("loop  Error has occurred: (errno %d) %s", errno, strerror(errno));
+			}
+
+			/**
+			 * 没有人可以处理的fd，赶快删掉避免死循环
+			 */
+			if (_c == 0) {
+				wmWorkerLoop_del(fd);
 			}
 		}
 		//有定时器才更新

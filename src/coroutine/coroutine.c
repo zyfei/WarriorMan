@@ -7,16 +7,20 @@ static wmHash_INT_PTR *user_yield_coros = NULL; //被yield的协程
 static wmCoroutine main_task = { 0 }; //主协程
 static wmCoroutine* current_task = NULL; //当前协程
 
-long run(wmCoroutine* task);
-void main_func(void *arg);
-void vm_stack_init();
-void save_vm_stack(wmCoroutine *task);
-void close_coro(wmCoroutine *task);
-wmCoroutine* get_origin_task(wmCoroutine *task);
-wmCoroutine* get_task();
-void restore_vm_stack(wmCoroutine *task);
-void sleep_callback(void* co);
+static long run(wmCoroutine* task);
+static void main_func(void *arg);
+static void vm_stack_init();
+static void save_vm_stack(wmCoroutine *task);
+static void close_coro(wmCoroutine *task);
+static wmCoroutine* get_origin_task(wmCoroutine *task);
+static wmCoroutine* get_task();
+static void restore_vm_stack(wmCoroutine *task);
+static void sleep_callback(void* co);
 
+
+/**
+ * 请求初始化的时候调用
+ */
 void wmCoroutine_init() {
 	coroutines = wmHash_init(WM_HASH_INT_STR);
 	user_yield_coros = wmHash_init(WM_HASH_INT_STR);

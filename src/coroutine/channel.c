@@ -1,7 +1,7 @@
 #include "channel.h"
 #include "coroutine.h"
 
-void sleep_timeout(void *param);
+static void sleep_timeout(void *param);
 
 //这个结构体，是用来控制协程，不在错误的时间co->resume的
 typedef struct {
