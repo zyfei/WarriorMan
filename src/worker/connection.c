@@ -9,16 +9,15 @@ static wmHash_INT_PTR *wm_connections = NULL; //记录着正在连接状态的co
 void checkBufferWillFull(wmConnection *connection);
 bool bufferIsFull(wmConnection *connection, size_t len);
 int _close(wmConnection *connection);
-void connections_add(wmConnection* connection);
-void connections_del(int fd);
+
+void wmConnection_init() {
+	wm_connections = wmHash_init(WM_HASH_INT_STR);
+}
 
 wmConnection * wmConnection_create(int fd) {
-	if (!wm_connections) {
-		wm_connections = wmHash_init(WM_HASH_INT_STR);
-	}
 
 	//查找并且删除key为fd的连接
-	connections_del(fd);
+	WM_HASH_DEL(WM_HASH_INT_STR, wm_connections, fd);
 
 	wmConnection *connection = (wmConnection *) wm_malloc(sizeof(wmConnection));
 	connection->fd = fd;
@@ -43,34 +42,15 @@ wmConnection * wmConnection_create(int fd) {
 	}
 	wmSocket_set_nonblock(connection->fd);
 
-	connections_add(connection);
+	if (WM_HASH_ADD(WM_HASH_INT_STR,wm_connections,connection->fd,connection) < 0) {
+		wmWarn("wmConnection_create-> connections_add fail");
+		return NULL;
+	}
 	return connection;
 }
 
-void connections_add(wmConnection* connection) {
-	//添加到map中 start
-	int ret;
-	int iter = wmHash_put(WM_HASH_INT_STR, wm_connections, connection->fd, &ret);
-	if (ret) {
-		wmHash_value(wm_connections, iter) = connection;
-	} else {
-		wmWarn("wmHash_put fail");
-	}
-}
-
 wmConnection* wmConnection_find_by_fd(int fd) {
-	wmHashKey iter = wmHash_get(WM_HASH_INT_STR, wm_connections, fd);
-	if (iter == kh_end(wm_connections)) {
-		return NULL;
-	}
-	return wmHash_value(wm_connections, iter);
-}
-
-void connections_del(int fd) {
-	wmHashKey iter = wmHash_get(WM_HASH_INT_STR, wm_connections, fd);
-	if (iter != kh_end(wm_connections)) {
-		wmHash_del(WM_HASH_INT_STR, wm_connections, iter);
-	}
+	return WM_HASH_GET(WM_HASH_INT_STR, wm_connections, fd);
 }
 
 /**
@@ -280,7 +260,7 @@ int _close(wmConnection *connection) {
 	}
 
 	//查找并且删除key为fd的连接
-	connections_del(connection->fd);
+	WM_HASH_DEL(WM_HASH_INT_STR, wm_connections, connection->fd);
 
 	//释放connection,摧毁这个类，如果顺利的话会触发wmConnection_free
 	zval_ptr_dtor(connection->_This);
@@ -309,3 +289,6 @@ void wmConnection_free(wmConnection *connection) {
 	connection = NULL;
 }
 
+void wmConnection_shutdown() {
+	wmHash_destroy(WM_HASH_INT_STR,wm_connections);
+}

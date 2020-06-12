@@ -34,7 +34,7 @@ static inline wmStack* wmStack_create() {
 	if (s->node == NULL) {
 		wm_free(s);
 		//php_error_docref(NULL, E_WARNING, "wmStack_create error");
-		printf("wmStack_create error \n");
+		php_printf("wmStack_create error \n");
 		s = NULL;
 		return s;
 	}
@@ -58,7 +58,7 @@ static inline int wmStack_push(wmStack *stack, void* data) {
 		//重新调整大小，也就是加WM_STACK_CRE个
 		stack->node = (wmStack_Node*) realloc(stack->node, (stack->size + WM_STACK_CRE) * sizeof(wmStack_Node));
 		if (stack->node == NULL) {
-			printf("wmStack_push error \n");
+			php_printf("wmStack_push error \n");
 			return 0;
 		}
 		int old_size = stack->size;

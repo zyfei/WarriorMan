@@ -13,7 +13,6 @@ static char signals[1024];
  * 一旦出现信号，写入signal_fd中
  */
 void sig_handler(int sigalno) {
-	php_printf("capture signal,signal is %d \n", sigalno);
 	//保留原来的errno，在函数最后回复，以保证函数的可重入性
 	int save_errno = errno;
 	int msg = sigalno;
@@ -23,7 +22,6 @@ void sig_handler(int sigalno) {
 	if (wmSocket_send(signal_fd[1], (char*) &msg, 1, 0) <= 0) {
 		php_printf("The message sent to the server failed\n");
 	}
-	php_printf("signal is send to server\n");
 	errno = save_errno;
 }
 
@@ -195,7 +193,7 @@ void wmWorkerLoop_loop() {
 	//这里应该改成死循环了
 	while (WorkerG.is_running) {
 		//毫秒级定时器，必须是1
-		int timeout = 5000;
+		int timeout = 1000;
 		struct epoll_event *events;
 		events = WorkerG.poll->events;
 		n = epoll_wait(WorkerG.poll->epollfd, events, WorkerG.poll->ncap, timeout);
@@ -204,6 +202,7 @@ void wmWorkerLoop_loop() {
 			int fd, coro_id;
 			fromuint64(events[i].data.u64, &fd, &coro_id);
 			//先判断是不是信号fd,不用判断是不是读事件，因为只添加了读事件~
+
 			if (fd == signal_fd[0]) {
 				sig_callback(fd);
 				continue;

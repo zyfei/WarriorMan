@@ -44,7 +44,8 @@ typedef struct {
 wmConnectionObject* wm_connection_fetch_object(zend_object *obj);
 zend_object* wm_connection_create_object(zend_class_entry *ce);
 
-
+void wmConnection_init();
+void wmConnection_shutdown();
 wmConnection * wmConnection_create(int fd);
 wmConnection* wmConnection_find_by_fd(int fd);
 ssize_t wmConnection_recv(wmConnection *socket, int32_t length);

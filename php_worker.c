@@ -35,6 +35,7 @@ static zend_object* wmWorker_create_object(zend_class_entry *ce) {
 static void wmWorker_free_object(zend_object *object) {
 	wmWorkerObject *worker_obj = (wmWorkerObject *) wm_worker_fetch_object(object);
 	//这里应该释放worker内存的，但是程序是走不到这里
+	wmWorker_free(worker_obj->worker);
 	zend_object_std_dtor(&worker_obj->std);
 }
 

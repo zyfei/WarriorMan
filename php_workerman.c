@@ -47,6 +47,8 @@ PHP_RINIT_FUNCTION(workerman) {
 	//初始化base相关
 	workerman_base_init();
 	wmCoroutine_init();
+	wmWorker_init();
+	wmConnection_init();
 	return SUCCESS;
 }
 
@@ -56,6 +58,8 @@ PHP_RINIT_FUNCTION(workerman) {
 PHP_RSHUTDOWN_FUNCTION(workerman) {
 	workerman_base_shutdown();
 	wmCoroutine_shutdown();
+	wmWorker_shutdown();
+	wmConnection_shutdown();
 	return SUCCESS;
 }
 

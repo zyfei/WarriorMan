@@ -105,7 +105,7 @@ int wmArray_set(wmArray *array, uint32_t n, void *data) {
 void wmArray_printf(wmArray *array) {
 	for (int i = 0; i < array->offset; i++) {
 		int *pid = wmArray_find(array, i);
-		printf("key=%d value=%d \n", i, *pid);
+		php_printf("key=%d value=%d \n", i, *pid);
 	}
 }
 

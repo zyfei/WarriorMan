@@ -27,7 +27,7 @@ wmString* wmString_new(size_t size) {
  * 打印string
  */
 void wmString_print(wmString *str) {
-	printf("String[length=%zu,size=%zu,offset=%jd]=%.*s\n", str->length, str->size, (intmax_t) str->offset, (int) str->length, str->str);
+	php_printf("String[length=%zu,size=%zu,offset=%jd]=%.*s\n", str->length, str->size, (intmax_t) str->offset, (int) str->length, str->str);
 }
 
 /**

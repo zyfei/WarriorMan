@@ -54,7 +54,6 @@ if test "$PHP_WM" != "no"; then
     	src/core/base.c \
     	src/core/log.c \
     	src/core/socket.c \
-    	src/core/hashmap.c \
     	src/core/timer.c \
     	src/core/wm_string.c \
     	src/core/file.c \

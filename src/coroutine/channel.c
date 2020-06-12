@@ -1,9 +1,6 @@
 #include "channel.h"
 #include "coroutine.h"
 
-//协程map表
-swHashMap *wm_channels = NULL;
-
 void sleep_timeout(void *param);
 
 //这个结构体，是用来控制协程，不在错误的时间co->resume的

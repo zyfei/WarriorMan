@@ -5,7 +5,6 @@
  * 引入一些自己做的基础库
  */
 #include "header.h"
-#include "hashmap.h"
 #include "timer.h"
 #include "socket.h"
 #include "stack.h"
@@ -14,7 +13,7 @@
 #include "wm_string.h"
 #include "file.h"
 #include "array.h"
-#include "wm_hash.h"
+#include "hash.h"
 
 
 //构造函数用到

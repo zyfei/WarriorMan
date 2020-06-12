@@ -15,7 +15,6 @@ typedef struct {
 	wmQueue *data_queue;
 } wmChannel;
 
-extern swHashMap *wm_channels;
 wmChannel* wmChannel_create(uint32_t _capacity);
 bool wmChannel_push(wmChannel* channel, void *data, double timeout);//插入
 void* wmChannel_pop(wmChannel* channel, double timeout);//弹出

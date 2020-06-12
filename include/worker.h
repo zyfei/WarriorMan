@@ -46,6 +46,8 @@ typedef struct {
 wmWorkerObject* wm_worker_fetch_object(zend_object *obj);
 //为了通过php对象，找到上面的c++对象 ======= end
 
+void wmWorker_init();
+void wmWorker_shutdown();
 wmWorker* wmWorker_create(zval *_This, zend_string *socketName);
 void wmWorker_runAll(); //启动服务器
 bool wmWorker_stop(wmWorker* worker); //关闭服务器
