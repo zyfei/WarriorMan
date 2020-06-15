@@ -30,6 +30,7 @@ KHASH_MAP_INIT_INT(WM_HASH_INT_STR, void*); //键是int，值是void类型指针
 #define wmHash_del kh_del
 #define wmHash_exist kh_exist
 #define wmHash_value kh_value
+#define wmHash_key kh_key
 #define wmHash_begin kh_begin
 #define wmHash_end kh_end
 #define wmHash_destroy kh_destroy

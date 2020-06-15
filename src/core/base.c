@@ -14,6 +14,7 @@ void workerman_base_init() {
 	WorkerG.is_running = false;
 	WorkerG.poll = NULL;
 	WorkerG.buffer_stack = wmString_new(512);
+	WorkerG.buffer_stack_large = wmString_new(2048);
 }
 
 /**

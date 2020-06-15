@@ -103,4 +103,16 @@ static inline size_t wm_snprintf(char *buf, size_t size, const char *format, ...
 	}
 	return retval;
 }
+
+/**
+ * 获得格式化后的时间
+ */
+static inline void wm_get_date(char* date) {
+	time_t rawtime;
+	struct tm * timeinfo;
+	time(&rawtime);
+	timeinfo = localtime(&rawtime);
+	strftime(date, sizeof(date), "%Y-%m-%d %H:%M:%S", timeinfo);
+}
+
 #endif	/* WM_HELPER_H */

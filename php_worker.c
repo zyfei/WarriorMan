@@ -138,8 +138,11 @@ void workerman_worker_init() {
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onBufferDrain"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onError"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("name"), ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("user"), ZEND_ACC_PUBLIC);
 
 	//静态变量
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("logFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("stdoutFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
 	zend_declare_property_bool(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), 0, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
 }

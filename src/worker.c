@@ -27,6 +27,8 @@ static wmString* _runDir = NULL; //启动路径
 static int _status = WM_WORKER_STATUS_STARTING; //当前服务状态
 static bool _daemonize = false; //守护进程模式
 static int _masterPid = 0; //master进程ID
+static wmString* _logFile = NULL; //记录启动停止等信息
+static wmString* _stdoutFile = NULL; //当守护模式运行的时候，所有输出会重定向到这里
 
 static int _maxUserNameLength = 0; //用户名字的最大长度
 static int _maxWorkerNameLength = 0; //名字的最大长度
@@ -60,6 +62,8 @@ static void displayUI();
 static void error_callback(int fd, int coro_id);
 static void echoWin(const char *format, ...);
 static char* getCurrentUser();
+void _log(const char *format, ...);
+void setUserAndGroup(wmWorker * worker);
 
 //初始化一下参数
 void wmWorker_init() {
@@ -212,25 +216,26 @@ void monitorWorkers() {
 		} while (pid < 0 && errno == EINTR);
 
 		if (pid > 0) {
-			if (WIFEXITED(status)) {
-				php_printf("子进程 %d 退出,返回信息码:%d\n", pid, WEXITSTATUS(status));
-			} else if (WIFSIGNALED(status)) {
-				php_printf("子进程 %d 退出,返回信息码:%d\n", pid, WTERMSIG(status));
-			} else if (WIFSTOPPED(status)) {
-				php_printf("子进程 %d 退出,返回信息码:%d\n", pid, WSTOPSIG(status));
-			} else {
-				php_printf("子进程 %d 退出,未知信息码\n", pid);
-			}
-
 			for (int k = wmHash_begin(_worker_pids); k != wmHash_end(_worker_pids); k++) {
 				if (!wmHash_exist(_worker_pids, k)) {
 					continue;
 				}
 				wmArray* pid_arr = wmHash_value(_worker_pids, k);
+				int worker_id = wmHash_key(_workers, k);
 				for (int i = 0; i < pid_arr->offset; i++) {
 					int *_pid = wmArray_find(pid_arr, i);
 					if (*_pid == pid) { //找到正主了，就是这个孙子自己先退出了，办他
 						wmArray_set(pid_arr, i, &zero);
+						wmWorker* worker = WM_HASH_GET(WM_HASH_INT_STR, _workers, worker_id);
+						if (WIFEXITED(status) != 0) {
+							if (WIFSIGNALED(status)) {
+								_log("1worker:%s pid:%d exit with status %d", worker->name->str, pid, WTERMSIG(status));
+							} else if (WIFSTOPPED(status)) {
+								_log("2worker:%s pid:%d exit with status %d", worker->name->str, pid, WSTOPSIG(status));
+							} else {
+								_log("3worker:%s pid:%dexit with status unknow", worker->name->str, pid);
+							}
+						}
 						break;
 					}
 				}
@@ -245,7 +250,7 @@ void monitorWorkers() {
 		if (_status == WM_WORKER_STATUS_SHUTDOWN) {
 			getAllWorkerPids();
 			if (_pid_array_tmp->offset == 0) {
-				php_printf("WarriorMan[%s] has been stopped \n", _startFile->str);
+				_log("WarriorMan[%s] has been stopped \n", _startFile->str);
 				exit(0); //直接退出，不给php反应的机会，否则会弹出警告
 			}
 		}
@@ -313,8 +318,10 @@ void forkOneWorker(wmWorker* worker, int key) {
 			wmError("call_user_function 'cli_set_process_title' error");
 			return;
 		}
+		setUserAndGroup(worker);
 		_run(worker);
-		wmTrace("event-loop exited");
+		wmWarn("event-loop exited");
+		_log("event-loop exited");
 		exit(0);
 	} else {
 		wmError("forkOneWorker fail");
@@ -366,10 +373,10 @@ void initWorkers() {
 		}
 		wmWorker* worker = wmHash_value(_workers, k);
 		//检查worker->name
-		zval *_name = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), 0);
-		if (_name) {
-			if (Z_TYPE_INFO_P(_name) == IS_STRING) {
-				worker->name = wmString_dup(_name->value.str->val, _name->value.str->len);
+		zval *_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), 0);
+		if (_zval) {
+			if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
+				worker->name = wmString_dup(_zval->value.str->val, _zval->value.str->len);
 			}
 		}
 		if (!worker->name) {
@@ -377,13 +384,21 @@ void initWorkers() {
 			zend_update_property_stringl(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), worker->name->str, 4);
 		}
 
-		//设置当前用户
-		if (!worker->user) {
-			worker->user = getCurrentUser();
-		} else {
-			if (getuid() != 0 && strncmp(worker->user, getCurrentUser(), strlen(worker->user)) != 0) {
-				wmWarn("You must have the root privileges to change uid and gid.");
+		_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("user"), 0);
+		if (_zval) {
+			if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
+				worker->user = wm_malloc(sizeof(char) *_zval->value.str->len + 1);
+				memcpy(worker->user, _zval->value.str->val, _zval->value.str->len);
+				worker->user[_zval->value.str->len] = '\0';
 			}
+		} else {
+			worker->user = getCurrentUser();
+			zend_update_property_stringl(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("user"), worker->user, strlen(worker->user));
+		}
+
+		//检查当前用户
+		if (getuid() != 0 && strncmp(worker->user, getCurrentUser(), strlen(worker->user)) != 0) {
+			_log("You must have the root privileges to change uid and gid.");
 		}
 
 		//设置用户名字的最大长度
@@ -430,7 +445,7 @@ void alarm_wait() {
 void stopAll() {
 	_status = WM_WORKER_STATUS_SHUTDOWN;
 	if (_masterPid == getpid()) { //主进程
-		php_printf("WarriorMan[%s] stopping ...\n", _startFile->str);
+		_log("WarriorMan[%s] stopping ...\n", _startFile->str);
 		getAllWorkerPids(); //获取所有子进程
 		for (int i = 0; i < _pid_array_tmp->offset; i++) {
 			int* pid = wmArray_find(_pid_array_tmp, i);
@@ -497,14 +512,14 @@ void checkEnv() {
 	_runDir = wmString_dup(executed_filename, sizeof(char) * (run_dir_len));
 
 	//检查,并且设置pid文件位置
-	zval* _pidFile_zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), 0);
-	if (!_pidFile_zval) {
+	zval* _zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), 0);
+	if (!_zval) {
 		_pidFile = wmString_dup2(_runDir);
 		wmString_append_ptr(_pidFile, ZEND_STRL("worker.pid"));
 
 		zend_update_static_property_stringl(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), _pidFile->str, _pidFile->length);
 	} else {
-		_pidFile = wmString_dup(_pidFile_zval->value.str->val, _pidFile_zval->value.str->len);
+		_pidFile = wmString_dup(_zval->value.str->val, _zval->value.str->len);
 	}
 	//
 
@@ -512,9 +527,9 @@ void checkEnv() {
 	_status = WM_WORKER_STATUS_STARTING;
 
 	//检查守护进程模式
-	zval* _daemonize_zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), 0);
-	if (_daemonize_zval) {
-		if (Z_TYPE_INFO_P(_daemonize_zval) == IS_TRUE) {
+	_zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), 0);
+	if (_zval) {
+		if (Z_TYPE_INFO_P(_zval) == IS_TRUE) {
 			_daemonize = true;
 		}
 	}
@@ -529,6 +544,42 @@ void checkEnv() {
 
 	//保存标准输出
 	_stdout = stdout;
+
+	//设置Logfile文件位置
+	_zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("logFile"), 0);
+	if (!_zval) {
+		_logFile = wmString_dup2(_runDir);
+		wmString_append_ptr(_logFile, ZEND_STRL("warriorMan.log"));
+
+		zend_update_static_property_stringl(workerman_worker_ce_ptr, ZEND_STRL("logFile"), _logFile->str, _logFile->length);
+	} else {
+		_logFile = wmString_dup(_zval->value.str->val, _zval->value.str->len);
+	}
+
+	if (access(_logFile->str, F_OK) == 0) {
+		struct timeval tv;
+		gettimeofday(&tv, NULL);
+		utimes(_logFile->str, &tv);
+		chmod(_logFile->str, 0622);
+	}
+
+	//设置stdoutFile文件位置
+	_zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("stdoutFile"), 0);
+	if (!_zval) {
+		_stdoutFile = wmString_dup2(_runDir);
+		wmString_append_ptr(_stdoutFile, ZEND_STRL("stdout.log"));
+
+		zend_update_static_property_stringl(workerman_worker_ce_ptr, ZEND_STRL("stdoutFile"), _stdoutFile->str, _stdoutFile->length);
+	} else {
+		_stdoutFile = wmString_dup(_zval->value.str->val, _zval->value.str->len);
+	}
+
+	if (access(_stdoutFile->str, F_OK) == 0) {
+		struct timeval tv;
+		gettimeofday(&tv, NULL);
+		utimes(_stdoutFile->str, &tv);
+		chmod(_stdoutFile->str, 0622);
+	}
 }
 
 //初始化idMap
@@ -589,9 +640,9 @@ void parseCommand() {
 
 	if (command_type == 0) {
 		if (command != NULL) {
-			php_printf("Unknown command: %s\n", command->val);
+			printf("Unknown command: %s\n", command->val);
 		}
-		php_printf(
+		printf(
 			"Usage: php yourfile <command> [mode]\nCommands: \nstart\t\tStart worker in DEBUG mode.\n\t\tUse mode -d to start in DAEMON mode.\nstop\t\tStop worker.\n\t\tUse mode -g to stop gracefully.\nrestart\t\tRestart workers.\n\t\tUse mode -d to start in DAEMON mode.\n\t\tUse mode -g to stop gracefully.\nreload\t\tReload codes.\n\t\tUse mode -g to reload gracefully.\nstatus\t\tGet worker status.\n\t\tUse mode -d to show live status.\nconnections\tGet worker connections.\n");
 		exit(0);
 		return;
@@ -612,17 +663,23 @@ void parseCommand() {
 			_masterPid = 0;
 		}
 	}
+	if (_daemonize) {
+		_log("WarriorMan[%s] %s in DAEMON mode", start_file->val, command->val);
+	} else {
+		_log("WarriorMan[%s] %s in DEBUG mode", start_file->val, command->val);
+	}
+
 	int master_is_alive = 0;
 	if (_masterPid && (kill(_masterPid, 0) != -1) && (getpid() != _masterPid)) {
 		master_is_alive = 1;
 	}
 	if (master_is_alive) {
 		if (command_type == 1) {
-			php_printf("WarriorMan[%s] already running ...\n", start_file->val);
+			_log("WarriorMan[%s] already running ...", start_file->val);
 			exit(0);
 		}
 	} else if (command_type != 1 && command_type != 3) {
-		php_printf("WarriorMan[%s] not run\n", start_file->val);
+		_log("WarriorMan[%s] not run", start_file->val);
 		exit(0);
 	}
 	int i;
@@ -632,7 +689,7 @@ void parseCommand() {
 	case 1: //如果是start，就继续运行
 		break;
 	case 2: //stop
-		php_printf("WarriorMan[%s] is stopping ...\n", start_file->val);
+		_log("WarriorMan[%s] is stopping ...", start_file->val);
 		kill(_masterPid, SIGINT); //给主进程发送信号
 		for (i = 0; i < 5; i++) {
 			if (kill(_masterPid, 0) == -1) { //如果死亡了，那么跳出
@@ -642,14 +699,14 @@ void parseCommand() {
 			sleep(1);
 		}
 		if (command_ret == 1) {
-			php_printf("WarriorMan[%s] stop success\n", start_file->val);
+			_log("WarriorMan[%s] stop success", start_file->val);
 		} else {
-			php_printf("WarriorMan[%s] stop fail\n", start_file->val);
+			_log("WarriorMan[%s] stop fail", start_file->val);
 		}
 		exit(0);
 		return;
 	default:
-		php_printf("Unknown command: %s\n", command->val);
+		_log("Unknown command: %s", command->val);
 		exit(0);
 		return;
 	}
@@ -810,7 +867,7 @@ void daemonize() {
 void saveMasterPid() {
 	_masterPid = getpid();
 	int ret = wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%d", _masterPid);
-	wm_file_put_contents(_pidFile->str, WorkerG.buffer_stack->str, ret); //写入PID文件
+	wm_file_put_contents(_pidFile->str, WorkerG.buffer_stack->str, ret, false); //写入PID文件
 }
 
 /**
@@ -824,13 +881,13 @@ void signalHandler(int signal) {
 		break;
 		// Reload.
 	case SIGUSR1:
-		php_printf("Reload haven't started to do\n");
+		printf("Reload haven't started to do\n");
 		//static::$_pidsToRestart = static::getAllWorkerPids();
 		//_reload();
 		break;
 		// Show status.
 	case SIGUSR2:
-		php_printf("Status haven't started to do\n");
+		printf("Status haven't started to do\n");
 		//static::writeStatisticsToStatusFile();
 		break;
 		// Show connection status.
@@ -896,9 +953,9 @@ void displayUI() {
 	}
 
 	echoWin("----------------------------------------------------------------\n");
-	if(_daemonize){
-		echoWin("Input \"php %s\" to quit. Start success.\n\n",_startFile->str);
-	}else{
+	if (_daemonize) {
+		echoWin("Input \"php %s\" to quit. Start success.\n\n", _startFile->str);
+	} else {
 		echoWin("Press Ctrl-C to quit. Start success.\n");
 	}
 
@@ -930,6 +987,44 @@ void echoWin(const char *format, ...) {
 	//标准输出
 	fputs(WorkerG.buffer_stack->str, _stdout);
 	fflush(_stdout); //刷新缓冲区
+}
+
+void _log(const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+	int ret = vsnprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, format, args);
+	va_end(args);
+	WorkerG.buffer_stack->length = ret;
+	wmString_append_ptr(WorkerG.buffer_stack, "\n", 2);
+
+	if (!_daemonize) {
+		echoWin("%s", WorkerG.buffer_stack->str);
+	}
+	char date[128];
+	wm_get_date(date);
+
+	ret = wm_snprintf(WorkerG.buffer_stack_large->str, WorkerG.buffer_stack_large->size, "%s pid:%d %s", date, getpid(), WorkerG.buffer_stack->str);
+	wm_file_put_contents(_logFile->str, WorkerG.buffer_stack_large->str, ret, true); //写入PID文件
+}
+
+/**
+ * 设置运行组和用户
+ */
+void setUserAndGroup(wmWorker * worker) {
+	struct passwd * pw;
+	pw = getpwnam(worker->user);
+	if (!pw) {
+		_log("Warning: User %s not exsits", worker->user);
+		return;
+	}
+	int uid = pw->pw_uid;
+	int gid = pw->pw_gid;
+
+	if (uid != getuid() || gid != getgid()) {
+		if (!setgid(gid) || !initgroups(worker->user, gid) || !setuid(uid)) {
+			_log("Warning: change gid or uid fail.");
+		}
+	}
 }
 
 wmWorker* wmWorker_find_by_fd(int fd) {

@@ -84,7 +84,7 @@ wmString* wm_file_get_contents(const char *filename) {
 	return content;
 }
 
-int wm_file_put_contents(const char *filename, const char *content, size_t length) {
+int wm_file_put_contents(const char *filename, const char *content, size_t length, bool append) {
 	if (length <= 0) {
 		wmTrace("wm_file_put_contents(%s) content is empty", filename);
 		return false;
@@ -94,7 +94,14 @@ int wm_file_put_contents(const char *filename, const char *content, size_t lengt
 		return false;
 	}
 
-	int fd = open(filename, O_WRONLY | O_TRUNC | O_CREAT, 0666);
+	int flags = O_WRONLY | O_CREAT;
+	if (append) {
+		flags = flags | O_APPEND;
+	} else {
+		flags = flags | O_TRUNC;
+	}
+
+	int fd = open(filename, flags, 0666);
 	if (fd < 0) {
 		wmWarn("open(%s) failed", filename);
 		return false;

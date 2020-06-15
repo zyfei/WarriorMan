@@ -25,6 +25,7 @@
 #include <time.h>
 #include <sys/timeb.h>
 #include <stdbool.h>
+#include <grp.h>
 
 #include <fcntl.h>
 #include <unistd.h>

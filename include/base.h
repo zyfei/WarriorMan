@@ -246,6 +246,7 @@ typedef struct {
 	wmPoll_t *poll;
 	wmTimerWheel timer; //核心定时器
 	wmString *buffer_stack; //用于整个项目的临时字符串存储
+	wmString *buffer_stack_large; //用于整个项目的临时字符串存储,有时候一个不够用
 } wmGlobal_t;
 
 //初始化wmPoll_t
