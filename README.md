@@ -87,7 +87,7 @@ Warriorman\Worker::runAll();
 
 ## 特别鸣谢
 
-感谢WarriorMan项目 [WarriorMan](https://github.com/walkor/Workerman)，我完全仿照Workerman源码和文档制作。
+感谢Workerman项目 [Workerman](https://github.com/walkor/Workerman)，我完全仿照Workerman源码和文档制作。
 
 感谢Swoole项目 [Swoole](https://github.com/swoole/swoole-src)，我直接copy了不少Swoole的代码
 
