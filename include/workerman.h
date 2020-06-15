@@ -5,8 +5,6 @@
 
 #include "header.h"
 
-# define PHP_WORKERMAN_VERSION "0.1.0"
-
 extern zend_module_entry workerman_module_entry;
 # define phpext_workerman_ptr &workerman_module_entry
 

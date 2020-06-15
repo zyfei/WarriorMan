@@ -5,12 +5,10 @@
 static unsigned int _last_id = 0;
 static wmString *_processTitle = NULL;
 
-/**
- * 保存所有的worker
- */
-static wmHash_INT_PTR *_workers = NULL; //保存所有协程
-
+static wmHash_INT_PTR *_workers = NULL; //保存所有的worker
 static wmWorker* _main_worker = NULL; //当前子进程所属的worker
+
+static FILE* _stdout = NULL; //标准输出
 
 /**
  * 记录着每个worker，fork的所有pid
@@ -29,6 +27,10 @@ static wmString* _runDir = NULL; //启动路径
 static int _status = WM_WORKER_STATUS_STARTING; //当前服务状态
 static bool _daemonize = false; //守护进程模式
 static int _masterPid = 0; //master进程ID
+
+static int _maxUserNameLength = 0; //用户名字的最大长度
+static int _maxWorkerNameLength = 0; //名字的最大长度
+static int _maxSocketNameLength = 0; //listen的最大长度
 
 static void acceptConnection(int fd, int coro_id);
 static void parseSocketAddress(wmWorker* worker, zend_string *listen); //解析地址
@@ -56,11 +58,13 @@ static void monitorWorkers();
 static void alarm_wait();
 static void displayUI();
 static void error_callback(int fd, int coro_id);
+static void echoWin(const char *format, ...);
+static char* getCurrentUser();
 
 //初始化一下参数
 void wmWorker_init() {
 	//初始化进程标题
-	_processTitle = wmString_dup("WorkerMan", 9);
+	_processTitle = wmString_dup("WarriorMan", 10);
 	_workers = wmHash_init(WM_HASH_INT_STR);
 	_fd_workers = wmHash_init(WM_HASH_INT_STR);
 	_worker_pids = wmHash_init(WM_HASH_INT_STR);
@@ -97,6 +101,7 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	worker->name = NULL;
 	worker->socketName = wmString_dup(socketName->val, socketName->len);
 	worker->stopping = false;
+	worker->user = NULL;
 	parseSocketAddress(worker, socketName);
 
 	//写入workers对照表
@@ -262,7 +267,6 @@ void forkWorkers() {
 			continue;
 		}
 		wmWorker* worker = wmHash_value(_workers, k);
-
 		while (1) {
 			int key = getKey_by_pid(worker, 0);
 			if (key < 0) {
@@ -371,6 +375,30 @@ void initWorkers() {
 		if (!worker->name) {
 			worker->name = wmString_dup("none", 4);
 			zend_update_property_stringl(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), worker->name->str, 4);
+		}
+
+		//设置当前用户
+		if (!worker->user) {
+			worker->user = getCurrentUser();
+		} else {
+			if (getuid() != 0 && strncmp(worker->user, getCurrentUser(), strlen(worker->user)) != 0) {
+				wmWarn("You must have the root privileges to change uid and gid.");
+			}
+		}
+
+		//设置用户名字的最大长度
+		if (_maxUserNameLength < strlen(worker->user)) {
+			_maxUserNameLength = strlen(worker->user);
+		}
+
+		//设置worker->name的最大长度
+		if (_maxWorkerNameLength < worker->name->length) {
+			_maxWorkerNameLength = worker->name->length;
+		}
+
+		//设置worker->name的最大长度
+		if (_maxSocketNameLength < worker->socketName->length) {
+			_maxSocketNameLength = worker->socketName->length;
 		}
 
 		//listen
@@ -499,6 +527,8 @@ void checkEnv() {
 		return;
 	}
 
+	//保存标准输出
+	_stdout = stdout;
 }
 
 //初始化idMap
@@ -834,16 +864,72 @@ void reinstallSignal() {
 	wmWorkerLoop_add_sigal(SIGUSR2, signalHandler);
 }
 
+char* getCurrentUser() {
+	struct passwd *pwd;
+	pwd = getpwuid(getuid());
+	return pwd->pw_name;
+}
+
 void displayUI() {
-	php_printf("\n\n======WarriorMan Start=====\n");
+	// show version
+	echoWin("<n>-----------------------<w> %s </w>-----------------------------\n</n>", _processTitle->str);
+	echoWin("Workerman version:%s          PHP version:%s\n", PHP_WORKERMAN_VERSION, PHP_VERSION);
+	echoWin("--------------------------<w> WORKERS </w>-----------------------------\n");
+	echoWin("<w>user</w>%-*s<w>worker</w>%-*s<w>listen</w>%-*s<w>processes</w> <w>status</w>\n", //
+		_maxUserNameLength + 2 - strlen("user"), "", //
+		_maxWorkerNameLength + 2 - strlen("worker"), "", //
+		_maxSocketNameLength + 2 - strlen("listen"), "");
 	for (int k = wmHash_begin(_workers); k != wmHash_end(_workers); k++) {
 		if (!wmHash_exist(_workers, k)) {
 			continue;
 		}
 		wmWorker* worker = wmHash_value(_workers, k);
-		php_printf("name:%s  count:%d  listen:%s \n", worker->name->str, worker->count, worker->socketName->str);
+		int count_space_num = worker->count > 9 ? 2 : 1;
+		count_space_num = worker->count > 99 ? 3 : count_space_num;
+		count_space_num = worker->count > 999 ? 4 : count_space_num;
+
+		echoWin("%-*s%-*s%-*s %d%-*s <g> [OK] </g>\n", //
+			_maxUserNameLength + 2, worker->user, //
+			_maxWorkerNameLength + 2, worker->name->str, //
+			_maxSocketNameLength + 2, worker->socketName->str, //
+			worker->count, 10 - count_space_num, "");
 	}
-	php_printf("======WarriorMan Start=====\n\n\n");
+
+	echoWin("----------------------------------------------------------------\n");
+	if(_daemonize){
+		echoWin("Input \"php %s\" to quit. Start success.\n\n",_startFile->str);
+	}else{
+		echoWin("Press Ctrl-C to quit. Start success.\n");
+	}
+
+}
+
+/**
+ * 只向窗口输出
+ */
+void echoWin(const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+	int retval = vsnprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, format, args);
+	va_end(args);
+	if (retval < 0) {
+		retval = 0;
+		WorkerG.buffer_stack->str[0] = '\0';
+	} else if (retval >= WorkerG.buffer_stack->size) {
+		retval = WorkerG.buffer_stack->size - 1;
+		WorkerG.buffer_stack->str[retval] = '\0';
+	}
+	WorkerG.buffer_stack->length = retval;
+	wmString_replace(WorkerG.buffer_stack, "<n>", "\033[1A\n\033[K");
+	wmString_replace(WorkerG.buffer_stack, "<w>", "\033[47;30m");
+	wmString_replace(WorkerG.buffer_stack, "<g>", "\033[32;40m");
+	wmString_replace(WorkerG.buffer_stack, "</n>", "\033[0m");
+	wmString_replace(WorkerG.buffer_stack, "</w>", "\033[0m");
+	wmString_replace(WorkerG.buffer_stack, "</g>", "\033[0m");
+
+	//标准输出
+	fputs(WorkerG.buffer_stack->str, _stdout);
+	fflush(_stdout); //刷新缓冲区
 }
 
 wmWorker* wmWorker_find_by_fd(int fd) {

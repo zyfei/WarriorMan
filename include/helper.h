@@ -103,5 +103,4 @@ static inline size_t wm_snprintf(char *buf, size_t size, const char *format, ...
 	}
 	return retval;
 }
-
 #endif	/* WM_HELPER_H */

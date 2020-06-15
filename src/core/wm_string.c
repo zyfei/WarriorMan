@@ -269,3 +269,21 @@ void wmString_random_string(char *buf, size_t size) {
 	}
 	buf[i] = '\0';
 }
+
+void wmString_replace(wmString *str, char *find, char *replace) {
+	//新建一个新字符串，存储替换后的str
+	wmString *dst = wmString_dup2(str);
+
+	str->length = 0;
+	for (int i = 0; i < dst->length; i++) {
+		//如果找到了
+		if (!strncmp(dst->str + i, find, strlen(find))) { //查找目标字符串
+			wmString_append_ptr(str, replace, strlen(replace)); //保存一字节进缓冲区
+			i += strlen(find) - 1;
+		} else {
+			wmString_append_ptr(str, dst->str + i, 1); //保存一字节进缓冲区
+		}
+	}
+
+	wmString_free(dst);
+}

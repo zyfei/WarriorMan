@@ -26,5 +26,6 @@ u_int32_t wmString_utf8_decode(char **p, size_t n);
 size_t wmString_utf8_length(char *p, size_t n);
 void wmString_random_string(char *buf, size_t size);
 void wmString_free(wmString *str);
+void wmString_replace(wmString *str, char *find, char *replace); //字符串替换
 
 #endif    /* _WM_STRING_H */
