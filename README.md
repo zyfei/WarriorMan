@@ -22,14 +22,12 @@ PHP7 or Higher
 ### A tcp server  (目前只支持tcp)
 ```php
 <?php
-// hook系统函数，目前只hook了sleep函数
-Warriorman\Runtime::enableCoroutine();
-
 $worker = new Warriorman\Worker("tcp://0.0.0.0:8080", array(
 	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
-	"count" => 2 // 进程数量
+	"count" => 1 // 进程数量
 ));
 $worker->name = "tcpServer"; // 设置名字
+
 $worker->onWorkerStart = function ($worker) {
 	var_dump("onWorkerStart ->" . $worker->workerId);
 };
@@ -40,10 +38,10 @@ $worker->onConnect = function ($connection) {
 	));
 	echo "new connection id {$connection->id} \n";
 };
+
 $worker->onMessage = function ($connection, $data) {
 	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worla\r\n";
 	$connection->send($responseStr);
-	sleep(0.01); // 这个sleep是协程版本的sleep了，扩展会自动切换协程，不会阻塞
 };
 
 $worker->onBufferFull = function ($connection) {
@@ -61,7 +59,9 @@ $worker->onClose = function ($connection) {
 };
 
 // 监听另外一个端口
-$worker2 = new Warriorman\Worker("tcp://0.0.0.0:8081");
+$worker2 = new Warriorman\Worker("tcp://0.0.0.0:8081", array(
+	"count" => 8 // 进程数量
+));
 $worker2->onMessage = function ($connection, $data) {
 	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";
 	$connection->send($responseStr);
