@@ -8,8 +8,6 @@ static wmString *_processTitle = NULL;
 static wmHash_INT_PTR *_workers = NULL; //保存所有的worker
 static wmWorker* _main_worker = NULL; //当前子进程所属的worker
 
-static FILE* _stdout = NULL; //标准输出
-
 /**
  * 记录着每个worker，fork的所有pid
  */
@@ -29,6 +27,8 @@ static bool _daemonize = false; //守护进程模式
 static int _masterPid = 0; //master进程ID
 static wmString* _logFile = NULL; //记录启动停止等信息
 static wmString* _stdoutFile = NULL; //当守护模式运行的时候，所有输出会重定向到这里
+static FILE* _stdout = NULL; //重设之后的标准输出
+static FILE* _stderr = NULL; //重设之后的标准错误输出
 
 static int _maxUserNameLength = 0; //用户名字的最大长度
 static int _maxWorkerNameLength = 0; //名字的最大长度
@@ -54,7 +54,6 @@ static void installSignal(); //装载信号
 static void reinstallSignal(); //针对子进程，使用epoll重新装载信号
 static void getAllWorkerPids(); //获取所有子进程pid
 static void stopAll(); //停止服务
-static void _reload(); //重启
 static void signalHandler(int signal);
 static void monitorWorkers();
 static void alarm_wait();
@@ -64,6 +63,7 @@ static void echoWin(const char *format, ...);
 static char* getCurrentUser();
 void _log(const char *format, ...);
 void setUserAndGroup(wmWorker * worker);
+void resetStd(); //重设默认输出到文件
 
 //初始化一下参数
 void wmWorker_init() {
@@ -197,8 +197,9 @@ void wmWorker_runAll() {
 	initWorkers(); //初始化进程相关资料
 	installSignal(); //装载信号
 	saveMasterPid();
-	displayUI();
 	forkWorkers();
+	displayUI();
+	resetStd();
 	monitorWorkers(); //监听子进程
 }
 
@@ -250,7 +251,7 @@ void monitorWorkers() {
 		if (_status == WM_WORKER_STATUS_SHUTDOWN) {
 			getAllWorkerPids();
 			if (_pid_array_tmp->offset == 0) {
-				_log("WarriorMan[%s] has been stopped \n", _startFile->str);
+				_log("WarriorMan[%s] has been stopped", _startFile->str);
 				exit(0); //直接退出，不给php反应的机会，否则会弹出警告
 			}
 		}
@@ -302,9 +303,13 @@ void forkOneWorker(wmWorker* worker, int key) {
 				wmWorker_free(worker2);
 			}
 		}
-
 		//设置当前子进程运行的是哪个worker
 		_main_worker = worker;
+
+		//重设标准输出
+		if (_status == WM_WORKER_STATUS_STARTING) {
+			resetStd();
+		}
 
 		//取消闹钟
 		alarm(0);
@@ -445,7 +450,7 @@ void alarm_wait() {
 void stopAll() {
 	_status = WM_WORKER_STATUS_SHUTDOWN;
 	if (_masterPid == getpid()) { //主进程
-		_log("WarriorMan[%s] stopping ...\n", _startFile->str);
+		_log("WarriorMan[%s] stopping ...", _startFile->str);
 		getAllWorkerPids(); //获取所有子进程
 		for (int i = 0; i < _pid_array_tmp->offset; i++) {
 			int* pid = wmArray_find(_pid_array_tmp, i);
@@ -481,6 +486,12 @@ bool wmWorker_stop(wmWorker* worker) {
 		}
 	}
 	_unlisten(worker);
+	if (_stdout != NULL) {
+		fclose(_stdout);
+	}
+	if (_stderr != NULL) {
+		fclose(_stderr);
+	}
 	//关闭所有连接
 	wmConnection_close_connections();
 	return true;
@@ -542,14 +553,11 @@ void checkEnv() {
 		return;
 	}
 
-	//保存标准输出
-	_stdout = stdout;
-
 	//设置Logfile文件位置
 	_zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("logFile"), 0);
 	if (!_zval) {
 		_logFile = wmString_dup2(_runDir);
-		wmString_append_ptr(_logFile, ZEND_STRL("warriorMan.log"));
+		wmString_append_ptr(_logFile, ZEND_STRL("warriorman.log"));
 
 		zend_update_static_property_stringl(workerman_worker_ce_ptr, ZEND_STRL("logFile"), _logFile->str, _logFile->length);
 	} else {
@@ -985,8 +993,8 @@ void echoWin(const char *format, ...) {
 	wmString_replace(WorkerG.buffer_stack, "</g>", "\033[0m");
 
 	//标准输出
-	fputs(WorkerG.buffer_stack->str, _stdout);
-	fflush(_stdout); //刷新缓冲区
+	fputs(WorkerG.buffer_stack->str, stdout);
+	fflush(stdout); //刷新缓冲区
 }
 
 void _log(const char *format, ...) {
@@ -1001,7 +1009,7 @@ void _log(const char *format, ...) {
 		echoWin("%s", WorkerG.buffer_stack->str);
 	}
 	char date[128];
-	wm_get_date(date);
+	wm_get_date(date,sizeof(date));
 
 	ret = wm_snprintf(WorkerG.buffer_stack_large->str, WorkerG.buffer_stack_large->size, "%s pid:%d %s", date, getpid(), WorkerG.buffer_stack->str);
 	wm_file_put_contents(_logFile->str, WorkerG.buffer_stack_large->str, ret, true); //写入PID文件
@@ -1025,6 +1033,15 @@ void setUserAndGroup(wmWorker * worker) {
 			_log("Warning: change gid or uid fail.");
 		}
 	}
+}
+
+//重设默认输出
+void resetStd() {
+	if (!_daemonize) {
+		return;
+	}
+	_stdout = freopen(_stdoutFile->str, "a", stdout);
+	_stderr = freopen(_stdoutFile->str, "a", stderr);
 }
 
 wmWorker* wmWorker_find_by_fd(int fd) {
