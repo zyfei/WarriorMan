@@ -154,12 +154,8 @@ void _unlisten(wmWorker *worker) {
 void _run(wmWorker *worker) {
 	//zval zsocket;
 	worker->_status = WM_WORKER_STATUS_RUNNING;
-	//在这里应该注册事件回调
-	resumeAccept(worker);
 
-	reinstallSignal(); //重新注册信号检测
-
-	//处理onWorkerStart
+	//先处理onWorkerStart,用户将会在这里初始化pdo等，所以这里不是协程
 	bind_callback(worker->_This, "onWorkerStart", &worker->onWorkerStart);
 	if (worker->onWorkerStart) {
 		worker->onWorkerStart->fci.param_count = 1;
@@ -169,6 +165,12 @@ void _run(wmWorker *worker) {
 			return;
 		}
 	}
+
+	//在这里应该注册事件回调
+	resumeAccept(worker);
+
+	//重新注册信号检测
+	reinstallSignal();
 
 	//设置回调方法 start
 	bind_callback(worker->_This, "onWorkerStop", &worker->onWorkerStop);
@@ -499,6 +501,15 @@ bool wmWorker_stop(wmWorker* worker) {
 
 //检查环境
 void checkEnv() {
+	//检查是不是在协程环境
+//	wmCoroutine * cor = wmCoroutine_get_current();
+//	if (cor == NULL) {
+//		wmError("Only run in coroutine mode \n");
+//		return;
+//	}
+	//开启协程，hook相关函数
+	wm_enableCoroutine();
+
 	//检查是否是cli模式
 	zend_string* _php_sapi = zend_string_init("PHP_SAPI", strlen("PHP_SAPI"), 0);
 	zval* _php_sapi_zval = zend_get_constant(_php_sapi);
@@ -938,7 +949,7 @@ char* getCurrentUser() {
 void displayUI() {
 	// show version
 	echoWin("<n>-----------------------<w> %s </w>-----------------------------\n</n>", _processTitle->str);
-	echoWin("Workerman version:%s          PHP version:%s\n", PHP_WORKERMAN_VERSION, PHP_VERSION);
+	echoWin("WarriorMan version:%s          PHP version:%s\n", PHP_WORKERMAN_VERSION, PHP_VERSION);
 	echoWin("--------------------------<w> WORKERS </w>-----------------------------\n");
 	echoWin("<w>user</w>%-*s<w>worker</w>%-*s<w>listen</w>%-*s<w>processes</w> <w>status</w>\n", //
 		_maxUserNameLength + 2 - strlen("user"), "", //
@@ -1009,7 +1020,7 @@ void _log(const char *format, ...) {
 		echoWin("%s", WorkerG.buffer_stack->str);
 	}
 	char date[128];
-	wm_get_date(date,sizeof(date));
+	wm_get_date(date, sizeof(date));
 
 	ret = wm_snprintf(WorkerG.buffer_stack_large->str, WorkerG.buffer_stack_large->size, "%s pid:%d %s", date, getpid(), WorkerG.buffer_stack->str);
 	wm_file_put_contents(_logFile->str, WorkerG.buffer_stack_large->str, ret, true); //写入PID文件

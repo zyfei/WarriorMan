@@ -216,6 +216,9 @@ static inline void wm_zend_fci_cache_free(void* fci_cache) {
 int call_closure_func(php_fci_fcc* fci_fcc);
 bool set_process_title(char* process_title);
 
+//开启协程，hook相关函数
+void wm_enableCoroutine();
+
 //初始化base相关
 void workerman_base_init();
 void workerman_base_shutdown();
@@ -239,6 +242,7 @@ typedef struct {
 	int ncap; //epoll回调可以接收最多事件数量
 	int event_num; // 当前在监听的事件的数量
 	struct epoll_event *events; //是用来保存epoll返回的事件。
+	struct epoll_event *event; //用来储存每一次添加修改epoll的临时变量
 } wmPoll_t;
 
 typedef struct {

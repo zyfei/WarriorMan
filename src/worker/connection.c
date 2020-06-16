@@ -8,18 +8,18 @@ static wmHash_INT_PTR *wm_connections = NULL; //记录着正在连接状态的co
 //检查是否发送缓存区慢
 static void checkBufferWillFull(wmConnection *connection);
 static bool bufferIsFull(wmConnection *connection, size_t len);
-static int _close(wmConnection *connection);
+static int onClose(wmConnection *connection);
 //专门给loop回调用的
-static void read_callback(int fd, int coro_id);
-static void write_callback(int fd, int coro_id);
-static void error_callback(int fd, int coro_id);
+static void onRead(int fd, int coro_id);
+static void onError(int fd, int coro_id);
 
 void wmConnection_init() {
 	wm_connections = wmHash_init(WM_HASH_INT_STR);
 
-	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_CONNECTION, read_callback);
-	wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_CONNECTION, write_callback);
-	wmWorkerLoop_set_handler(WM_EVENT_ERROR, WM_LOOP_CONNECTION, error_callback);
+	//wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_RESUME, NULL);
+	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_CONNECTION, onRead);
+	wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_CONNECTION, NULL);
+	wmWorkerLoop_set_handler(WM_EVENT_ERROR, WM_LOOP_CONNECTION, onError);
 }
 
 wmConnection * wmConnection_create(int fd) {
@@ -81,10 +81,10 @@ void onError_callback(void* _mess_data) {
 }
 
 //已经可以读消息了
-void read_callback(int fd, int coro_id) {
+void onRead(int fd, int coro_id) {
 	wmConnection* connection = wmConnection_find_by_fd(fd);
 	if (connection == NULL) {
-		wmWarn("Error has occurred: _wmConnection_read_callback fd=%d wmConnection is NULL", fd);
+		wmWarn("Error has occurred: _wmConnection_onRead fd=%d wmConnection is NULL", fd);
 		exit(0);
 		return;
 	}
@@ -100,7 +100,7 @@ void read_callback(int fd, int coro_id) {
 		zend_update_property_long(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errCode"), WM_ERROR_SESSION_CLOSED_BY_CLIENT);
 
 		zend_update_property_string(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errMsg"), wmCode_str(WM_ERROR_SESSION_CLOSED_BY_CLIENT));
-		_close(connection);
+		onClose(connection);
 		return;
 	}
 	//再试一次，等待epoll回调
@@ -157,6 +157,7 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 		//如果发生错误
 		if (ret < 0) {
 			if (errno != EAGAIN) { // 不是缓冲区错误，就返回报错
+				wmWarn("Error has occurred: (fd=%d,errno %d) %s", connection->fd, errno, strerror(errno));
 				return false;
 			}
 			ret = 0;
@@ -177,26 +178,13 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 		}
 		if (!_add_Loop) {
 			connection->events |= WM_EVENT_WRITE;
-			if (connection->events & WM_EVENT_READ) {
-				wmWorkerLoop_update(connection->fd, connection->events, WM_LOOP_CONNECTION);
-			} else {
-				wmWorkerLoop_add(connection->fd, connection->events, WM_LOOP_CONNECTION);
-			}
+			wmWorkerLoop_update(connection->fd, connection->events, WM_LOOP_CONNECTION);
 			_add_Loop = true;
 		}
-
+		//可写的时候，自动唤醒
 		wmCoroutine_yield();
 	}
 	return true;
-}
-
-void write_callback(int fd, int coro_id) {
-	wmCoroutine* co = wmCoroutine_get_by_cid(coro_id);
-	if (co == NULL) {
-		wmWarn("Error has occurred: _wmConnection_write_callback wmCoroutine is NULL");
-		return;
-	}
-	wmCoroutine_resume(co);
 }
 
 //检查应用层发送缓冲区是否这次添加之后，已经满了
@@ -233,7 +221,7 @@ bool bufferIsFull(wmConnection *connection, size_t len) {
 
 //这是一个用户调用的方法
 int wmConnection_close(wmConnection *connection) {
-	return _close(connection);
+	return onClose(connection);
 }
 
 /**
@@ -246,25 +234,25 @@ void wmConnection_close_connections() {
 		}
 		wmConnection* conn = wmHash_value(wm_connections, k);
 		wmHash_del(WM_HASH_INT_STR, wm_connections, k);
-		_close(conn);
+		onClose(conn);
 	}
 }
 
 /**
  * 处理epoll失败的情况
  */
-void error_callback(int fd, int coro_id) {
+void onError(int fd, int coro_id) {
 	wmConnection* conn = wmConnection_find_by_fd(fd);
 	if (conn == NULL) {
 		return;
 	}
-	_close(conn);
+	onClose(conn);
 }
 
 /**
  * 关闭这个连接
  */
-int _close(wmConnection *connection) {
+int onClose(wmConnection *connection) {
 	if (connection->_status == WM_CONNECTION_STATUS_CLOSED) {
 		return 0;
 	}
@@ -294,7 +282,7 @@ void wmConnection_free(wmConnection *connection) {
 	}
 	//如果还在连接，那么调用close
 	if (connection->_status == WM_CONNECTION_STATUS_CONNECTING) {
-		_close(connection);
+		onClose(connection);
 	}
 
 	wmString_free(connection->read_buffer);

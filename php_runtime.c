@@ -16,8 +16,13 @@ static void hook_func(const char *name, size_t name_len, zif_handler new_handler
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_runtime_void, 0, 0, 0) //
 ZEND_END_ARG_INFO()
 
-PHP_METHOD(workerman_runtime, enableCoroutine) {
+//开启协程模式,hook相关函数
+void wm_enableCoroutine(){
 	hook_func(ZEND_STRL("sleep"), zim_workerman_coroutine_sleep);
+}
+
+PHP_METHOD(workerman_runtime, enableCoroutine) {
+	wm_enableCoroutine();
 }
 
 static const zend_function_entry workerman_runtime_methods[] = { //

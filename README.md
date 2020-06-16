@@ -1,6 +1,6 @@
 # WarriorMan
 ## What is it
-协程版本的Workerman，完全按照Workerman的文档制作，支持协程的创建和切换。虽然目前还在开发中，但是有兴趣的同学可以给在下提提建议，找找BUG。  
+协程版本的WarriorMan，完全按照WarriorMan的文档制作，支持协程的创建和切换。虽然目前还在开发中，但是有兴趣的同学可以给在下提提建议，找找BUG。  
 
 此项目将会长期维护
 
@@ -87,7 +87,7 @@ Warriorman\Worker::runAll();
 
 ## 特别鸣谢
 
-感谢WarriorMan项目 [WarriorMan](https://github.com/walkor/Workerman)，我完全仿照Workerman源码和文档制作。
+感谢WarriorMan项目 [WarriorMan](https://github.com/walkor/WarriorMan)，我完全仿照WarriorMan源码和文档制作。
 
 感谢Swoole项目 [Swoole](https://github.com/swoole/swoole-src)，我直接copy了不少Swoole的代码
 

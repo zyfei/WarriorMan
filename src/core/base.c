@@ -45,6 +45,7 @@ int init_wmPoll() {
 		WorkerG.poll->events = (struct epoll_event *) wm_malloc(size);
 		memset(WorkerG.poll->events, 0, size);
 		WorkerG.poll->event_num = 0; // 事件的数量
+		WorkerG.poll->event = (struct epoll_event *) wm_malloc(sizeof(struct epoll_event));
 	}
 	return 0;
 }
@@ -60,6 +61,8 @@ int free_wmPoll() {
 		wm_free(WorkerG.poll);
 		WorkerG.poll = NULL;
 		WorkerG.is_running = false;
+		wm_free(WorkerG.poll->event);
+		WorkerG.poll->event = NULL;
 	}
 	return 0;
 }

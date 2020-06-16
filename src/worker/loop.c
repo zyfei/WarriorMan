@@ -118,6 +118,18 @@ void wmWorkerLoop_add_sigal(int sigal, loop_func_t fn) {
 }
 
 /**
+ * 恢复协程&用于loop_wait回调
+ */
+void loop_callback_coroutine_resume(int fd, int coro_id) {
+	wmCoroutine* co = wmCoroutine_get_by_cid(coro_id);
+	if (co == NULL) {
+		wmWarn("Error has occurred: loop_callback_coroutine_resume . wmCoroutine is NULL");
+		return;
+	}
+	wmCoroutine_resume(co);
+}
+
+/**
  *	设置event处理方式
  */
 bool wmWorkerLoop_set_handler(int event, int type, loop_callback_func_t fn) {
@@ -134,6 +146,10 @@ bool wmWorkerLoop_set_handler(int event, int type, loop_callback_func_t fn) {
 		break;
 	default:
 		return false;
+	}
+	//默认是直接resume相关协程
+	if (fn == NULL) {
+		fn = loop_callback_coroutine_resume;
 	}
 	handlers[type] = fn;
 	return true;
@@ -177,7 +193,7 @@ void wmWorkerLoop_add(int fd, int events, int fdtype) {
 	}
 
 	struct epoll_event *ev;
-	ev = WorkerG.poll->events;
+	ev = WorkerG.poll->event;
 	//转换epoll能看懂的事件类型
 	ev->events = event_decode(events);
 
@@ -230,6 +246,7 @@ void wmWorkerLoop_loop() {
 		for (int i = 0; i < n; i++) {
 			_c = 0;
 			uint64_t v = events[i].data.u64;
+
 			int fdtype = (int) (v >> 61);
 			//成功的把头三位卡没了
 			v = (v << 3) >> 3;
@@ -240,16 +257,16 @@ void wmWorkerLoop_loop() {
 				sig_callback(fd);
 			}
 
-			//再判断是否是worker的
-
 			//read
 			if (events[i].events & EPOLLIN) {
 				fn = loop_get_handler(EPOLLIN, fdtype);
 				if (fn != NULL) {
 					_c = 1;
 					fn(fd, coro_id);
+					//break;
 				}
 			}
+
 			//write
 			if (events[i].events & EPOLLOUT) {
 				fn = loop_get_handler(EPOLLOUT, fdtype);
@@ -258,12 +275,14 @@ void wmWorkerLoop_loop() {
 					fn(fd, coro_id);
 				}
 			}
+
 			//error
 			if ((events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) && _c == 0) {
 				fn = loop_get_handler(0, fdtype);
 				if (fn != NULL) {
 					_c = 1;
 					fn(fd, coro_id);
+					break;
 				}
 				wmWarn("loop  Error has occurred: (errno %d) %s", errno, strerror(errno));
 			}
