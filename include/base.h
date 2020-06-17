@@ -214,6 +214,9 @@ static inline void wm_zend_fci_cache_free(void* fci_cache) {
 
 //调用闭包函数
 int call_closure_func(php_fci_fcc* fci_fcc);
+
+void wm_get_internal_function(zval *object,zend_class_entry* obj_ce,const char *function_name,size_t function_name_len,zend_fcall_info_cache *fcic);
+
 bool set_process_title(char* process_title);
 
 //开启协程，hook相关函数

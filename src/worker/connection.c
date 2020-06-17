@@ -26,6 +26,7 @@ wmConnection * wmConnection_create(int fd) {
 	wmConnection *connection = (wmConnection *) wm_malloc(sizeof(wmConnection));
 	connection->fd = fd;
 	connection->socket = wmSocket_create_by_fd(fd);
+	connection->socket->owner = (void *)connection;
 	if (connection->socket == NULL) {
 		return NULL;
 	}

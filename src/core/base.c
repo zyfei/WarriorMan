@@ -136,6 +136,20 @@ int call_closure_func(php_fci_fcc* fci_fcc) {
 }
 
 /**
+ * 获取一个内部方法，用于创建协程
+ */
+void wm_get_internal_function(zval *object, zend_class_entry* obj_ce, const char *function_name, size_t function_name_len, zend_fcall_info_cache *fcic) {
+	fcic->function_handler = zend_hash_str_find_ptr(&obj_ce->function_table, function_name, function_name_len);
+	if (UNEXPECTED(fcic->function_handler == NULL)) {
+		/* error at c-level */
+		zend_error_noreturn(E_CORE_ERROR, "Couldn't find implementation for method %s::%s", ZSTR_VAL(obj_ce->name), function_name);
+	}
+
+	fcic->called_scope = Z_OBJCE_P(object);
+	fcic->object = Z_OBJ_P(object);
+}
+
+/**
  * 设置进程标题
  */
 bool set_process_title(char* process_title) {

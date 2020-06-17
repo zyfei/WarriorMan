@@ -12,7 +12,7 @@ Warriorman::create(function () {
 	
 	$worker->onConnect = function ($connection) {
 		$connection->set(array(
-			"maxSendBufferSize" => 1234
+			"maxSendBufferSize" => 1
 		));
 		echo "new connection id {$connection->id} \n";
 	};

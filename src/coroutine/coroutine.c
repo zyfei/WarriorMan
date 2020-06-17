@@ -17,7 +17,6 @@ static wmCoroutine* get_task();
 static void restore_vm_stack(wmCoroutine *task);
 static void sleep_callback(void* co);
 
-
 /**
  * 请求初始化的时候调用
  */
@@ -30,11 +29,15 @@ void wmCoroutine_init() {
  * 创建一个协程
  */
 long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc, zval *argv) {
-
 	php_coro_args php_coro_args;
 	php_coro_args.fci_cache = fci_cache;
 	php_coro_args.argv = argv;
 	php_coro_args.argc = argc;
+
+	if (fci_cache->function_handler->type != ZEND_USER_FUNCTION && fci_cache->function_handler->type != ZEND_INTERNAL_FUNCTION) {
+		wmError("invalid function type %u", fci_cache->function_handler->type);
+		return -1;
+	}
 
 	//创建协程,注意 这个时候当前的task还没有php协程栈，是在main_func中初始化的
 	wmCoroutine* task = (wmCoroutine *) wm_malloc(sizeof(wmCoroutine));
@@ -84,7 +87,6 @@ long run(wmCoroutine* task) {
  * 创建协程,执行协程主方法
  */
 void main_func(void *arg) {
-
 	//把一些核心内容提取出来，存放在其他变量里面。
 	int i;
 	php_coro_args *php_arg = (php_coro_args *) arg;
@@ -94,14 +96,12 @@ void main_func(void *arg) {
 	int argc = php_arg->argc;
 	zend_execute_data *call;
 	zval _retval, *retval = &_retval;
-
 	//初始化一个新php栈，并且放入EG
 	vm_stack_init();
 	call = (zend_execute_data *) (EG(vm_stack_top));
 
 	//因为php中内存分配是有对齐的，所以取真实地址
 	EG(vm_stack_top) = (zval *) ((char *) call + PHP_CORO_TASK_SLOT * sizeof(zval));
-
 	//函数分配一块用于当前作用域的内存空间，返回结果是zend_execute_data的起始位置。
 #if PHP_VERSION_ID < 70400
 	call = zend_vm_stack_push_call_frame(ZEND_CALL_TOP_FUNCTION | ZEND_CALL_ALLOCATED, func, argc, fci_cache.called_scope, fci_cache.object);
@@ -144,12 +144,14 @@ void main_func(void *arg) {
 
 	//当前协程
 	wmCoroutine* _task = current_task;
+
 	//保存php栈信息
 	save_vm_stack(_task);
 
 	_task->defer_tasks = NULL;
 
 	if (func->type == ZEND_USER_FUNCTION) {
+
 		ZVAL_UNDEF(retval);
 		EG(current_execute_data) = NULL;
 
@@ -160,6 +162,12 @@ void main_func(void *arg) {
 #endif
 
 		zend_execute_ex(EG(current_execute_data));
+	} else {
+		ZVAL_NULL(retval);
+		call->prev_execute_data = NULL;
+		call->return_value = NULL; /* this is not a constructor call */
+		execute_internal(call, retval);
+		zend_vm_stack_free_args(call);
 	}
 
 	wmStack *defer_tasks = _task->defer_tasks;
@@ -289,7 +297,7 @@ bool wmCoroutine_resume(wmCoroutine *task) {
 	if (yield_co == NULL) {
 		return false;
 	}
-	WM_HASH_DEL(WM_HASH_INT_STR,user_yield_coros,task->cid);
+	WM_HASH_DEL(WM_HASH_INT_STR, user_yield_coros, task->cid);
 
 	wmCoroutine *_current_task = get_task();
 	//这里要注意，不是保存的父协程，是谁唤醒他的，就保存谁保存当前的协程
@@ -317,7 +325,7 @@ void close_coro(wmCoroutine *task) {
 	WM_HASH_DEL(WM_HASH_INT_STR, coroutines, task->cid);
 
 	//yield表中删除
-	WM_HASH_DEL(WM_HASH_INT_STR,user_yield_coros,task->cid);
+	WM_HASH_DEL(WM_HASH_INT_STR, user_yield_coros, task->cid);
 
 	//获取他的唤起
 	wmCoroutine *origin_task = get_origin_task(task);
@@ -378,7 +386,6 @@ wmCoroutine* wmCoroutine_get_current() {
 wmCoroutine* wmCoroutine_get_by_cid(long _cid) {
 	return WM_HASH_GET(WM_HASH_INT_STR, coroutines, _cid);
 }
-
 
 /**
  * 释放申请相关内存

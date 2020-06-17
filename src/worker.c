@@ -45,7 +45,6 @@ static void daemonize();
 static void saveMasterPid();
 static void initWorkers();
 static void _listen(wmWorker *worker);
-static void _run(wmWorker *worker);
 static void forkWorkers();
 static void forkOneWorker(wmWorker* worker, int key);
 static int getKey_by_pid(wmWorker* worker, int pid);
@@ -151,7 +150,7 @@ void _unlisten(wmWorker *worker) {
 }
 
 //启动服务器
-void _run(wmWorker *worker) {
+void wmWorker_run(wmWorker *worker) {
 	//zval zsocket;
 	worker->_status = WM_WORKER_STATUS_RUNNING;
 
@@ -182,8 +181,6 @@ void _run(wmWorker *worker) {
 	bind_callback(worker->_This, "onError", &worker->onError);
 	//设置回调方法 end
 
-	//进入loop
-	wmWorkerLoop_loop();
 }
 
 //全部运行
@@ -326,7 +323,17 @@ void forkOneWorker(wmWorker* worker, int key) {
 			return;
 		}
 		setUserAndGroup(worker);
-		_run(worker);
+		//创建一个新协程去处理事件
+
+		//创建run协程 start
+		zend_fcall_info_cache run;
+		wm_get_internal_function(worker->_This,workerman_worker_ce_ptr,ZEND_STRL("run"),&run);
+		wmCoroutine_create(&run, 0, NULL);
+		//创建run协程 end
+
+		//进入loop
+		wmWorkerLoop_loop();
+		//_run(worker);
 		wmWarn("event-loop exited");
 		_log("event-loop exited");
 		exit(0);

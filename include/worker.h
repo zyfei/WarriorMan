@@ -15,7 +15,6 @@ typedef struct _wmWorker {
 	uint32_t id; //worker id
 	uint32_t fd; //监听端口的fd
 	zval* _This; //指向当前php实例的指针
-
 	php_fci_fcc *onWorkerStart;
 	php_fci_fcc *onWorkerStop;
 	php_fci_fcc *onWorkerReload;
@@ -50,6 +49,7 @@ wmWorkerObject* wm_worker_fetch_object(zend_object *obj);
 void wmWorker_init();
 void wmWorker_shutdown();
 wmWorker* wmWorker_create(zval *_This, zend_string *socketName);
+void wmWorker_run(wmWorker *worker);
 void wmWorker_runAll(); //启动服务器
 bool wmWorker_stop(wmWorker* worker); //关闭服务器
 void wmWorker_free(wmWorker* worker);

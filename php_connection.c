@@ -76,6 +76,7 @@ PHP_METHOD(workerman_connection, set) {
 	if (php_workerman_array_get_value(vht, "maxSendBufferSize", ztmp)) {
 		zend_long v = zval_get_long(ztmp);
 		connection_object->connection->maxSendBufferSize = v;
+		connection_object->connection->socket->maxSendBufferSize = v;
 		zend_update_property_long(workerman_connection_ce_ptr, getThis(), ZEND_STRL("maxSendBufferSize"), v);
 	}
 
@@ -83,6 +84,7 @@ PHP_METHOD(workerman_connection, set) {
 	if (php_workerman_array_get_value(vht, "maxPackageSize", ztmp)) {
 		zend_long v = zval_get_long(ztmp);
 		connection_object->connection->maxPackageSize = v;
+		connection_object->connection->socket->maxPackageSize = v;
 		zend_update_property_long(workerman_connection_ce_ptr, getThis(), ZEND_STRL("maxPackageSize"), v);
 	}
 }
