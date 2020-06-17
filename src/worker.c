@@ -199,8 +199,8 @@ void wmWorker_runAll() {
 	initWorkers(); //初始化进程相关资料
 	installSignal(); //装载信号
 	saveMasterPid();
-	forkWorkers();
 	displayUI();
+	forkWorkers();
 	resetStd();
 	monitorWorkers(); //监听子进程
 }
@@ -758,7 +758,7 @@ void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_f
  */
 void acceptConnection(wmWorker* worker) {
 	int connfd;
-	wmConnection* _conn;
+	wmConnection* conn;
 	zval* __zval;
 	for (int i = 0; i < WM_ACCEPT_MAX_COUNT; i++) {
 		connfd = wm_socket_accept(worker->fd);
@@ -773,14 +773,14 @@ void acceptConnection(wmWorker* worker) {
 				return;
 			}
 		}
-		_conn = wmConnection_create(connfd);
-		if (_conn == NULL) {
+		conn = wmConnection_create(connfd);
+		if (conn == NULL) {
 			wmWarn("_wmWorker_acceptConnection() -> wmConnection_create failed")
 			return;
 		}
 		//添加读监听
-		_conn->socket->events = WM_EVENT_READ;
-		wmWorkerLoop_add(_conn->fd, _conn->socket->events, WM_LOOP_CONNECTION);
+		conn->socket->events = WM_EVENT_READ;
+		wmWorkerLoop_add(conn->fd, conn->socket->events, WM_LOOP_CONNECTION);
 
 		//新的Connection对象
 		zend_object *obj = wm_connection_create_object(workerman_connection_ce_ptr);
@@ -790,7 +790,7 @@ void acceptConnection(wmWorker* worker) {
 		wmConnectionObject* connection_object = (wmConnectionObject *) wm_connection_fetch_object(obj);
 
 		//接客
-		connection_object->connection = _conn;
+		connection_object->connection = conn;
 		connection_object->connection->worker = (void*) worker;
 		connection_object->connection->_This = z;
 
@@ -808,17 +808,17 @@ void acceptConnection(wmWorker* worker) {
 		//设置属性 end
 
 		//设置socket属性start
-		_conn->socket->transport = worker->transport;
-		_conn->socket->maxSendBufferSize = _conn->maxSendBufferSize;
-		_conn->socket->maxPackageSize = _conn->maxPackageSize;
+		conn->socket->transport = worker->transport;
+		conn->socket->maxSendBufferSize = conn->maxSendBufferSize;
+		conn->socket->maxPackageSize = conn->maxPackageSize;
 		//设置socket属性end
 
 		//设置回调方法 start
-		connection_object->connection->onMessage = worker->onMessage;
-		connection_object->connection->onClose = worker->onClose;
-		connection_object->connection->onBufferFull = worker->onBufferFull;
-		connection_object->connection->onBufferDrain = worker->onBufferDrain;
-		connection_object->connection->onError = worker->onError;
+		conn->onMessage = worker->onMessage;
+		conn->onClose = worker->onClose;
+		conn->onBufferFull = worker->onBufferFull;
+		conn->onBufferDrain = worker->onBufferDrain;
+		conn->onError = worker->onError;
 		//设置回调方法 end
 
 		//onConnect

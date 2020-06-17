@@ -109,7 +109,6 @@ PHP_METHOD(workerman_worker, runAll) {
  * 给worker内部使用
  */
 PHP_METHOD(workerman_worker, run) {
-	php_printf("run!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
 	wmWorkerObject *worker_obj;
 	worker_obj = (wmWorkerObject *) wm_worker_fetch_object(Z_OBJ_P(getThis()));
 	wmWorker_run(worker_obj->worker);
@@ -119,7 +118,7 @@ static const zend_function_entry workerman_worker_methods[] = { //
 	PHP_ME(workerman_worker, __construct, arginfo_workerman_worker_construct, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR) // ZEND_ACC_CTOR is used to declare that this method is a constructor of this class.
 		PHP_ME(workerman_worker, runAll, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC)
 		PHP_ME(workerman_worker, stop, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC)
-		PHP_ME(workerman_worker, run, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC)
+		PHP_ME(workerman_worker, run, arginfo_workerman_worker_void, ZEND_ACC_PRIVATE)
 		PHP_FE_END };
 
 /**
