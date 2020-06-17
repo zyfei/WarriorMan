@@ -15,6 +15,7 @@ void wmConnection_init() {
 	wm_connections = wmHash_init(WM_HASH_INT_STR);
 
 	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_CONNECTION, onRead);
+	wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_CONNECTION, WM_LOOP_RESUME);
 	wmWorkerLoop_set_handler(WM_EVENT_ERROR, WM_LOOP_CONNECTION, onError);
 }
 
@@ -26,7 +27,7 @@ wmConnection * wmConnection_create(int fd) {
 	wmConnection *connection = (wmConnection *) wm_malloc(sizeof(wmConnection));
 	connection->fd = fd;
 	connection->socket = wmSocket_create_by_fd(fd);
-	connection->socket->owner = (void *)connection;
+	connection->socket->owner = (void *) connection;
 	if (connection->socket == NULL) {
 		return NULL;
 	}

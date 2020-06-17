@@ -34,10 +34,9 @@ static int _maxUserNameLength = 0; //用户名字的最大长度
 static int _maxWorkerNameLength = 0; //名字的最大长度
 static int _maxSocketNameLength = 0; //listen的最大长度
 
-static void acceptConnection(int fd, int coro_id);
+static void acceptConnection(wmWorker* worker);
 static void parseSocketAddress(wmWorker* worker, zend_string *listen); //解析地址
 static void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_fcc);
-static void resumeAccept(wmWorker *worker);
 static void checkEnv();
 static void parseCommand();
 static void initWorkerPids();
@@ -73,7 +72,7 @@ void wmWorker_init() {
 	_worker_pids = wmHash_init(WM_HASH_INT_STR);
 	_pid_array_tmp = wmArray_new(64, sizeof(int));
 
-	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_WORKER, acceptConnection);
+	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_WORKER, WM_LOOP_RESUME);
 	wmWorkerLoop_set_handler(WM_EVENT_ERROR, WM_LOOP_WORKER, error_callback);
 }
 
@@ -165,9 +164,6 @@ void wmWorker_run(wmWorker *worker) {
 		}
 	}
 
-	//在这里应该注册事件回调
-	resumeAccept(worker);
-
 	//重新注册信号检测
 	reinstallSignal();
 
@@ -181,6 +177,13 @@ void wmWorker_run(wmWorker *worker) {
 	bind_callback(worker->_This, "onError", &worker->onError);
 	//设置回调方法 end
 
+	//注册loop事件
+	wmWorkerLoop_add(worker->fd, WM_EVENT_READ | WM_EVENT_EPOLLEXCLUSIVE, WM_LOOP_WORKER);
+	//死循环accept，遇到消息就新创建协程处理
+	while (1) {
+		wmCoroutine_yield();
+		acceptConnection(worker);
+	}
 }
 
 //全部运行
@@ -257,14 +260,6 @@ void monitorWorkers() {
 	}
 }
 
-/**
- * 向loop注册accept
- */
-void resumeAccept(wmWorker *worker) {
-	//读 | 避免惊群
-	wmWorkerLoop_add(worker->fd, WM_EVENT_READ | WM_EVENT_EPOLLEXCLUSIVE, WM_LOOP_WORKER);
-}
-
 //fork子进程
 void forkWorkers() {
 	for (int k = wmHash_begin(_workers); k != wmHash_end(_workers); k++) {
@@ -327,7 +322,7 @@ void forkOneWorker(wmWorker* worker, int key) {
 
 		//创建run协程 start
 		zend_fcall_info_cache run;
-		wm_get_internal_function(worker->_This,workerman_worker_ce_ptr,ZEND_STRL("run"),&run);
+		wm_get_internal_function(worker->_This, workerman_worker_ce_ptr, ZEND_STRL("run"), &run);
 		wmCoroutine_create(&run, 0, NULL);
 		//创建run协程 end
 
@@ -761,8 +756,7 @@ void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_f
 /**
  * 由epoll调用
  */
-void acceptConnection(int fd, int coro_id) {
-	wmWorker* worker = wmWorker_find_by_fd(fd);
+void acceptConnection(wmWorker* worker) {
 	int connfd;
 	wmConnection* _conn;
 	zval* __zval;

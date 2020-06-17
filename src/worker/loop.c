@@ -1,6 +1,7 @@
 #include "loop.h"
 
 static loop_callback_func_t read_handler[7];
+static loop_callback_func_t write_handler[7];
 static loop_callback_func_t error_handler[7];
 
 /**
@@ -137,6 +138,9 @@ bool wmWorkerLoop_set_handler(int event, int type, loop_callback_func_t fn) {
 	case WM_EVENT_READ:
 		handlers = read_handler;
 		break;
+	case WM_EVENT_WRITE:
+		handlers = write_handler;
+		break;
 	case WM_EVENT_ERROR:
 		handlers = error_handler;
 		break;
@@ -255,10 +259,13 @@ void wmWorkerLoop_loop() {
 				}
 			}
 
-			//如果是可写，那么就恢复协程
+			//write 如果是可写，那么就恢复协程
 			if (events[i].events & EPOLLOUT) {
-				_c = 1;
-				loop_callback_coroutine_resume(fd, coro_id);
+				fn = loop_get_handler(EPOLLIN, fdtype);
+				if (fn != NULL) {
+					_c = 1;
+					fn(fd, coro_id);
+				}
 			}
 
 			//error
