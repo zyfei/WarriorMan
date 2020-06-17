@@ -244,6 +244,7 @@ void wmWorkerLoop_loop() {
 			//成功的把头三位卡没了
 			v = (v << 3) >> 3;
 			int fd = (int) (v >> 32);
+
 			int coro_id = (int) (v & 0xffffffff);
 
 			if (fd == signal_fd[0]) {

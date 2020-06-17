@@ -89,6 +89,20 @@ PHP_METHOD(workerman_connection, set) {
 	}
 }
 
+/**
+ * 私有方法，只有扩展内部使用
+ */
+PHP_METHOD(workerman_connection, read) {
+	wmConnectionObject* connection_object = (wmConnectionObject *) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	wmConnection *conn = connection_object->connection;
+	if (conn == NULL) {
+		php_error_docref(NULL, E_WARNING, "send error");
+		RETURN_FALSE
+	}
+	wmConnection_read(conn);
+	RETURN_TRUE
+}
+
 //发送数据
 PHP_METHOD(workerman_connection, send) {
 	wmConnectionObject* connection_object;
@@ -134,6 +148,7 @@ static const zend_function_entry workerman_connection_methods[] = { //
 	PHP_ME(workerman_connection, set, arginfo_workerman_connection_set, ZEND_ACC_PUBLIC) //
 		PHP_ME(workerman_connection, send, arginfo_workerman_connection_send, ZEND_ACC_PUBLIC) //
 		PHP_ME(workerman_connection, close, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_connection, read, arginfo_workerman_connection_void, ZEND_ACC_PRIVATE) //
 		PHP_FE_END };
 
 /**

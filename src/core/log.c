@@ -54,6 +54,12 @@ const char* wmCode_str(int code) {
 	case WM_ERROR_SEND_FAIL:
 		return "send buffer full and drop package";
 		break;
+	case WM_ERROR_READ_FAIL:
+		return "read buffer error";
+		break;
+	case WM_ERROR_LOOP_FAIL:
+		return "loop error";
+		break;
 	default:
 		snprintf(wm_error, sizeof(wm_error), "Unknown error: %d", code);
 		return wm_error;

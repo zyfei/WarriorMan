@@ -754,12 +754,13 @@ void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_f
 }
 
 /**
- * 由epoll调用
+ * 由run方法循环调用
  */
 void acceptConnection(wmWorker* worker) {
 	int connfd;
 	wmConnection* conn;
 	zval* __zval;
+	zend_fcall_info_cache call_read;
 	for (int i = 0; i < WM_ACCEPT_MAX_COUNT; i++) {
 		connfd = wm_socket_accept(worker->fd);
 		if (connfd < 0) {
@@ -778,9 +779,6 @@ void acceptConnection(wmWorker* worker) {
 			wmWarn("_wmWorker_acceptConnection() -> wmConnection_create failed")
 			return;
 		}
-		//添加读监听
-		conn->socket->events = WM_EVENT_READ;
-		wmWorkerLoop_add(conn->fd, conn->socket->events, WM_LOOP_CONNECTION);
 
 		//新的Connection对象
 		zend_object *obj = wm_connection_create_object(workerman_connection_ce_ptr);
@@ -805,6 +803,8 @@ void acceptConnection(wmWorker* worker) {
 		__zval = zend_read_static_property(workerman_connection_ce_ptr, ZEND_STRL("defaultMaxPackageSize"), 0);
 		connection_object->connection->maxPackageSize = __zval->value.lval;
 		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("maxPackageSize"), connection_object->connection->maxPackageSize);
+
+		zval_ptr_dtor(__zval);
 		//设置属性 end
 
 		//设置socket属性start
@@ -825,7 +825,11 @@ void acceptConnection(wmWorker* worker) {
 		if (worker->onConnect) {
 			wmCoroutine_create(&(worker->onConnect->fcc), 1, z); //创建新协程
 		}
-		zval_ptr_dtor(__zval);
+
+		//创建协程 conn开始读 start
+		wm_get_internal_function(conn->_This, workerman_connection_ce_ptr, ZEND_STRL("read"), &call_read);
+		wmCoroutine_create(&call_read, 0, NULL);
+		//创建协程 conn开始读  end
 	}
 }
 
