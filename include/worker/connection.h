@@ -5,6 +5,9 @@
 #define _COROUTINE_SOCKET_H
 
 #include "base.h"
+#include "coroutine.h"
+#include "loop.h"
+#include "wm_socket.h"
 
 extern zend_class_entry workerman_connection_ce;
 extern zend_class_entry *workerman_connection_ce_ptr;
@@ -19,11 +22,8 @@ typedef struct {
 	int maxSendBufferSize; //应用层发送缓冲区
 	int maxPackageSize; //接收的最大包包长
 	//写入php属性中 end
-
+	wmSocket* socket; //创建的socket对象
 	zval* _This; //指向当前PHP类的指针
-	int events; //当前这个conn已经注册给epoll的事件
-	wmString *read_buffer; //读缓冲区
-	wmString *write_buffer; //写缓冲区
 	int _status; //当前连接的状态
 
 	php_fci_fcc *onMessage;

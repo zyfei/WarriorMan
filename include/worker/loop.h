@@ -3,10 +3,10 @@
 
 #include "base.h"
 #include "coroutine.h"
-#include "worker.h"
 #include "array.h"
 #include "socket.h"
 #include "log.h"
+
 /**
  * 保存触发信号之后的回调方法
  */

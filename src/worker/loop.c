@@ -1,7 +1,6 @@
 #include "loop.h"
 
 static loop_callback_func_t read_handler[7];
-static loop_callback_func_t write_handler[7];
 static loop_callback_func_t error_handler[7];
 
 /**
@@ -24,7 +23,7 @@ void sig_handler(int sigalno) {
 
 	//将信号值写入管代，通知主循环。
 	//向1里面写，从0里面读
-	if (wmSocket_send(signal_fd[1], (char*) &msg, 1, 0) <= 0) {
+	if (wm_socket_send(signal_fd[1], (char*) &msg, 1, 0) <= 0) {
 		php_printf("The message sent to the server failed\n");
 	}
 	errno = save_errno;
@@ -36,7 +35,7 @@ void sig_handler(int sigalno) {
 void sig_callback(int fd) {
 	int recv_ret_value;
 	do {
-		recv_ret_value = wmSocket_recv(signal_fd[0], signals, sizeof(signals), 0);
+		recv_ret_value = wm_socket_recv(signal_fd[0], signals, sizeof(signals), 0);
 	} while (recv_ret_value < 0 && errno == EAGAIN);
 
 	if (recv_ret_value == 0) { //信号fd被关闭了
@@ -89,8 +88,8 @@ void wmWorkerLoop_add_sigal(int sigal, loop_func_t fn) {
 		 * 此处我们假设pipe_fd[1]为写端，非阻塞
 		 * pipe_fd[0]为读端
 		 */
-		wmSocket_set_nonblock(signal_fd[0]);
-		wmSocket_set_nonblock(signal_fd[1]);
+		wm_socket_set_nonblock(signal_fd[0]);
+		wm_socket_set_nonblock(signal_fd[1]);
 
 		//最后加入loop
 		wmWorkerLoop_add(signal_fd[0], WM_EVENT_READ, WM_LOOP_SIGAL);
@@ -138,18 +137,11 @@ bool wmWorkerLoop_set_handler(int event, int type, loop_callback_func_t fn) {
 	case WM_EVENT_READ:
 		handlers = read_handler;
 		break;
-	case WM_EVENT_WRITE:
-		handlers = write_handler;
-		break;
 	case WM_EVENT_ERROR:
 		handlers = error_handler;
 		break;
 	default:
 		return false;
-	}
-	//默认是直接resume相关协程
-	if (fn == NULL) {
-		fn = loop_callback_coroutine_resume;
 	}
 	handlers[type] = fn;
 	return true;
@@ -160,9 +152,6 @@ loop_callback_func_t loop_get_handler(int event, int type) {
 	switch (event) {
 	case EPOLLIN:
 		handlers = read_handler;
-		break;
-	case EPOLLOUT:
-		handlers = write_handler;
 		break;
 	default:
 		handlers = error_handler;
@@ -263,17 +252,13 @@ void wmWorkerLoop_loop() {
 				if (fn != NULL) {
 					_c = 1;
 					fn(fd, coro_id);
-					//break;
 				}
 			}
 
-			//write
+			//如果是可写，那么就恢复协程
 			if (events[i].events & EPOLLOUT) {
-				fn = loop_get_handler(EPOLLOUT, fdtype);
-				if (fn != NULL) {
-					_c = 1;
-					fn(fd, coro_id);
-				}
+				_c = 1;
+				loop_callback_coroutine_resume(fd, coro_id);
 			}
 
 			//error

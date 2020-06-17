@@ -1,13 +1,11 @@
 #include "connection.h"
-#include "coroutine.h"
-#include "loop.h"
 
 static long wm_coroutine_socket_last_id = 0;
 static wmHash_INT_PTR *wm_connections = NULL; //记录着正在连接状态的conn
 
 //检查是否发送缓存区慢
-static void checkBufferWillFull(wmConnection *connection);
-static bool bufferIsFull(wmConnection *connection, size_t len);
+static void bufferWillFull(void *_connection);
+static void bufferIsFull(void *_connection);
 static int onClose(wmConnection *connection);
 //专门给loop回调用的
 static void onRead(int fd, int coro_id);
@@ -16,9 +14,7 @@ static void onError(int fd, int coro_id);
 void wmConnection_init() {
 	wm_connections = wmHash_init(WM_HASH_INT_STR);
 
-	//wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_RESUME, NULL);
 	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_CONNECTION, onRead);
-	wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_CONNECTION, NULL);
 	wmWorkerLoop_set_handler(WM_EVENT_ERROR, WM_LOOP_CONNECTION, onError);
 }
 
@@ -29,11 +25,19 @@ wmConnection * wmConnection_create(int fd) {
 
 	wmConnection *connection = (wmConnection *) wm_malloc(sizeof(wmConnection));
 	connection->fd = fd;
-	connection->read_buffer = NULL;
-	connection->write_buffer = NULL;
+	connection->socket = wmSocket_create_by_fd(fd);
+	if (connection->socket == NULL) {
+		return NULL;
+	}
+	connection->socket->loop_type = WM_LOOP_CONNECTION;
+	connection->socket->maxPackageSize = WM_MAX_PACKAGE_SIZE;
+	connection->socket->maxSendBufferSize = WM_MAX_SEND_BUFFER_SIZE;
+	connection->socket->onBufferFull = bufferIsFull;
+	connection->socket->onBufferWillFull = bufferWillFull;
+	//绑定Full回调
+
 	connection->_This = NULL;
 	connection->id = ++wm_coroutine_socket_last_id;
-	connection->events = WM_EVENT_NULL;
 	connection->_status = WM_CONNECTION_STATUS_ESTABLISHED;
 
 	connection->maxSendBufferSize = WM_MAX_SEND_BUFFER_SIZE;
@@ -48,8 +52,6 @@ wmConnection * wmConnection_create(int fd) {
 		wm_coroutine_socket_last_id = 0;
 		connection->id = ++wm_coroutine_socket_last_id;
 	}
-	wmSocket_set_nonblock(connection->fd);
-
 	if (WM_HASH_ADD(WM_HASH_INT_STR,wm_connections,connection->fd,connection) < 0) {
 		wmWarn("wmConnection_create-> connections_add fail");
 		return NULL;
@@ -62,17 +64,18 @@ wmConnection* wmConnection_find_by_fd(int fd) {
 }
 
 /**
- * onMessage协程调用结束一次，就触发一次
- * 这里得研究一下，引用计数这块不太懂
+ * onMessage协程结束调用
  */
 void onMessage_callback(void* _mess_data) {
 	zval* md = (zval*) _mess_data;
 	zval* md2 = (zval*) ((char *) _mess_data + sizeof(zval));
-	//php_printf("aaa %d \n",md->value.counted->gc.refcount);
 	zval_ptr_dtor(md2);
 	efree(md);
 }
 
+/**
+ * onError结束调用
+ */
 void onError_callback(void* _mess_data) {
 	zval* md = (zval*) _mess_data;
 	zval* md2 = (zval*) ((char *) _mess_data + (sizeof(zval) * 2));
@@ -89,44 +92,37 @@ void onRead(int fd, int coro_id) {
 		return;
 	}
 
-	if (!connection->read_buffer) {
-		connection->read_buffer = wmString_new(WM_BUFFER_SIZE_BIG);
-	}
-	int ret = wmSocket_recv(connection->fd, connection->read_buffer->str + connection->read_buffer->length,
-	WM_BUFFER_SIZE_BIG, 0);
-
+	int ret = wmSocket_recv(connection->socket);
 	//连接关闭
 	if (ret == 0) {
 		zend_update_property_long(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errCode"), WM_ERROR_SESSION_CLOSED_BY_CLIENT);
-
 		zend_update_property_string(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errMsg"), wmCode_str(WM_ERROR_SESSION_CLOSED_BY_CLIENT));
 		onClose(connection);
 		return;
 	}
-	//再试一次，等待epoll回调
 	if (ret < 0) {
+		//如果由于信号中断或者暂时没有数据可读，直接返回
+		if (errno == EINTR || errno == EAGAIN) {
+			return;
+		}
 		wmWarn("Error has occurred: (fd=%d,errno %d) %s", connection->fd, errno, strerror(errno));
 		php_error_docref(NULL, E_WARNING, "recv error");
 		return;
 	}
 
-	connection->read_buffer->length += ret;
-
-	if (connection->read_buffer->length == 0) {
-		return;
-	}
-
-	//创建一个单独协程处理
-	if (connection->onMessage) {
-		//构建zval，默认的引用计数是1，在php方法调用完毕释放
-		zval* _mess_data = (zval*) emalloc(sizeof(zval) * 2);
-		_mess_data[0] = *connection->_This;
-		zend_string* _zs = zend_string_init(connection->read_buffer->str, connection->read_buffer->length, 0);
-		ZVAL_STR(&_mess_data[1], _zs);
-		//现在就可以清空read）bufferle
-		connection->read_buffer->length = 0;
-		long _cid = wmCoroutine_create(&(connection->onMessage->fcc), 2, _mess_data); //创建新协程
-		wmCoroutine_set_callback(_cid, onMessage_callback, _mess_data);
+	//这个socket是否有一个完整的消息,如果有的话，就读出来
+	int buffer_len;
+	while ((buffer_len = wmSocket_read(connection->socket)) > 0) {
+		//创建一个单独协程处理
+		if (connection->onMessage) {
+			//构建zval，默认的引用计数是1，在php方法调用完毕释放
+			zval* _mess_data = (zval*) emalloc(sizeof(zval) * 2);
+			_mess_data[0] = *connection->_This;
+			zend_string* _zs = zend_string_init(wmScoket_getReadBuffer(connection->socket, buffer_len), buffer_len, 0);
+			ZVAL_STR(&_mess_data[1], _zs);
+			long _cid = wmCoroutine_create(&(connection->onMessage->fcc), 2, _mess_data); //创建新协程
+			wmCoroutine_set_callback(_cid, onMessage_callback, _mess_data);
+		}
 	}
 }
 
@@ -138,85 +134,42 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 		return false;
 	}
 
-	if (!connection->write_buffer) {
-		connection->write_buffer = wmString_new(WM_BUFFER_SIZE_BIG);
-	}
-	int ret;
-
-	if (bufferIsFull(connection, len)) {
+	int ret = wmSocket_send(connection->socket, buf, len);
+	//触发onError
+	if (ret == WM_SOCKET_ERROR) {
+		onError(connection->fd, 0);
 		return false;
 	}
-
-	wmString_append_ptr(connection->write_buffer, buf, len);
-	//检查是否缓冲区满
-	checkBufferWillFull(connection);
-	bool _add_Loop = false;
-	while (1) {
-		ret = wmSocket_send(connection->fd, connection->write_buffer->str + connection->write_buffer->offset,
-			connection->write_buffer->length - connection->write_buffer->offset, 0);
-		//如果发生错误
-		if (ret < 0) {
-			if (errno != EAGAIN) { // 不是缓冲区错误，就返回报错
-				wmWarn("Error has occurred: (fd=%d,errno %d) %s", connection->fd, errno, strerror(errno));
-				return false;
-			}
-			ret = 0;
-		}
-		connection->write_buffer->offset += ret;
-
-		//发送完了，就直接返回
-		if (connection->write_buffer->offset == connection->write_buffer->length) {
-
-			//在这里取消事件注册，使用修改的方式
-			if (_add_Loop) {
-				connection->events = connection->events - WM_EVENT_WRITE;
-				wmWorkerLoop_update(connection->fd, connection->events, WM_LOOP_CONNECTION);
-			}
-			connection->write_buffer->offset = 0;
-			connection->write_buffer->length = 0;
-			return true;
-		}
-		if (!_add_Loop) {
-			connection->events |= WM_EVENT_WRITE;
-			wmWorkerLoop_update(connection->fd, connection->events, WM_LOOP_CONNECTION);
-			_add_Loop = true;
-		}
-		//可写的时候，自动唤醒
-		wmCoroutine_yield();
+	//触发onClose
+	if (ret == WM_SOCKET_CLOSE) {
+		onClose(connection);
+		return false;
 	}
 	return true;
+
 }
 
-//检查应用层发送缓冲区是否这次添加之后，已经满了
-void checkBufferWillFull(wmConnection *connection) {
-	if (connection->maxSendBufferSize <= (connection->write_buffer->length - connection->write_buffer->offset)) {
-		if (connection->onBufferFull) {
-			wmCoroutine_create(&(connection->onBufferFull->fcc), 1, connection->_This); //创建新协程
-		}
+//应用层发送缓冲区是否这次添加之后，已经满了
+void bufferWillFull(void *_connection) {
+	wmConnection* connection = (wmConnection*) _connection;
+	if (connection->onBufferFull) {
+		wmCoroutine_create(&(connection->onBufferFull->fcc), 1, connection->_This); //创建新协程
 	}
 }
 
 //检查是否已经满了,并回调
-bool bufferIsFull(wmConnection *connection, size_t len) {
-	//如果是空的，那就不检查
-	if ((connection->write_buffer->length - connection->write_buffer->offset) == 0) {
-		return false;
+void bufferIsFull(void *_connection) {
+	wmConnection* connection = (wmConnection*) _connection;
+	if (connection->onError) {
+		//构建zval，默认的引用计数是1，在php方法调用完毕释放
+		zval* _mess_data = (zval*) emalloc(sizeof(zval) * 3);
+		_mess_data[0] = *connection->_This;
+		ZVAL_LONG(&_mess_data[1], WM_ERROR_SEND_FAIL);
+		zend_string* _zs = zend_string_init(wmCode_str(WM_ERROR_SEND_FAIL), strlen(wmCode_str(WM_ERROR_SEND_FAIL)), 0);
+		ZVAL_STR(&_mess_data[2], _zs);
+		long _cid = wmCoroutine_create(&(connection->onError->fcc), 3, _mess_data); //创建新协程
+		wmCoroutine_set_callback(_cid, onError_callback, _mess_data);
 	}
-
-	if (connection->maxSendBufferSize <= (connection->write_buffer->length - connection->write_buffer->offset + len)) {
-		if (connection->onError) {
-			//构建zval，默认的引用计数是1，在php方法调用完毕释放
-			zval* _mess_data = (zval*) emalloc(sizeof(zval) * 3);
-			_mess_data[0] = *connection->_This;
-			ZVAL_LONG(&_mess_data[1], WM_ERROR_SEND_FAIL);
-			zend_string* _zs = zend_string_init(wmCode_str(WM_ERROR_SEND_FAIL), strlen(wmCode_str(WM_ERROR_SEND_FAIL)), 0);
-			ZVAL_STR(&_mess_data[2], _zs);
-			long _cid = wmCoroutine_create(&(connection->onError->fcc), 3, _mess_data); //创建新协程
-			wmCoroutine_set_callback(_cid, onError_callback, _mess_data);
-		}
-		return true;
-	}
-	return false;
 }
 
 //这是一个用户调用的方法
@@ -258,7 +211,7 @@ int onClose(wmConnection *connection) {
 	}
 
 	wmWorkerLoop_del(connection->fd); //释放事件
-	int ret = wmSocket_close(connection->fd);
+	int ret = wmSocket_close(connection->socket);
 
 	connection->_status = WM_CONNECTION_STATUS_CLOSED;
 	//触发onClose
@@ -284,9 +237,7 @@ void wmConnection_free(wmConnection *connection) {
 	if (connection->_status == WM_CONNECTION_STATUS_CONNECTING) {
 		onClose(connection);
 	}
-
-	wmString_free(connection->read_buffer);
-	wmString_free(connection->write_buffer);
+	wmSocket_free(connection->socket);
 
 	//释放暂时申请指向自身php对象的zval指针
 	if (connection->_This) {

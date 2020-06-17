@@ -118,14 +118,14 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 //服务器监听启动
 void _listen(wmWorker *worker) {
 	if (worker->fd == 0) {
-		worker->fd = wmSocket_create(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		wmSocket_set_nonblock(worker->fd);
-		if (wmSocket_bind(worker->fd, worker->host, worker->port) < 0) {
+		worker->fd = wm_socket_create(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		wm_socket_set_nonblock(worker->fd);
+		if (wm_socket_bind(worker->fd, worker->host, worker->port) < 0) {
 			wmWarn("Error has occurred: port=%d (errno %d) %s", worker->port, errno, strerror(errno));
 			return;
 		}
 
-		if (wmSocket_listen(worker->fd, worker->backlog) < 0) {
+		if (wm_socket_listen(worker->fd, worker->backlog) < 0) {
 			wmWarn("Error has occurred: fd=%d (errno %d) %s", worker->fd, errno, strerror(errno));
 			return;
 		}
@@ -145,7 +145,7 @@ void _listen(wmWorker *worker) {
 //取消监听
 void _unlisten(wmWorker *worker) {
 	if (worker->fd != 0) {
-		wmSocket_close(worker->fd);
+		wm_socket_close(worker->fd);
 		worker->fd = 0;
 	}
 }
@@ -502,11 +502,11 @@ bool wmWorker_stop(wmWorker* worker) {
 //检查环境
 void checkEnv() {
 	//检查是不是在协程环境
-//	wmCoroutine * cor = wmCoroutine_get_current();
-//	if (cor == NULL) {
-//		wmError("Only run in coroutine mode \n");
-//		return;
-//	}
+	wmCoroutine * cor = wmCoroutine_get_current();
+	if (cor == NULL) {
+		wmError("Only run in coroutine mode \n");
+		return;
+	}
 	//开启协程，hook相关函数
 	wm_enableCoroutine();
 
@@ -760,7 +760,7 @@ void acceptConnection(int fd, int coro_id) {
 	wmConnection* _conn;
 	zval* __zval;
 	for (int i = 0; i < WM_ACCEPT_MAX_COUNT; i++) {
-		connfd = wmSocket_accept(worker->fd);
+		connfd = wm_socket_accept(worker->fd);
 		if (connfd < 0) {
 			switch (errno) {
 			case EAGAIN: //队列空了，没有信息要读了
@@ -777,10 +777,9 @@ void acceptConnection(int fd, int coro_id) {
 			wmWarn("_wmWorker_acceptConnection() -> wmConnection_create failed")
 			return;
 		}
-
-		_conn->events = WM_EVENT_READ;
 		//添加读监听
-		wmWorkerLoop_add(_conn->fd, _conn->events, WM_LOOP_CONNECTION);
+		_conn->socket->events = WM_EVENT_READ;
+		wmWorkerLoop_add(_conn->fd, _conn->socket->events, WM_LOOP_CONNECTION);
 
 		//新的Connection对象
 		zend_object *obj = wm_connection_create_object(workerman_connection_ce_ptr);
@@ -806,6 +805,12 @@ void acceptConnection(int fd, int coro_id) {
 		connection_object->connection->maxPackageSize = __zval->value.lval;
 		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("maxPackageSize"), connection_object->connection->maxPackageSize);
 		//设置属性 end
+
+		//设置socket属性start
+		_conn->socket->transport = worker->transport;
+		_conn->socket->maxSendBufferSize = _conn->maxSendBufferSize;
+		_conn->socket->maxPackageSize = _conn->maxPackageSize;
+		//设置socket属性end
 
 		//设置回调方法 start
 		connection_object->connection->onMessage = worker->onMessage;

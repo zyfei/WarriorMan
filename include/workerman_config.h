@@ -8,10 +8,16 @@ enum wmSocket_type {
 	WM_SOCK_UDP = 2, //
 };
 
+enum wmSocketError_type {
+	WM_SOCKET_SUCCESS = 0, //
+	WM_SOCKET_CLOSE = 1, //
+	WM_SOCKET_ERROR = 2, //
+};
+
 enum wmLoop_type {
-	WM_LOOP_WORKER = 1, //
-	WM_LOOP_CONNECTION = 2, //
-	WM_LOOP_SIGAL = 3, //
+	WM_LOOP_WORKER = 0, //
+	WM_LOOP_CONNECTION = 1, //
+	WM_LOOP_SIGAL = 2, //
 };
 
 enum wmChannel_opcode {

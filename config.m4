@@ -61,6 +61,7 @@ if test "$PHP_WM" != "no"; then
     	src/coroutine/channel.c \
     	src/coroutine/context.c \
     	src/coroutine/coroutine.c \
+    	src/coroutine/socket.c \
     	src/worker/loop.c \
     	src/worker/connection.c \
     	src/worker.c \

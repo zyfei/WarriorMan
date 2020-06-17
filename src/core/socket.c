@@ -3,7 +3,7 @@
 /**
  * 创建套接字
  */
-int wmSocket_create(int domain, int type, int protocol) {
+int wm_socket_create(int domain, int type, int protocol) {
 	int sock;
 	sock = socket(domain, type, protocol);
 	if (sock < 0) {
@@ -15,7 +15,7 @@ int wmSocket_create(int domain, int type, int protocol) {
 /**
  * 设置为非阻塞模式
  */
-int wmSocket_set_nonblock(int sock) {
+int wm_socket_set_nonblock(int sock) {
 	int flags;
 	//用来获取这个socket原来的一些属性。
 	flags = fcntl(sock, F_GETFL, 0);
@@ -35,7 +35,7 @@ int wmSocket_set_nonblock(int sock) {
 /**
  * 对bind()函数进行了封装
  */
-int wmSocket_bind(int sock, char *host, int port) {
+int wm_socket_bind(int sock, char *host, int port) {
 	int ret;
 	struct sockaddr_in servaddr;
 
@@ -54,7 +54,7 @@ int wmSocket_bind(int sock, char *host, int port) {
 	return ret;
 }
 
-int wmSocket_listen(int sock, int backlog) {
+int wm_socket_listen(int sock, int backlog) {
 	int ret;
 
 	ret = listen(sock, backlog);
@@ -64,7 +64,7 @@ int wmSocket_listen(int sock, int backlog) {
 	return ret;
 }
 
-int wmSocket_accept(int sock) {
+int wm_socket_accept(int sock) {
 	int connfd;
 	struct sockaddr_in sa;
 	socklen_t len;
@@ -78,7 +78,7 @@ int wmSocket_accept(int sock) {
 	return connfd;
 }
 
-ssize_t wmSocket_recv(int sock, void *buf, size_t len, int flag) {
+ssize_t wm_socket_recv(int sock, void *buf, size_t len, int flag) {
 	ssize_t ret;
 
 	/**
@@ -97,7 +97,7 @@ ssize_t wmSocket_recv(int sock, void *buf, size_t len, int flag) {
 	return ret;
 }
 
-ssize_t wmSocket_send(int sock, const void *buf, size_t len, int flag) {
+ssize_t wm_socket_send(int sock, const void *buf, size_t len, int flag) {
 	ssize_t ret;
 
 	ret = send(sock, buf, len, flag);
@@ -107,7 +107,7 @@ ssize_t wmSocket_send(int sock, const void *buf, size_t len, int flag) {
 	return ret;
 }
 
-int wmSocket_close(int fd) {
+int wm_socket_close(int fd) {
 	int ret;
 
 	ret = close(fd);
