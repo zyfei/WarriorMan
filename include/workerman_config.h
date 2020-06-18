@@ -10,8 +10,8 @@ enum wmSocket_type {
 
 enum wmSocketError_type {
 	WM_SOCKET_SUCCESS = 0, //
-	WM_SOCKET_CLOSE = 1, //
-	WM_SOCKET_ERROR = 2, //
+	WM_SOCKET_CLOSE = -1, //
+	WM_SOCKET_ERROR = -2, //
 };
 
 enum wmLoop_type {

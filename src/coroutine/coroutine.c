@@ -43,6 +43,10 @@ long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc, zval *a
 	wmCoroutine* task = (wmCoroutine *) wm_malloc(sizeof(wmCoroutine));
 	bzero(task, sizeof(wmCoroutine));
 	task->cid = ++last_cid;
+	if (task->cid < 0) {
+		last_cid = 100; //从100开始
+		task->cid = ++last_cid; //创造101
+	}
 	task->_defer = NULL;
 
 	if (WM_HASH_ADD(WM_HASH_INT_STR, coroutines, task->cid,task) < 0) {

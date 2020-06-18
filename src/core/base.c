@@ -22,6 +22,7 @@ void workerman_base_init() {
  */
 void workerman_base_shutdown() {
 	wmString_free(WorkerG.buffer_stack);
+	wmString_free(WorkerG.buffer_stack_large);
 }
 
 //初始化epoll
@@ -58,11 +59,11 @@ int free_wmPoll() {
 		}
 		wm_free(WorkerG.poll->events);
 		WorkerG.poll->events = NULL;
+		wm_free(WorkerG.poll->event);
+		WorkerG.poll->event = NULL;
 		wm_free(WorkerG.poll);
 		WorkerG.poll = NULL;
 		WorkerG.is_running = false;
-		wm_free(WorkerG.poll->event);
-		WorkerG.poll->event = NULL;
 	}
 	return 0;
 }

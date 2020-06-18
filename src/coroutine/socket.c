@@ -39,47 +39,36 @@ wmSocket * wmSocket_create_by_fd(int fd) {
 }
 
 /**
- * 尝试从管道中读消息
+ * 读消息
  */
-int wmSocket_recv(wmSocket* socket) {
+int wmSocket_read(wmSocket* socket) {
+	if (socket->closed == true) {
+		return WM_SOCKET_CLOSE; //表示关闭
+	}
 	if (!socket->read_buffer) {
 		socket->read_buffer = wmString_new(WM_BUFFER_SIZE_BIG);
 	}
-	if (socket->read_buffer->offset == socket->read_buffer->length) {
-		socket->read_buffer->length = 0;
-		socket->read_buffer->offset = 0;
-	}
-	int ret = wm_socket_recv(socket->fd, socket->read_buffer->str + socket->read_buffer->length, WM_BUFFER_SIZE_BIG, 0);
-	//连接关闭
-	if (ret == 0) {
-		socket->closed = true;
-		return ret;
-	}
-	if (ret < 0) {
-		return ret;
-	}
-	socket->read_buffer->length += ret;
-	return ret;
-}
+	while (!socket->closed) {
+		int ret = wm_socket_recv(socket->fd, socket->read_buffer->str, WM_BUFFER_SIZE_BIG, 0);
+		//连接关闭
+		if (ret == 0) {
+			socket->closed = true;
+			return WM_SOCKET_CLOSE;
+		}
 
-char* wmScoket_getReadBuffer(wmSocket* socket, int length) {
-	return socket->read_buffer->str + socket->read_buffer->offset - length;
-}
-
-/**
- * 从buffer中读取一个包长，并且返回一个完整的包长度
- * PS:现在只有tcp，就是有多少读多少
- */
-int wmSocket_read(wmSocket* socket) {
-	//如果read已经读到最后，那么就把消息重置
-	if (socket->read_buffer->offset == socket->read_buffer->length) {
-		socket->read_buffer->length = 0;
-		socket->read_buffer->offset = 0;
-		return 0;
+		if (ret < 0 && errno != EAGAIN && errno != EINTR) {
+			//在这里判断是否已经关闭
+			if (access(socket->fp_path->str, F_OK) != 0 || feof(socket->fp) != 0) {
+				socket->closed = true;
+				return WM_SOCKET_ERROR;
+			}
+		}
+		if (ret > 0) {
+			return ret;
+		}
+		wmCoroutine_yield();
 	}
-	int len = socket->read_buffer->length - socket->read_buffer->offset;
-	socket->read_buffer->offset = socket->read_buffer->offset + len;
-	return len;
+	return WM_SOCKET_CLOSE;
 }
 
 //检查写缓冲区是不是已经满了,并回调
@@ -132,17 +121,18 @@ int wmSocket_send(wmSocket *socket, const void *buf, size_t len) {
 	//尝试写
 	bool _add_Loop = false;
 	int ret;
-	while (1) {
+	while (!socket->closed) {
 		//能发多少发多少，不用客气
 		ret = wm_socket_send(socket->fd, socket->write_buffer->str + socket->write_buffer->offset, socket->write_buffer->length - socket->write_buffer->offset,
 			0);
 		//如果发生错误
-		if (ret < 0 && errno != EAGAIN) {
+		if (ret < 0 && errno != EAGAIN && errno != EINTR) {
 			//在这里判断是否已经关闭
 			if (access(socket->fp_path->str, F_OK) != 0 || feof(socket->fp) != 0) {
 				socket->closed = true;
 				return WM_SOCKET_ERROR;
 			}
+			ret = 0;
 		}
 		socket->write_buffer->offset += ret;
 
@@ -166,7 +156,7 @@ int wmSocket_send(wmSocket *socket, const void *buf, size_t len) {
 		//可写的时候，自动唤醒
 		wmCoroutine_yield();
 	}
-	return WM_SOCKET_SUCCESS;
+	return WM_SOCKET_CLOSE;
 }
 
 /**

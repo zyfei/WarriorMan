@@ -31,8 +31,6 @@ typedef struct {
 
 wmSocket * wmSocket_create(int domain, int type, int protocol);
 wmSocket * wmSocket_create_by_fd(int fd);
-int wmSocket_recv(wmSocket* socket);
-char* wmScoket_getReadBuffer(wmSocket* socket, int length);
 int wmSocket_read(wmSocket* socket);
 int wmSocket_send(wmSocket *socket, const void *buf, size_t len);
 int wmSocket_close(wmSocket *socket);

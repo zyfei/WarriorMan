@@ -33,6 +33,8 @@ typedef struct {
 	php_fci_fcc *onBufferDrain;
 	php_fci_fcc *onError;
 
+	wmString* read_packet_buffer;//用来保存返回给用户整个包的缓冲区
+
 	void* worker; //所属于哪一个worker对象
 } wmConnection;
 

@@ -762,6 +762,7 @@ void acceptConnection(wmWorker* worker) {
 	zval* __zval;
 	zend_fcall_info_cache call_read;
 	for (int i = 0; i < WM_ACCEPT_MAX_COUNT; i++) {
+
 		connfd = wm_socket_accept(worker->fd);
 		if (connfd < 0) {
 			switch (errno) {

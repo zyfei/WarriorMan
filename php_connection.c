@@ -34,7 +34,6 @@ zend_object* wm_connection_create_object(zend_class_entry *ce) {
  */
 static void wm_connection_free_object(zend_object *object) {
 	wmConnectionObject *sock = (wmConnectionObject *) wm_connection_fetch_object(object);
-
 	//这里需要判断，这个connection是不是被人继续用了。
 	if (sock->connection && sock->connection != NULL) {
 		//现在有这个时候，把别的正常的fd关闭的情况
