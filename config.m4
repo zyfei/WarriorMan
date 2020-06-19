@@ -65,6 +65,7 @@ if test "$PHP_WM" != "no"; then
     	src/worker/loop.c \
     	src/worker/connection.c \
     	src/worker.c \
+    	src/runtime.c \
     	php_coroutine.c \
         php_workerman.c \
         php_channel.c \

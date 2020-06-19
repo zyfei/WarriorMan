@@ -20,7 +20,7 @@ ZEND_END_ARG_INFO()
 //开启协程模式,hook相关函数
 void wm_enableCoroutine() {
 	hook_func(ZEND_STRL("sleep"), zim_workerman_coroutine_sleep);
-	//php_stream_xport_register("tcp", socket_create); // 使用socket_create这个函数，替换原来的php_stream_generic_socket_factory
+	php_stream_xport_register("tcp", wmRuntime_socket_create); // 使用socket_create这个函数，替换原来的php_stream_generic_socket_factory
 }
 
 PHP_METHOD(workerman_runtime, enableCoroutine) {

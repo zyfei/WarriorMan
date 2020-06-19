@@ -14,7 +14,6 @@ typedef void (*wm_socket_func_t)(void*);
 
 typedef struct {
 	int fd; //文件描述符
-	FILE* fp; //文件指针
 	wmString* fp_path; //文件具体位置
 	wmString *read_buffer; //读缓冲区
 	wmString *write_buffer; //写缓冲区

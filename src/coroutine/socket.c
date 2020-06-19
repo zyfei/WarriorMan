@@ -14,10 +14,6 @@ wmSocket * wmSocket_create(int domain, int type, int protocol) {
 wmSocket * wmSocket_create_by_fd(int fd) {
 	wmSocket *socket = (wmSocket *) wm_malloc(sizeof(wmSocket));
 	socket->fd = fd;
-	if ((socket->fp = fdopen(fd, "r")) == NULL) {
-		wmWarn("open socketFp fail!");
-		return NULL;
-	}
 	//在这里判断是否已经关闭
 	int len = wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "/proc/%ld/fd/%d", (long) getpid(), fd);
 	socket->fp_path = wmString_dup(WorkerG.buffer_stack->str, len);
@@ -58,7 +54,7 @@ int wmSocket_read(wmSocket* socket) {
 
 		if (ret < 0 && errno != EAGAIN && errno != EINTR) {
 			//在这里判断是否已经关闭
-			if (access(socket->fp_path->str, F_OK) != 0 || feof(socket->fp) != 0) {
+			if (access(socket->fp_path->str, F_OK) != 0) {
 				socket->closed = true;
 				return WM_SOCKET_ERROR;
 			}
@@ -128,7 +124,7 @@ int wmSocket_send(wmSocket *socket, const void *buf, size_t len) {
 		//如果发生错误
 		if (ret < 0 && errno != EAGAIN && errno != EINTR) {
 			//在这里判断是否已经关闭
-			if (access(socket->fp_path->str, F_OK) != 0 || feof(socket->fp) != 0) {
+			if (access(socket->fp_path->str, F_OK) != 0) {
 				socket->closed = true;
 				return WM_SOCKET_ERROR;
 			}
@@ -182,8 +178,15 @@ void wmSocket_free(wmSocket *socket) {
 	if (socket->closed == false) {
 		wmSocket_close(socket);
 	}
-	wmString_free(socket->read_buffer);
-	wmString_free(socket->write_buffer);
+	if (socket->fp_path) {
+		wmString_free(socket->fp_path);
+	}
+	if (socket->read_buffer) {
+		wmString_free(socket->read_buffer);
+	}
+	if (socket->write_buffer) {
+		wmString_free(socket->write_buffer);
+	}
 	wm_free(socket);	//释放socket
 	socket = NULL;
 }

@@ -509,8 +509,6 @@ void checkEnv() {
 		wmError("Only run in coroutine mode \n");
 		return;
 	}
-	//开启协程，hook相关函数
-	wm_enableCoroutine();
 
 	//检查是否是cli模式
 	zend_string* _php_sapi = zend_string_init("PHP_SAPI", strlen("PHP_SAPI"), 0);
