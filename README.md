@@ -82,7 +82,7 @@ Warriorman::create(function () {
 
 ## Documentation
 
-目标是完全和workerman一样: [http://doc.workerman.net](http://doc.workerman.net) 
+目标是完全和workerman的文档一样: [http://doc.workerman.net](http://doc.workerman.net) 
 
 --------->>>>                           但是还有非常多没实现
 
@@ -90,10 +90,8 @@ Warriorman::create(function () {
 
 ## 特别鸣谢
 
-感谢WarriorMan项目 [WarriorMan](https://github.com/walkor/WarriorMan)，我完全仿照WarriorMan源码和文档制作。
-
-感谢Swoole项目 [Swoole](https://github.com/swoole/swoole-src)，我直接copy了不少Swoole的代码
-
+感谢Workerman项目 [Workerman](https://github.com/walkor/Workerman)，我完全依照Workerman文档制作。
+感谢Swoole项目 [Swoole](https://github.com/swoole/swoole-src)，给了我很多思路，并且我直接copy了不少Swoole的代码
 最后特别感谢 [Study](https://github.com/php-extension-research/study) 项目，我是学习这个教学项目之后，才有了此项目
 
 
