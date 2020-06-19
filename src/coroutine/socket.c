@@ -3,28 +3,31 @@
 static bool bufferIsFull(wmSocket *socket);
 static void checkBufferWillFull(wmSocket *socket);
 
-wmSocket * wmSocket_create(int domain, int type, int protocol) {
-	int fd = wm_socket_create(domain, type, protocol);
+wmSocket * wmSocket_create(int transport) {
+	int fd = -1;
+	switch (transport) {
+	case WM_SOCK_TCP:
+		fd = wm_socket_create(AF_INET, SOCK_STREAM, 0);
+	}
 	if (fd < 0) {
 		return NULL;
 	}
-	return wmSocket_create_by_fd(fd);
+	return wmSocket_create_by_fd(fd, transport);
 }
 
-wmSocket * wmSocket_create_by_fd(int fd) {
+wmSocket * wmSocket_create_by_fd(int fd, int transport) {
 	wmSocket *socket = (wmSocket *) wm_malloc(sizeof(wmSocket));
 	socket->fd = fd;
 	//在这里判断是否已经关闭
 	int len = wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "/proc/%ld/fd/%d", (long) getpid(), fd);
 	socket->fp_path = wmString_dup(WorkerG.buffer_stack->str, len);
 
-	socket->read_buffer = NULL;
 	socket->write_buffer = NULL;
 	socket->closed = false;
 	socket->maxSendBufferSize = 0; //应用层发送缓冲区
 	socket->maxPackageSize = 0; //接收的最大包包长
 	socket->loop_type = -1;
-	socket->transport = NULL;
+	socket->transport = transport;
 
 	socket->onBufferWillFull = NULL;
 	socket->onBufferFull = NULL;
@@ -35,23 +38,19 @@ wmSocket * wmSocket_create_by_fd(int fd) {
 }
 
 /**
- * 读消息
+ * 读消息,读出的消息放入buf中，返回读的长度
  */
-int wmSocket_read(wmSocket* socket) {
+int wmSocket_read(wmSocket* socket, char *buf, int len) {
 	if (socket->closed == true) {
 		return WM_SOCKET_CLOSE; //表示关闭
 	}
-	if (!socket->read_buffer) {
-		socket->read_buffer = wmString_new(WM_BUFFER_SIZE_BIG);
-	}
 	while (!socket->closed) {
-		int ret = wm_socket_recv(socket->fd, socket->read_buffer->str, WM_BUFFER_SIZE_BIG, 0);
+		int ret = wm_socket_recv(socket->fd, buf, len, 0);
 		//连接关闭
 		if (ret == 0) {
 			socket->closed = true;
 			return WM_SOCKET_CLOSE;
 		}
-
 		if (ret < 0 && errno != EAGAIN && errno != EINTR) {
 			//在这里判断是否已经关闭
 			if (access(socket->fp_path->str, F_OK) != 0) {
@@ -180,9 +179,6 @@ void wmSocket_free(wmSocket *socket) {
 	}
 	if (socket->fp_path) {
 		wmString_free(socket->fp_path);
-	}
-	if (socket->read_buffer) {
-		wmString_free(socket->read_buffer);
 	}
 	if (socket->write_buffer) {
 		wmString_free(socket->write_buffer);

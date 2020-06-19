@@ -98,7 +98,7 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	worker->host = NULL;
 	worker->port = 0;
 	worker->count = 0;
-	worker->transport = NULL;
+	worker->transport = 0;
 	worker->_This = _This;
 	worker->name = NULL;
 	worker->socketName = wmString_dup(socketName->val, socketName->len);
@@ -773,7 +773,14 @@ void acceptConnection(wmWorker* worker) {
 				return;
 			}
 		}
-		conn = wmConnection_create(connfd);
+		switch (worker->transport) {
+		case WM_SOCK_TCP:
+			conn = wmConnection_create(connfd, worker->transport);
+			break;
+		default:
+			wmError("unknow transport")
+			;
+		}
 		if (conn == NULL) {
 			wmWarn("_wmWorker_acceptConnection() -> wmConnection_create failed")
 			return;
@@ -807,7 +814,6 @@ void acceptConnection(wmWorker* worker) {
 		//设置属性 end
 
 		//设置socket属性start
-		conn->socket->transport = worker->transport;
 		conn->socket->maxSendBufferSize = conn->maxSendBufferSize;
 		conn->socket->maxPackageSize = conn->maxPackageSize;
 		//设置socket属性end
@@ -836,26 +842,30 @@ void acceptConnection(wmWorker* worker) {
  * 解析地址
  */
 void parseSocketAddress(wmWorker* worker, zend_string *listen) {
-	char *str = strtok(listen->val, ":");
-	for (int i = 0; i < 3; i++) {
-		if (i == 0 && str != NULL) { //判断协议
-			worker->transport = (char*) wm_malloc(sizeof(char) * (strlen(str)));
-			strcpy(worker->transport, str);
-		}
-		if (i == 1 && str != NULL) { //判断host
-			int str_i = 0;
-			while (str[str_i] == '/') {
-				str_i++;
-			}
-			if ((strlen(str) - str_i) > 0) {
-				worker->host = (char*) wm_malloc(sizeof(char) * (strlen(str) - str_i));
-				strcpy(worker->host, (char *) (str + str_i));
-			}
-		}
-		if (i == 2 && str != NULL) { //判断端口
-			worker->port = atoi(str);
-		}
-		str = strtok(NULL, ":");
+	char *transport = strstr(listen->val, "://");
+	int transport_len = transport - listen->val;
+	if (transport == NULL) {
+		wmError("parseSocketAddress error listen=%s", listen->val); //协议解析失败
+	}
+	if (strncmp("tcp", listen->val, transport_len) == 0) {
+		worker->transport = WM_SOCK_TCP;
+	}
+	if (strncmp("dup", listen->val, transport_len) == 0) {
+		worker->transport = WM_SOCK_UDP;
+	}
+	if (worker->transport == 0) {
+		wmError("parseSocketAddress error listen=%s , only the tcp,udp", listen->val); //协议解析失败
+	}
+	int len = transport_len + 3;
+	char *s1 = listen->val + len;
+	int s1_len = listen->len - len;
+	if (!isdigit(listen->val[len])) {
+		wmError("parseSocketAddress error listen=%s , please like 'tcp://0.0.0.0:1234'", listen->val); //协议解析失败
+	}
+	zend_string* err = NULL;
+	worker->host = parse_ip_address_ex(s1, s1_len, &worker->port, 1, &err);
+	if (err) {
+		wmError("%s", err->val);
 	}
 }
 
@@ -1076,9 +1086,6 @@ void wmWorker_free(wmWorker* worker) {
 	efree(worker->_This);
 	if (worker->host != NULL) {
 		wm_free(worker->host);
-	}
-	if (worker->transport != NULL) {
-		wm_free(worker->transport);
 	}
 	if (worker->name != NULL) {
 		wmString_free(worker->name);

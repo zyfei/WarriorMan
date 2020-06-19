@@ -2,6 +2,7 @@
 
 static long wm_coroutine_socket_last_id = 0;
 static wmHash_INT_PTR *wm_connections = NULL; //记录着正在连接状态的conn
+static wmString* _read_buffer_tmp = NULL; //每次read都从这里中转
 
 //检查是否发送缓存区慢
 static void bufferWillFull(void *_connection);
@@ -13,18 +14,18 @@ static void loopError(int fd, int coro_id);
 
 void wmConnection_init() {
 	wm_connections = wmHash_init(WM_HASH_INT_STR);
-
+	_read_buffer_tmp = wmString_new(WM_BUFFER_SIZE_BIG);
 	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_CONNECTION, WM_LOOP_RESUME);
 	wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_CONNECTION, WM_LOOP_RESUME);
 	wmWorkerLoop_set_handler(WM_EVENT_ERROR, WM_LOOP_CONNECTION, loopError);
 }
 
-wmConnection * wmConnection_create(int fd) {
+wmConnection * wmConnection_create(int fd, int transport) {
 	//查找并且删除key为fd的连接
 	WM_HASH_DEL(WM_HASH_INT_STR, wm_connections, fd);
 	wmConnection *connection = (wmConnection *) wm_malloc(sizeof(wmConnection));
 	connection->fd = fd;
-	connection->socket = wmSocket_create_by_fd(fd);
+	connection->socket = wmSocket_create_by_fd(fd, transport);
 	connection->socket->owner = (void *) connection;
 	if (connection->socket == NULL) {
 		return NULL;
@@ -50,7 +51,7 @@ wmConnection * wmConnection_create(int fd) {
 	connection->onError = NULL;
 
 	connection->errcode = 0;
-	connection->read_packet_buffer = wmString_new(WM_BUFFER_SIZE_BIG);
+	connection->read_packet_buffer = NULL;
 	if (connection->fd < 0) {
 		wm_coroutine_socket_last_id = 0;
 		connection->id = ++wm_coroutine_socket_last_id;
@@ -98,7 +99,9 @@ void wmConnection_read(wmConnection* connection) {
 
 	//开始读消息
 	while (connection && connection->_status == WM_CONNECTION_STATUS_ESTABLISHED) {
-		int ret = wmSocket_read(connection->socket);
+
+		int ret = wmSocket_read(connection->socket, _read_buffer_tmp->str, _read_buffer_tmp->size);
+
 		//触发onError
 		if (ret == WM_SOCKET_ERROR) {
 			connection->errcode = WM_ERROR_READ_FAIL;
@@ -112,9 +115,12 @@ void wmConnection_read(wmConnection* connection) {
 			return;
 		}
 		wmString* read_packet_buffer = connection->read_packet_buffer;
-		wmString_append_ptr(read_packet_buffer, connection->socket->read_buffer->str, ret);
+		if (read_packet_buffer == NULL) {
+			read_packet_buffer = wmString_new(ret);
+		}
+		wmString_append_ptr(read_packet_buffer, _read_buffer_tmp->str, ret);
 
-		//判断是否满足一个完整的包体,现在只判断长度
+		//判断是否满足一个完整的包体.  PS:现在通过长度模拟一下而已
 		int packet_len = read_packet_buffer->length;
 		while ((read_packet_buffer->length - read_packet_buffer->offset) >= packet_len) {
 			//创建一个单独协程处理
@@ -129,7 +135,7 @@ void wmConnection_read(wmConnection* connection) {
 			}
 			read_packet_buffer->offset += packet_len;
 		}
-
+		//大于0代表有消息被onMessage处理了，重新创建string缓冲区
 		if (read_packet_buffer->offset > 0) {
 			//重新创建一个read_packet缓冲区
 			int residue_buffer_len = read_packet_buffer->length - read_packet_buffer->offset;
@@ -281,4 +287,5 @@ void wmConnection_free(wmConnection *connection) {
 
 void wmConnection_shutdown() {
 	wmHash_destroy(WM_HASH_INT_STR,wm_connections);
+	wmString_free(_read_buffer_tmp);
 }

@@ -2,6 +2,7 @@
 #include "workerman.h"
 #include "base.h"
 #include "worker.h"
+#include "runtime.h"
 
 //创建协程接口方法声明
 PHP_FUNCTION(workerman_coroutine_create);
@@ -49,6 +50,7 @@ PHP_RINIT_FUNCTION(workerman) {
 	wmCoroutine_init();
 	wmWorker_init();
 	wmConnection_init();
+	wmRuntime_init();
 	return SUCCESS;
 }
 
@@ -60,6 +62,7 @@ PHP_RSHUTDOWN_FUNCTION(workerman) {
 	wmCoroutine_shutdown();
 	wmWorker_shutdown();
 	wmConnection_shutdown();
+	wmRuntime_shutdown();
 	return SUCCESS;
 }
 

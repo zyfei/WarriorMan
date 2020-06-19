@@ -15,9 +15,10 @@ enum wmSocketError_type {
 };
 
 enum wmLoop_type {
-	WM_LOOP_WORKER = 0, //
-	WM_LOOP_CONNECTION = 1, //
-	WM_LOOP_SIGAL = 2, //
+	WM_LOOP_WORKER = 1, //
+	WM_LOOP_CONNECTION = 2, //
+	WM_LOOP_RUNTIME = 3, //
+	WM_LOOP_SIGAL = 4, //
 };
 
 enum wmChannel_opcode {

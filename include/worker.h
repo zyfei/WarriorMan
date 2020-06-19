@@ -29,7 +29,8 @@ typedef struct _wmWorker {
 	int32_t backlog; //listen队列长度
 	wmString* socketName; // tcp://127.0.0.1:8080
 	char* user;//当前用户
-	char* transport; //协议
+	int transport; //协议
+	int sock_type;//是什么socket类型，比如tcp，udp等
 	char* host; //监听地址
 	int32_t port; //监听端口
 	int32_t count; //进程数量
