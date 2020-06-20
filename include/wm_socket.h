@@ -29,16 +29,26 @@ typedef struct {
 	int loop_type; //对应wmLoop_type这个枚举
 	int transport; //什么协议类型，比如TCP UDP等
 	wm_socket_func_t onBufferWillFull;
-	wm_socket_func_t onBufferFull;
 	char* connect_host;
 	int connect_port;
+
+	/**
+	 * runtime用
+	 */
+	bool shutdown_read;
+	bool shutdown_write;
 } wmSocket;
 
 wmSocket * wmSocket_create(int transport);
 wmSocket * wmSocket_create_by_fd(int fd, int transport);
 int wmSocket_read(wmSocket* socket, char *buf, int len);
 int wmSocket_send(wmSocket *socket, const void *buf, size_t len);
+int wmSocket_write(wmSocket *socket, const void *buf, size_t len);//不管缓冲区
 int wmSocket_close(wmSocket *socket);
 void wmSocket_free(wmSocket *socket);
-int wmSocket_connect(wmSocket *socket, char* _host, int _port);
+bool wmSocket_connect(wmSocket *socket, char* _host, int _port);
+wmSocket * wmSocket_accept(wmSocket* socket);
+ssize_t wmSocket_peek(wmSocket* socket, void *__buf, size_t __n);
+bool wmSocket_shutdown(wmSocket *socket, int __how);
+ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sockaddr* _addr, socklen_t *_socklen);
 #endif

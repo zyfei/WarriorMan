@@ -128,6 +128,15 @@ void loop_callback_coroutine_resume(int fd, int coro_id) {
 	}
 	wmCoroutine_resume(co);
 }
+void loop_callback_coroutine_resume_and_del(int fd, int coro_id) {
+	wmCoroutine* co = wmCoroutine_get_by_cid(coro_id);
+	if (co == NULL) {
+		wmWarn("Error has occurred: loop_callback_coroutine_resume . wmCoroutine is NULL");
+		return;
+	}
+	wmWorkerLoop_del(fd); //删除监听
+	wmCoroutine_resume(co);
+}
 
 /**
  *	设置event处理方式
@@ -167,7 +176,7 @@ loop_callback_func_t loop_get_handler(int event, int type) {
 }
 
 static int LOOP_TYPE = EPOLL_CTL_ADD;
-void wmWorkerLoop_add(int fd, int events, int fdtype) {
+bool wmWorkerLoop_add(int fd, int events, int fdtype) {
 	//初始化epoll
 	if (!WorkerG.poll) {
 		init_wmPoll();
@@ -176,7 +185,7 @@ void wmWorkerLoop_add(int fd, int events, int fdtype) {
 	//没有事件
 	if (events == WM_EVENT_NULL) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		return;
+		return false;
 	}
 
 	long coro_id = 0;
@@ -200,14 +209,17 @@ void wmWorkerLoop_add(int fd, int events, int fdtype) {
 	//注册到全局的epollfd上面。
 	if (epoll_ctl(WorkerG.poll->epollfd, LOOP_TYPE, fd, ev) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		return;
+		return false;
 	}
+	return true;
 }
 
-void wmWorkerLoop_update(int fd, int events, int fdtype) {
+bool wmWorkerLoop_update(int fd, int events, int fdtype) {
+	bool loop_return;
 	LOOP_TYPE = EPOLL_CTL_MOD;
-	wmWorkerLoop_add(fd, events, fdtype);
+	loop_return = wmWorkerLoop_add(fd, events, fdtype);
 	LOOP_TYPE = EPOLL_CTL_ADD;
+	return loop_return;
 }
 
 void wmWorkerLoop_del(int fd) {
@@ -250,6 +262,7 @@ void wmWorkerLoop_loop() {
 			if (fd == signal_fd[0]) {
 				sig_callback(fd);
 			}
+			php_printf("loop fd=%d,type=%d,event=%d", fd, fdtype, events[i].events);
 
 			//read
 			if (events[i].events & EPOLLIN) {
