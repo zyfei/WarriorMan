@@ -25,7 +25,6 @@ typedef struct {
 	wmSocket* socket; //创建的socket对象
 	zval* _This; //指向当前PHP类的指针
 	int _status; //当前连接的状态
-	int errcode; //错误码,onError根据这个错误码，来返回响应的错误
 
 	php_fci_fcc *onMessage;
 	php_fci_fcc *onClose;
@@ -33,7 +32,7 @@ typedef struct {
 	php_fci_fcc *onBufferDrain;
 	php_fci_fcc *onError;
 
-	wmString* read_packet_buffer;//用来保存返回给用户整个包的缓冲区
+	wmString* read_packet_buffer; //用来保存返回给用户整个包的缓冲区
 
 	void* worker; //所属于哪一个worker对象
 } wmConnection;
@@ -49,7 +48,7 @@ zend_object* wm_connection_create_object(zend_class_entry *ce);
 
 void wmConnection_init();
 void wmConnection_shutdown();
-wmConnection * wmConnection_create(int fd,int transport);
+wmConnection * wmConnection_create(int fd, int transport);
 wmConnection* wmConnection_find_by_fd(int fd);
 ssize_t wmConnection_recv(wmConnection *socket, int32_t length);
 void wmConnection_read(wmConnection* connection);

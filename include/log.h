@@ -22,9 +22,10 @@ enum wmCode {
 	 */
 	WM_ERROR_SESSION_CLOSED_BY_SERVER = 1001, //代表连接是被服务器关闭的，
 	WM_ERROR_SESSION_CLOSED_BY_CLIENT = 1002, //代表连接是被客户端关闭的。
-	WM_ERROR_SEND_FAIL = 1003, //发送失败
-	WM_ERROR_READ_FAIL = 1004, //接收失败
-	WM_ERROR_LOOP_FAIL = 1005, //LOOP回调错误
+	WM_ERROR_SESSION_CLOSED = 1003, //代表连接是被客户端关闭的。
+	WM_ERROR_SEND_FAIL = 1004, //发送失败
+	WM_ERROR_READ_FAIL = 1005, //接收失败
+	WM_ERROR_LOOP_FAIL = 1006, //LOOP回调错误
 };
 
 #define wmDebug(wmr, ...)                                                         \

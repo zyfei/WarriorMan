@@ -44,12 +44,18 @@ void wmLog_put(int level, char *cnt) {
 }
 
 const char* wmCode_str(int code) {
+	if (code < 1000) {
+		return strerror(code);
+	}
 	switch (code) {
 	case WM_ERROR_SESSION_CLOSED_BY_SERVER:
 		return "Session closed by worker";
 		break;
 	case WM_ERROR_SESSION_CLOSED_BY_CLIENT:
 		return "Session closed by client";
+		break;
+	case WM_ERROR_SESSION_CLOSED:
+		return "Session has closed";
 		break;
 	case WM_ERROR_SEND_FAIL:
 		return "send buffer full and drop package";
@@ -60,6 +66,7 @@ const char* wmCode_str(int code) {
 	case WM_ERROR_LOOP_FAIL:
 		return "loop error";
 		break;
+
 	default:
 		snprintf(wm_error, sizeof(wm_error), "Unknown error: %d", code);
 		return wm_error;

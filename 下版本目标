@@ -5,3 +5,5 @@
 4 stdoutFile功能(完成)
 
 5 hook mysql pdo查询
+
+--改造 socket read方法，增加是否监听read的判断  没考虑清楚

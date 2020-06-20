@@ -154,14 +154,12 @@ static int php_wm_tcp_sockop_bind(php_stream *stream, php_wm_netstream_data_t *a
 //	if (!sock) {
 //		return FAILURE;
 //	}
-//	WM_SOCK_TCP
-//	sock->transport
-//	if (sock->get_type() == SW_SOCK_TCP || sock->get_type() == SW_SOCK_TCP6 || sock->get_type() == SW_SOCK_UDP || sock->get_type() == SW_SOCK_UDP6) {
+//	if (sock->transport == WM_SOCK_TCP || sock->transport == WM_SOCK_UDP) {
 //		ip_address = parse_ip_address_ex(xparam->inputs.name, xparam->inputs.namelen, &portno, xparam->want_errortext, &xparam->outputs.error_text);
 //		host = ip_address;
-//		if (sock->get_sock_type() == SOCK_STREAM) {
+//		if (sock->transport == WM_SOCK_TCP) { //SOCK_STREAM
 //			int sockoptval = 1;
-//			setsockopt(sock->get_fd(), IPPROTO_TCP, TCP_NODELAY, (char*) &sockoptval, sizeof(sockoptval));
+//			setsockopt(sock->fd, IPPROTO_TCP, TCP_NODELAY, (char*) &sockoptval, sizeof(sockoptval));
 //		}
 //	} else {
 //		host = xparam->inputs.name;
@@ -169,8 +167,8 @@ static int php_wm_tcp_sockop_bind(php_stream *stream, php_wm_netstream_data_t *a
 //	if (host == NULL) {
 //		return FAILURE;
 //	}
-//	if (xparam->inputs.timeout) {
-//		sock->set_timeout(xparam->inputs.timeout, SW_TIMEOUT_CONNECT);
+//	if (xparam->inputs.timeout) { //暂时没有超时设置
+//		//sock->set_timeout(xparam->inputs.timeout, SW_TIMEOUT_CONNECT);
 //	}
 //	if (sock->connect(host, portno) == false) {
 //		xparam->outputs.error_code = sock->errCode;
@@ -184,18 +182,17 @@ static int php_wm_tcp_sockop_bind(php_stream *stream, php_wm_netstream_data_t *a
 //	}
 //	return ret;
 //}
-//
+
 static inline int socket_xport_api(php_stream *stream, wmSocket *sock, php_stream_xport_param *xparam STREAMS_DC) {
-	return PHP_STREAM_OPTION_RETURN_OK;
 //	static const int shutdown_how[] = { SHUT_RD, SHUT_WR, SHUT_RDWR };
 //	switch (xparam->op) {
 //	case STREAM_XPORT_OP_LISTEN: {
-//		xparam->outputs.returncode = wm_socket_listen(abstract->socket->fd, xparam->inputs.backlog) ? 0 : -1;
+//		xparam->outputs.returncode = wm_socket_listen(abstract->socket->fd, xparam->inputs.backlog) ? 0 : -1; //listen
 //		break;
 //	}
 //	case STREAM_XPORT_OP_CONNECT:
 //	case STREAM_XPORT_OP_CONNECT_ASYNC:
-//		xparam->outputs.returncode = socket_connect(stream, sock, xparam);
+//		xparam->outputs.returncode = socket_connect(stream, sock, xparam); //connect
 //		break;
 //	case STREAM_XPORT_OP_BIND: {
 //		if (sock->get_sock_domain() != AF_UNIX) {
@@ -278,7 +275,7 @@ static inline int socket_xport_api(php_stream *stream, wmSocket *sock, php_strea
 //#endif
 //		break;
 //	}
-//	return PHP_STREAM_OPTION_RETURN_OK;
+	return PHP_STREAM_OPTION_RETURN_OK;
 }
 
 static int socket_set_option(php_stream *stream, int option, int value, void *ptrparam) {

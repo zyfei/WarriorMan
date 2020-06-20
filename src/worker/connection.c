@@ -50,7 +50,6 @@ wmConnection * wmConnection_create(int fd, int transport) {
 	connection->onBufferDrain = NULL;
 	connection->onError = NULL;
 
-	connection->errcode = 0;
 	connection->read_packet_buffer = NULL;
 	if (connection->fd < 0) {
 		wm_coroutine_socket_last_id = 0;
@@ -104,13 +103,11 @@ void wmConnection_read(wmConnection* connection) {
 
 		//触发onError
 		if (ret == WM_SOCKET_ERROR) {
-			connection->errcode = WM_ERROR_READ_FAIL;
 			onError(connection);
 			return;
 		}
 		//触发onClose
 		if (ret == WM_SOCKET_CLOSE) {
-			connection->errcode = WM_ERROR_SESSION_CLOSED_BY_CLIENT;
 			onClose(connection);
 			return;
 		}
@@ -178,8 +175,16 @@ void bufferWillFull(void *_connection) {
 //检查是否已经满了,并回调
 void bufferIsFull(void *_connection) {
 	wmConnection* connection = (wmConnection*) _connection;
-	connection->errcode = WM_ERROR_SEND_FAIL;
-	onError(connection);
+	if (connection->onError) {
+		//构建zval，默认的引用计数是1，在php方法调用完毕释放
+		zval* _mess_data = (zval*) emalloc(sizeof(zval) * 3);
+		_mess_data[0] = *connection->_This;
+		ZVAL_LONG(&_mess_data[1], WM_ERROR_SEND_FAIL);
+		zend_string* _zs = zend_string_init(wmCode_str(WM_ERROR_SEND_FAIL), strlen(wmCode_str(WM_ERROR_SEND_FAIL)), 0);
+		ZVAL_STR(&_mess_data[2], _zs);
+		long _cid = wmCoroutine_create(&(connection->onError->fcc), 3, _mess_data); //创建新协程
+		wmCoroutine_set_callback(_cid, onError_callback, _mess_data);
+	}
 }
 
 //这是一个用户调用的方法
@@ -206,7 +211,9 @@ void loopError(int fd, int coro_id) {
 	if (connection == NULL) {
 		return;
 	}
-	connection->errcode = WM_ERROR_LOOP_FAIL;
+	//设置错误码
+	connection->socket->errCode = WM_ERROR_LOOP_FAIL;
+	connection->socket->errMsg = wmCode_str(connection->socket->errCode);
 	onError(connection);
 }
 
@@ -214,24 +221,27 @@ void loopError(int fd, int coro_id) {
  * 处理epoll失败的情况
  */
 void onError(wmConnection *connection) {
-	wmWarn("Error has occurred: (fd=%d,errno %d) %s", connection->fd, errno, strerror(errno));
+	wmWarn("onError: (fd=%d,errno %d) %s", connection->fd, connection->socket->errCode, connection->socket->errMsg);
 
-	if (connection->errcode) {
-		zend_update_property_long(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errCode"), connection->errcode);
-		zend_update_property_string(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errMsg"), wmCode_str(connection->errcode));
+	if (connection->socket->errCode) {
+		zend_update_property_long(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errCode"), connection->socket->errCode);
+		zend_update_property_string(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errMsg"), connection->socket->errMsg);
 	}
 
 	if (connection->onError) {
 		//构建zval，默认的引用计数是1，在php方法调用完毕释放
 		zval* _mess_data = (zval*) emalloc(sizeof(zval) * 3);
 		_mess_data[0] = *connection->_This;
-		ZVAL_LONG(&_mess_data[1], connection->errcode);
-		zend_string* _zs = zend_string_init(wmCode_str(connection->errcode), strlen(wmCode_str(connection->errcode)), 0);
+		ZVAL_LONG(&_mess_data[1], connection->socket->errCode);
+		zend_string* _zs = zend_string_init(connection->socket->errMsg, strlen(connection->socket->errMsg), 0);
 		ZVAL_STR(&_mess_data[2], _zs);
 		long _cid = wmCoroutine_create(&(connection->onError->fcc), 3, _mess_data); //创建新协程
 		wmCoroutine_set_callback(_cid, onError_callback, _mess_data);
 	}
-	onClose(connection);
+
+	if (connection->socket->closed) {
+		onClose(connection);
+	}
 }
 
 /**
@@ -240,11 +250,6 @@ void onError(wmConnection *connection) {
 int onClose(wmConnection *connection) {
 	if (connection->_status == WM_CONNECTION_STATUS_CLOSED) {
 		return 0;
-	}
-
-	if (connection->errcode) {
-		zend_update_property_long(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errCode"), connection->errcode);
-		zend_update_property_string(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errMsg"), wmCode_str(connection->errcode));
 	}
 
 	wmWorkerLoop_del(connection->fd); //释放事件

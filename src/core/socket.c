@@ -54,6 +54,32 @@ int wm_socket_bind(int sock, char *host, int port) {
 	return ret;
 }
 
+/**
+ * 对connect进行封装
+ */
+int wm_socket_connect(int sock, char *host, int port) {
+	if (port <= 0 || port >= 65536) {
+		wmWarn("Invalid port [%d]", port);
+		return -1;
+	}
+
+	int ret;
+	struct sockaddr_in servaddr;
+
+	//初始化servaddr
+	bzero(&servaddr, sizeof(servaddr));
+	//将host转换为网络结构体sockaddr_in
+	inet_aton(host, &(servaddr.sin_addr));
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_port = htons(port);
+	//把socket和地址，端口绑定
+	ret = connect(sock, (struct sockaddr *) &servaddr, sizeof(servaddr));
+	if (ret < 0) {
+		return -1;
+	}
+	return ret;
+}
+
 int wm_socket_listen(int sock, int backlog) {
 	int ret;
 
