@@ -79,13 +79,11 @@ wmSocket * wmSocket_accept(wmSocket* socket) {
  * 作为客户端连接
  */
 bool wmSocket_connect(wmSocket *socket, char* _host, int _port) {
-	printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
 	int retval;
 	if (!socket->closed) {
 		do {
 			retval = wm_socket_connect(socket->fd, _host, _port);
 		} while (retval < 0 && errno == EINTR);
-		printf("a=%d errno=%d ====================\n", retval, errno);
 		if (retval < 0) {
 			if (errno != EINPROGRESS) {
 				set_err(socket, errno);
@@ -103,7 +101,6 @@ bool wmSocket_connect(wmSocket *socket, char* _host, int _port) {
 				return false;
 			}
 		}
-		printf("!!!!!!!!!!!!!!!!!!!!!!1 \n");
 		socket->connect_host = _host;
 		socket->connect_port = _port;
 		set_err(socket, 0);

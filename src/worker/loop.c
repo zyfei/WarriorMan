@@ -1,60 +1,10 @@
 #include "loop.h"
 
+static int LOOP_TYPE = EPOLL_CTL_ADD;
+
 static loop_callback_func_t read_handler[7];
 static loop_callback_func_t write_handler[7];
 static loop_callback_func_t error_handler[7];
-
-/**
- * 创建的信号通道
- * 载epoll版本信号
- * [0] 是读
- * [1] 是写
- */
-static int signal_fd[2] = { 0, 0 };
-static wmArray* signal_handler_array = NULL;
-static char signals[1024];
-
-/**
- * 一旦出现信号，写入signal_fd中
- */
-void sig_handler(int sigalno) {
-	//保留原来的errno，在函数最后回复，以保证函数的可重入性
-	int save_errno = errno;
-	int msg = sigalno;
-
-	//将信号值写入管代，通知主循环。
-	//向1里面写，从0里面读
-	if (wm_socket_send(signal_fd[1], (char*) &msg, 1, 0) <= 0) {
-		php_printf("The message sent to the server failed\n");
-	}
-	errno = save_errno;
-}
-
-/**
- * 读信号，并且处理信号
- */
-void sig_callback(int fd) {
-	int recv_ret_value;
-	do {
-		recv_ret_value = wm_socket_recv(signal_fd[0], signals, sizeof(signals), 0);
-	} while (recv_ret_value < 0 && errno == EAGAIN);
-
-	if (recv_ret_value == 0) { //信号fd被关闭了
-		wmError("signal_fd be closed");
-		exit(1);
-	}
-	if (recv_ret_value < 0) { //信号fd被关闭了
-		wmWarn("signal_fd read error");
-	} else {
-		//每个信号值占1字节，所以按字节来逐个接收信号
-		for (int i = 0; i < recv_ret_value; ++i) {
-			loop_func_t fn = wmArray_find(signal_handler_array, signals[i]);
-			if (fn) {
-				fn(signals[i]);
-			}
-		}
-	}
-}
 
 //把我们自己的events转换成epoll的
 static inline int event_decode(int events) {
@@ -76,45 +26,6 @@ static inline int event_decode(int events) {
 		flag |= (EPOLLRDHUP | EPOLLHUP | EPOLLERR);
 	}
 	return flag;
-}
-
-void wmWorkerLoop_add_sigal(int sigal, loop_func_t fn) {
-	if (signal_fd[0] == 0) {
-		//创建一对互相连接的，全双工管道
-		if (socketpair(PF_UNIX, SOCK_STREAM, 0, signal_fd) == -1) {
-			wmError("socketpair");
-			exit(1);
-		}
-		/* sockpair函数创建的管道是全双工的，不区分读写端
-		 * 此处我们假设pipe_fd[1]为写端，非阻塞
-		 * pipe_fd[0]为读端
-		 */
-		wm_socket_set_nonblock(signal_fd[0]);
-		wm_socket_set_nonblock(signal_fd[1]);
-
-		//最后加入loop
-		wmWorkerLoop_add(signal_fd[0], WM_EVENT_READ, WM_LOOP_SIGAL);
-	}
-
-	if (signal_handler_array == NULL) {
-		signal_handler_array = wmArray_new(64, sizeof(loop_func_t));
-		signal_handler_array->page_num = 64;
-	}
-
-	struct sigaction act;
-	bzero(&act, sizeof(act));
-	act.sa_handler = sig_handler; //设置信号处理函数
-	sigfillset(&act.sa_mask); //初始化信号屏蔽集
-	act.sa_flags |= SA_RESTART; //由此信号中断的系统调用自动重启动
-
-	//初始化信号处理函数
-	if (sigaction(sigal, &act, NULL) == -1) {
-		php_printf("capture signal,but to deal with failure\n");
-		return;
-	}
-
-	//加入信号数组中
-	wmArray_set(signal_handler_array, sigal, fn);
 }
 
 /**
@@ -166,6 +77,9 @@ loop_callback_func_t loop_get_handler(int event, int type) {
 	case EPOLLIN:
 		handlers = read_handler;
 		break;
+	case EPOLLOUT:
+		handlers = write_handler;
+		break;
 	default:
 		handlers = error_handler;
 	}
@@ -175,7 +89,6 @@ loop_callback_func_t loop_get_handler(int event, int type) {
 	return NULL;
 }
 
-static int LOOP_TYPE = EPOLL_CTL_ADD;
 bool wmWorkerLoop_add(int fd, int events, int fdtype) {
 	//初始化epoll
 	if (!WorkerG.poll) {
@@ -259,10 +172,6 @@ void wmWorkerLoop_loop() {
 
 			int coro_id = (int) (v & 0xffffffff);
 
-			if (fd == signal_fd[0]) {
-				sig_callback(fd);
-			}
-
 			//read
 			if (events[i].events & EPOLLIN) {
 				fn = loop_get_handler(EPOLLIN, fdtype);
@@ -274,7 +183,7 @@ void wmWorkerLoop_loop() {
 
 			//write 如果是可写，那么就恢复协程
 			if (events[i].events & EPOLLOUT) {
-				fn = loop_get_handler(EPOLLIN, fdtype);
+				fn = loop_get_handler(EPOLLOUT, fdtype);
 				if (fn != NULL) {
 					_c = 1;
 					fn(fd, coro_id);

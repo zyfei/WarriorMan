@@ -3,7 +3,6 @@
 
 #include "base.h"
 #include "coroutine.h"
-#include "array.h"
 #include "socket.h"
 #include "log.h"
 
@@ -19,7 +18,6 @@ void loop_callback_coroutine_resume_and_del(int fd, int coro_id);
 #define WM_LOOP_RESUME_AND_DEL loop_callback_coroutine_resume_and_del
 
 bool wmWorkerLoop_set_handler(int event, int type, loop_callback_func_t fn);
-void wmWorkerLoop_add_sigal(int sigal, loop_func_t fn);
 bool wmWorkerLoop_add(int fd, int events, int fdtype);
 bool wmWorkerLoop_update(int fd, int events, int fdtype);
 void wmWorkerLoop_loop();

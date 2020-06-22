@@ -5,16 +5,16 @@ Warriorman\Runtime::enableCoroutine();
 Warriorman::create(function () {
 	$worker = new Warriorman\Worker("tcp://0.0.0.0:8080", array(
 		"backlog" => 1234, // 默认102400，等待accept的连接队列长度
-		"count" => 1 // 进程数量
+		"count" => 5 // 进程数量
 	));
 	$worker->name = "tcpServer"; // 设置名字
 	
 	$worker->onWorkerStart = function ($worker) {
 		var_dump("onWorkerStart ->" . $worker->workerId);
-		global $db;
-		$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "qipai_pingtai");
-		$len = $db->query("select count(*) from a_agent");
-		var_dump($len);
+// 		global $db;
+// 		$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "qipai_pingtai");
+// 		$len = $db->query("select count(*) from a_agent");
+// 		var_dump($len);
 	};
 	
 	$worker->onConnect = function ($connection) {
@@ -28,9 +28,9 @@ Warriorman::create(function () {
 		$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worla\r\n";
 		$connection->send($responseStr);
 		
-		global $db;
-		$len = $db->query("select count(*) from a_agent");
-		var_dump($len);
+// 		global $db;
+// 		$len = $db->query("select count(*) from a_agent");
+// 		var_dump($len);
 	};
 	
 	$worker->onBufferFull = function ($connection) {
@@ -50,7 +50,7 @@ Warriorman::create(function () {
 	// 监听另外一个端口
 	$worker2 = new Warriorman\Worker("tcp://0.0.0.0:8081", array(
 		"backlog" => 1234, // 默认102400，等待accept的连接队列长度
-		"count" => 1 // 进程数量
+		"count" => 5 // 进程数量
 	));
 	$worker2->onMessage = function ($connection, $data) {
 		$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";

@@ -1,6 +1,7 @@
 #include "worker.h"
+
+#include "../include/worker/wm_signal.h"
 #include "coroutine.h"
-#include "loop.h"
 
 static unsigned int _last_id = 0;
 static wmString *_processTitle = NULL;
@@ -230,13 +231,14 @@ void monitorWorkers() {
 					if (*_pid == pid) { //找到正主了，就是这个孙子自己先退出了，办他
 						wmArray_set(pid_arr, i, &zero);
 						wmWorker* worker = WM_HASH_GET(WM_HASH_INT_STR, _workers, worker_id);
-						if (WIFEXITED(status) != 0) {
+						if (WIFEXITED(status) == 0) { //不是正常结束的
+							int exit_code = WEXITSTATUS(status);
 							if (WIFSIGNALED(status)) {
-								_log("1worker:%s pid:%d exit with status %d", worker->name->str, pid, WTERMSIG(status));
+								_log("worker:%s pid:%d exit(%d) with status %d", worker->name->str, pid, exit_code, WTERMSIG(status));
 							} else if (WIFSTOPPED(status)) {
-								_log("2worker:%s pid:%d exit with status %d", worker->name->str, pid, WSTOPSIG(status));
+								_log("worker:%s pid:%d exit(%d) with status %d", worker->name->str, pid, exit_code, WSTOPSIG(status));
 							} else {
-								_log("3worker:%s pid:%dexit with status unknow", worker->name->str, pid);
+								_log("worker:%s pid:%d exit(%d)", worker->name->str, pid, exit_code);
 							}
 						}
 						break;
@@ -954,9 +956,9 @@ void reinstallSignal() {
 	// 忽略 status
 	signal(SIGUSR2, SIG_IGN);
 
-	wmWorkerLoop_add_sigal(SIGINT, signalHandler);
-	wmWorkerLoop_add_sigal(SIGUSR1, signalHandler);
-	wmWorkerLoop_add_sigal(SIGUSR2, signalHandler);
+	wmSignal_add(SIGINT, signalHandler);
+	wmSignal_add(SIGUSR1, signalHandler);
+	wmSignal_add(SIGUSR2, signalHandler);
 }
 
 char* getCurrentUser() {
