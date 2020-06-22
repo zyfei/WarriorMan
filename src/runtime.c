@@ -25,8 +25,6 @@ void wmRuntime_shutdown() {
 ///////
 
 static RUNTIME_SIZE_T socket_write(php_stream *stream, const char *buf, size_t count) {
-	php_printf("socket_write\n");
-php_printf("write_buf=%.*s \n",count,buf);
 	php_wm_netstream_data_t *abstract = (php_wm_netstream_data_t *) stream->abstract;
 	if (UNEXPECTED(!abstract)) {
 		return 0;
@@ -37,7 +35,6 @@ php_printf("write_buf=%.*s \n",count,buf);
 		return 0;
 	}
 	didwrite = wmSocket_write(sock, buf, count);
-	php_printf("write size:%d\n",didwrite);
 	if (didwrite > 0) {
 		php_stream_notify_progress_increment(PHP_STREAM_CONTEXT(stream), didwrite, 0);
 	}
@@ -50,7 +47,6 @@ php_printf("write_buf=%.*s \n",count,buf);
 }
 
 static RUNTIME_SIZE_T socket_read(php_stream *stream, char *buf, size_t count) {
-	php_printf("socket_read\n");
 	php_wm_netstream_data_t *abstract = (php_wm_netstream_data_t *) stream->abstract;
 	if (UNEXPECTED(!abstract)) {
 		return 0;
@@ -61,7 +57,6 @@ static RUNTIME_SIZE_T socket_read(php_stream *stream, char *buf, size_t count) {
 		return 0;
 	}
 	nr_bytes = wmSocket_read(sock, buf, count);
-php_printf("read_buf len=%d \n",nr_bytes);
 	if (nr_bytes == WM_SOCKET_ERROR || nr_bytes == WM_SOCKET_CLOSE) {
 		stream->eof = 0;
 	}
@@ -77,7 +72,6 @@ php_printf("read_buf len=%d \n",nr_bytes);
 }
 
 static int socket_close(php_stream *stream, int close_handle) {
-	php_printf("socket_close \n");
 	php_wm_netstream_data_t *abstract = (php_wm_netstream_data_t *) stream->abstract;
 	wmSocket* sock = abstract->socket;
 	wmSocket_free(sock);
@@ -86,12 +80,10 @@ static int socket_close(php_stream *stream, int close_handle) {
 }
 
 static int socket_flush(php_stream *stream) {
-	php_printf("socket_flush \n");
 	return 0;
 }
 
 static int socket_cast(php_stream *stream, int castas, void **ret) {
-	php_printf("socket_cast \n");
 
 	php_wm_netstream_data_t *abstract = (php_wm_netstream_data_t *) stream->abstract;
 	if (UNEXPECTED(!abstract)) {
@@ -124,7 +116,6 @@ static int socket_cast(php_stream *stream, int castas, void **ret) {
 }
 
 static int socket_stat(php_stream *stream, php_stream_statbuf *ssb) {
-	php_printf("socket_stat \n");
 
 	php_wm_netstream_data_t *abstract = (php_wm_netstream_data_t *) stream->abstract;
 	if (UNEXPECTED(!abstract)) {
@@ -138,11 +129,9 @@ static int socket_stat(php_stream *stream, php_stream_statbuf *ssb) {
 }
 
 static int socket_bind(php_stream *stream, wmSocket *sock, php_stream_xport_param *xparam) {
-	php_printf("socket_bind \n");
 
 	char *host = NULL;
 	int portno;
-	php_printf("xp= %s", xparam->inputs.name);
 	host = parse_ip_address(xparam, &portno);
 	if (host == NULL) {
 		return -1;
@@ -158,8 +147,6 @@ static int socket_bind(php_stream *stream, wmSocket *sock, php_stream_xport_para
  * php socket的connect方法
  */
 static int socket_connect(php_stream *stream, wmSocket *sock, php_stream_xport_param *xparam) {
-	php_printf("socket_connect \n");
-
 	char *host = NULL;
 	int portno = 0;
 	int ret = 0;
@@ -197,8 +184,6 @@ static int socket_connect(php_stream *stream, wmSocket *sock, php_stream_xport_p
 }
 
 static inline int socket_accept(php_stream *stream, wmSocket *sock, php_stream_xport_param *xparam STREAMS_DC) {
-	php_printf("socket_accept \n");
-
 	int tcp_nodelay = 0;
 	zval *tmpzval = NULL;
 
@@ -260,8 +245,6 @@ static inline int socket_accept(php_stream *stream, wmSocket *sock, php_stream_x
 }
 
 static inline int socket_sendto(wmSocket *sock, const char *buf, size_t buflen, struct sockaddr *addr, socklen_t addrlen) {
-	php_printf("socket_sendto \n");
-
 	if (addr) {
 		return sendto(sock->fd, buf, buflen, 0, addr, addrlen);
 	} else {
@@ -270,8 +253,6 @@ static inline int socket_sendto(wmSocket *sock, const char *buf, size_t buflen, 
 }
 
 static inline int socket_recvfrom(wmSocket *sock, char *buf, size_t buflen, zend_string **textaddr, struct sockaddr **addr, socklen_t *addrlen) {
-	php_printf("socket_recvfrom \n");
-
 	int ret;
 	int want_addr = textaddr || addr;
 
@@ -410,7 +391,9 @@ static int socket_set_option(php_stream *stream, int option, int value, void *pt
 		break;
 	}
 	case PHP_STREAM_OPTION_READ_TIMEOUT: {
-		php_printf("PHP_STREAM_OPTION_READ_TIMEOUT ! hai mei you\n");
+		struct timeval* a = (struct timeval*) ptrparam;
+		php_printf("time out %ld\n",a->tv_sec);
+		php_printf("PHP_STREAM_OPTION_READ_TIMEOUT  mei shi xian\n");
 		//abstract->socket->set_timeout((struct timeval*) ptrparam, SW_TIMEOUT_READ);
 		break;
 	}
@@ -446,8 +429,6 @@ static php_stream_ops tcp_socket_ops = { //
 php_stream *wmRuntime_socket_create(const char *proto, size_t protolen, const char *resourcename, size_t resourcenamelen, //
 	const char *persistent_id, int options, int flags, struct timeval *timeout, php_stream_context *context STREAMS_DC
 	) {
-	php_printf("wmRuntime_socket_create \n");
-
 	php_stream *stream;
 	php_wm_netstream_data_t *abstract;
 	wmSocket *sock;

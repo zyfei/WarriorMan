@@ -262,7 +262,6 @@ void wmWorkerLoop_loop() {
 			if (fd == signal_fd[0]) {
 				sig_callback(fd);
 			}
-			php_printf("loop fd=%d,type=%d,event=%d", fd, fdtype, events[i].events);
 
 			//read
 			if (events[i].events & EPOLLIN) {
