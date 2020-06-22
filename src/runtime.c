@@ -11,14 +11,9 @@ typedef struct {
 #define RUNTIME_SIZE_T ssize_t
 #endif
 
-//////
-void loopError(int fd, int coro_id) {
-	wmWarn("Runtime loopError fd=%d , coro_id=%d", fd, coro_id);
-}
 void wmRuntime_init() {
-	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_RUNTIME, WM_LOOP_RESUME_AND_DEL);
-	wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_RUNTIME, WM_LOOP_RESUME_AND_DEL);
-	wmWorkerLoop_set_handler(WM_EVENT_ERROR, WM_LOOP_RUNTIME, loopError);
+	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_RUNTIME, WM_LOOP_RESUME);
+	wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_RUNTIME, WM_LOOP_RESUME);
 }
 void wmRuntime_shutdown() {
 }

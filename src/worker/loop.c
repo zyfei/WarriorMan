@@ -16,14 +16,8 @@ static inline int event_decode(int events) {
 	if (events & WM_EVENT_WRITE) {
 		flag |= EPOLLOUT;
 	}
-	if (events & WM_EVENT_ONCE) {
-		flag |= EPOLLONESHOT;
-	}
 	if (events & WM_EVENT_EPOLLEXCLUSIVE) { //避免惊群
 		flag |= EPOLLEXCLUSIVE;
-	}
-	if (events & WM_EVENT_ERROR) {
-		flag |= (EPOLLRDHUP | EPOLLHUP | EPOLLERR);
 	}
 	return flag;
 }
@@ -60,9 +54,6 @@ bool wmWorkerLoop_set_handler(int event, int type, loop_callback_func_t fn) {
 		break;
 	case WM_EVENT_WRITE:
 		handlers = write_handler;
-		break;
-	case WM_EVENT_ERROR:
-		handlers = error_handler;
 		break;
 	default:
 		return false;
@@ -153,7 +144,6 @@ void wmWorkerLoop_loop() {
 	int n;
 	long mic_time;
 	loop_callback_func_t fn;
-	int _c = 0; //是否可以处理这个epoll信号，不能处理就del他
 	while (WorkerG.is_running) {
 		//毫秒级定时器，必须是1
 		int timeout = 1;
@@ -162,7 +152,6 @@ void wmWorkerLoop_loop() {
 		n = epoll_wait(WorkerG.poll->epollfd, events, WorkerG.poll->ncap, timeout);
 		//循环处理epoll请求
 		for (int i = 0; i < n; i++) {
-			_c = 0;
 			uint64_t v = events[i].data.u64;
 
 			int fdtype = (int) (v >> 61);
@@ -172,11 +161,12 @@ void wmWorkerLoop_loop() {
 
 			int coro_id = (int) (v & 0xffffffff);
 
+			php_printf("loop fd=%d\n",fd);
+
 			//read
 			if (events[i].events & EPOLLIN) {
 				fn = loop_get_handler(EPOLLIN, fdtype);
 				if (fn != NULL) {
-					_c = 1;
 					fn(fd, coro_id);
 				}
 			}
@@ -185,28 +175,10 @@ void wmWorkerLoop_loop() {
 			if (events[i].events & EPOLLOUT) {
 				fn = loop_get_handler(EPOLLOUT, fdtype);
 				if (fn != NULL) {
-					_c = 1;
 					fn(fd, coro_id);
 				}
 			}
 
-			//error
-			if ((events[i].events & (EPOLLRDHUP | EPOLLERR | EPOLLHUP)) && _c == 0) {
-				fn = loop_get_handler(0, fdtype);
-				if (fn != NULL) {
-					_c = 1;
-					fn(fd, coro_id);
-					break;
-				}
-				wmWarn("loop  Error has occurred: (errno %d) %s", errno, strerror(errno));
-			}
-
-			/**
-			 * 没有人可以处理的fd，赶快删掉避免死循环
-			 */
-			if (_c == 0) {
-				wmWorkerLoop_del(fd);
-			}
 		}
 		//有定时器才更新
 		if (WorkerG.timer.num > 0) {

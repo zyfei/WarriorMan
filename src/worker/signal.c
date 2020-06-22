@@ -27,24 +27,28 @@ void sig_handler(int signalno) {
 }
 
 /**
- * 读信号，并且处理信号
+ * 等待&处理signal信号
  */
-void sig_callback(int fd, int coro_id) {
-	int recv_ret_value;
-	do {
-		recv_ret_value = wm_socket_recv(signal_fd[0], signals, sizeof(signals), 0);
-	} while (recv_ret_value < 0 && errno == EAGAIN);
-
-	if (recv_ret_value <= 0) { //信号fd被关闭了
-		wmError("signal_fd be closed");
-	}
-	//每个信号值占1字节，所以按字节来逐个接收信号
-	for (int i = 0; i < recv_ret_value; ++i) {
-		int signal = signals[i];
-		if (signal_handler_array[signal] != 0) {
-			signal_handler_array[signal](signals[i]);
+void wmSignal_wait() {
+	wmSocket* socket = wmSocket_create_by_fd(signal_fd[0], WM_SOCK_TCP);
+	//监听read事件
+	socket->events = WM_EVENT_READ;
+	wmWorkerLoop_add(socket->fd, socket->events, WM_LOOP_WORKER);
+	while (1) {
+		int ret = wmSocket_read(socket, signals, 1024);
+		if (ret < 0) {
+			break;
+		}
+		//每个信号值占1字节，所以按字节来逐个接收信号
+		for (int i = 0; i < ret; ++i) {
+			int signal = signals[i];
+			if (signal_handler_array[signal] != 0) {
+				signal_handler_array[signal](signals[i]);
+			}
 		}
 	}
+	wmError("signal socket closed. server exist")
+
 }
 
 void wmSignal_add(int signal, signal_func_t fn) {
@@ -59,12 +63,6 @@ void wmSignal_add(int signal, signal_func_t fn) {
 		 */
 		wm_socket_set_nonblock(signal_fd[0]);
 		wm_socket_set_nonblock(signal_fd[1]);
-
-		//添加信号的读监听配置
-		wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_SIGAL, sig_callback);
-
-		//最后加入loop
-		wmWorkerLoop_add(signal_fd[0], WM_EVENT_READ, WM_LOOP_SIGAL);
 	}
 
 	struct sigaction act;

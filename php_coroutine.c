@@ -1,7 +1,7 @@
 /**
  * 协程工具入口文件
  */
-#include "coroutine.h"
+#include "wm_signal.h"
 
 //创建协程接口参数声明
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_coroutine_create, 0, 0, 1) //
@@ -35,8 +35,6 @@ ZEND_END_ARG_INFO()
 PHP_FUNCTION(workerman_coroutine_create) {
 	zend_fcall_info fci = empty_fcall_info;
 	zend_fcall_info_cache fcc = empty_fcall_info_cache;
-	//zval result;
-
 	//第一个参数表示必传的参数个数，第二个参数表示最多传入的参数个数，-1代表可变参数
 	ZEND_PARSE_PARAMETERS_START(1, -1)
 				Z_PARAM_FUNC(fci, fcc)
@@ -46,13 +44,6 @@ PHP_FUNCTION(workerman_coroutine_create) {
 				// 这个宏设置fci.params指针的起始位置，以及fci.param_count的值
 				Z_PARAM_VARIADIC('*', fci.params, fci.param_count)			//
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE); //如果不满足传入条件，返回false
-	//函数的返回值，放入result
-	//fci.retval = &result;
-	//运行传入的函数
-	//	if (zend_call_function(&fci, &fcc) != SUCCESS) {
-	//		return;
-	//	}
-	//	*return_value = result;
 	long cid = wmCoroutine_create(&fcc, fci.param_count, fci.params);
 	RETURN_LONG(cid);
 }
@@ -143,6 +134,15 @@ PHP_METHOD(workerman_coroutine, sleep) {
 }
 
 /**
+ * 开始监听信号
+ * 私有静态方法&扩展内部使用
+ */
+PHP_METHOD(workerman_coroutine, signal_wait) {
+	wmSignal_wait();
+	RETURN_TRUE
+}
+
+/**
  * 我们需要对这个方法进行收集，放在变量 workerman_coroutine_methods里面
  */
 const zend_function_entry workerman_coroutine_methods[] = { //
@@ -156,6 +156,7 @@ const zend_function_entry workerman_coroutine_methods[] = { //
 		PHP_ME(workerman_coroutine, isExist, arginfo_workerman_coroutine_isExist, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 		PHP_ME(workerman_coroutine, defer, arginfo_workerman_coroutine_defer, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 		PHP_ME(workerman_coroutine, sleep, arginfo_workerman_coroutine_sleep, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
+		PHP_ME(workerman_coroutine, signal_wait, arginfo_workerman_coroutine_void, ZEND_ACC_PRIVATE | ZEND_ACC_STATIC) //
 		PHP_FE_END //
 		};
 

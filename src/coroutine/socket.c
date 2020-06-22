@@ -244,10 +244,9 @@ int wmSocket_send(wmSocket *socket, const void *buf, size_t len) {
 		ret_num += ret;
 		//发送完了，就直接返回
 		if (socket->write_buffer->offset == socket->write_buffer->length) {
-
 			//在这里取消事件注册，使用修改的方式
 			if (_add_Loop) {
-				socket->events = socket->events - WM_EVENT_WRITE;
+				socket->events &= (~WM_EVENT_WRITE);
 				wmWorkerLoop_update(socket->fd, socket->events, socket->loop_type);
 			}
 			socket->write_buffer->offset = 0;
@@ -326,6 +325,9 @@ bool event_wait(wmSocket* socket, int event) {
 		}
 	}
 	wmCoroutine_yield();
+	if (socket->loop_type == WM_LOOP_RUNTIME) {
+		wmWorkerLoop_del(socket->fd); //删除监听
+	}
 	return true;
 }
 

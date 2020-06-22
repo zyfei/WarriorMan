@@ -8,15 +8,12 @@ static wmString* _read_buffer_tmp = NULL; //每次read都从这里中转
 static void bufferWillFull(void *_connection);
 static int onClose(wmConnection *connection);
 static void onError(wmConnection *connection);
-//专门给loop回调用的
-static void loopError(int fd, int coro_id);
 
 void wmConnection_init() {
 	wm_connections = wmHash_init(WM_HASH_INT_STR);
 	_read_buffer_tmp = wmString_new(WM_BUFFER_SIZE_BIG);
 	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_CONNECTION, WM_LOOP_RESUME);
 	wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_CONNECTION, WM_LOOP_RESUME);
-	wmWorkerLoop_set_handler(WM_EVENT_ERROR, WM_LOOP_CONNECTION, loopError);
 }
 
 wmConnection * wmConnection_create(int fd, int transport) {
@@ -187,17 +184,6 @@ void wmConnection_close_connections() {
 		wmHash_del(WM_HASH_INT_STR, wm_connections, k);
 		onClose(conn);
 	}
-}
-
-void loopError(int fd, int coro_id) {
-	wmConnection* connection = wmConnection_find_by_fd(fd);
-	if (connection == NULL) {
-		return;
-	}
-	//设置错误码
-	connection->socket->errCode = WM_ERROR_LOOP_FAIL;
-	connection->socket->errMsg = wmCode_str(connection->socket->errCode);
-	onError(connection);
 }
 
 /**

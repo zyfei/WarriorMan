@@ -146,8 +146,18 @@ void wm_get_internal_function(zval *object, zend_class_entry* obj_ce, const char
 		zend_error_noreturn(E_CORE_ERROR, "Couldn't find implementation for method %s::%s", ZSTR_VAL(obj_ce->name), function_name);
 	}
 
-	fcic->called_scope = Z_OBJCE_P(object);
-	fcic->object = Z_OBJ_P(object);
+	if (object) {
+		fcic->called_scope = Z_OBJCE_P(object);
+	} else {
+		zend_class_entry *called_scope = zend_get_called_scope(EG(current_execute_data));
+
+		if (obj_ce && (!called_scope || !instanceof_function(called_scope, obj_ce))) {
+			fcic->called_scope = obj_ce;
+		} else {
+			fcic->called_scope = called_scope;
+		}
+	}
+	fcic->object = object ? Z_OBJ_P(object) : NULL;
 }
 
 /**

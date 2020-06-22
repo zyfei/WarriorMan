@@ -33,9 +33,7 @@ enum wmEvent_type {
 	WM_EVENT_NULL = 0, //
 	WM_EVENT_READ = 1u << 9, //
 	WM_EVENT_WRITE = 1u << 10, //
-	WM_EVENT_ERROR = 1u << 11, //
-	WM_EVENT_ONCE = 1u << 12, //只执行一次
-	WM_EVENT_EPOLLEXCLUSIVE = 1u << 13, //防止惊群效应
+	WM_EVENT_EPOLLEXCLUSIVE = 1u << 11, //防止惊群效应
 };
 
 /**

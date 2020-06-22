@@ -149,6 +149,11 @@ static inline int php_workerman_array_length_safe(zval *zarray) {
 }
 
 /**
+ * Coroutine类
+ */
+extern zend_class_entry workerman_coroutine_ce;
+extern zend_class_entry *workerman_coroutine_ce_ptr;
+/**
  * Socket类
  */
 extern zend_class_entry workerman_socket_ce;

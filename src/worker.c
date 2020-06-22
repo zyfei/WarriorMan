@@ -57,7 +57,6 @@ static void signalHandler(int signal);
 static void monitorWorkers();
 static void alarm_wait();
 static void displayUI();
-static void error_callback(int fd, int coro_id);
 static void echoWin(const char *format, ...);
 static char* getCurrentUser();
 void _log(const char *format, ...);
@@ -74,7 +73,6 @@ void wmWorker_init() {
 	_pid_array_tmp = wmArray_new(64, sizeof(int));
 
 	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_WORKER, WM_LOOP_RESUME);
-	wmWorkerLoop_set_handler(WM_EVENT_ERROR, WM_LOOP_WORKER, error_callback);
 }
 
 /**
@@ -319,7 +317,6 @@ void forkOneWorker(wmWorker* worker, int key) {
 		setUserAndGroup(worker);
 		//创建一个新协程去处理事件
 
-
 		//创建run协程 start
 		zend_fcall_info_cache run;
 		wm_get_internal_function(worker->_This, workerman_worker_ce_ptr, ZEND_STRL("run"), &run);
@@ -396,7 +393,7 @@ void initWorkers() {
 		_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("user"), 0);
 		if (_zval) {
 			if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
-				worker->user = wm_malloc(sizeof(char) *_zval->value.str->len + 1);
+				worker->user = wm_malloc(sizeof(char) * _zval->value.str->len + 1);
 				memcpy(worker->user, _zval->value.str->val, _zval->value.str->len);
 				worker->user[_zval->value.str->len] = '\0';
 			}
@@ -946,6 +943,9 @@ void installSignal() {
 	signal(SIGPIPE, SIG_IGN); //忽略由于对端连接关闭，导致进程退出的问题
 }
 
+/**
+ * 使用epoll重新处理信号
+ */
 void reinstallSignal() {
 	// 忽略 stop
 	signal(SIGINT, SIG_IGN);
@@ -957,6 +957,12 @@ void reinstallSignal() {
 	wmSignal_add(SIGINT, signalHandler);
 	wmSignal_add(SIGUSR1, signalHandler);
 	wmSignal_add(SIGUSR2, signalHandler);
+
+	//创建signal_wait协程 start
+	zend_fcall_info_cache signal_wait;
+	wm_get_internal_function(NULL, workerman_coroutine_ce_ptr, ZEND_STRL("signal_wait"), &signal_wait);
+	wmCoroutine_create(&signal_wait, 0, NULL);
+	//创建signal_wait协程 end
 }
 
 char* getCurrentUser() {
@@ -1110,34 +1116,27 @@ void wmWorker_free(wmWorker* worker) {
 		efree(worker->onClose);
 		wm_zend_fci_cache_discard(&worker->onClose->fcc);
 	}
-//	if (worker->onBufferFull != NULL) {
-//		efree(worker->onBufferFull);
-//		wm_zend_fci_cache_discard(&worker->onBufferFull->fcc);
-//	}
-//	if (worker->onBufferDrain != NULL) {
-//		efree(worker->onBufferDrain);
-//		wm_zend_fci_cache_discard(&worker->onBufferDrain->fcc);
-//	}
-//	if (worker->onError != NULL) {
-//		efree(worker->onError);
-//		wm_zend_fci_cache_discard(&worker->onError->fcc);
-//	}
-//	//删除并且释放所有连接
-//	wmConnection_close_connections();
-//
-//	//从workers中删除
-//	WM_HASH_DEL(WM_HASH_INT_STR, _workers, worker->id);
-//	WM_HASH_DEL(WM_HASH_INT_STR, _fd_workers, worker->fd);
-//
-//	wm_free(worker);
-//	worker = NULL;
-}
+	if (worker->onBufferFull != NULL) {
+		efree(worker->onBufferFull);
+		wm_zend_fci_cache_discard(&worker->onBufferFull->fcc);
+	}
+	if (worker->onBufferDrain != NULL) {
+		efree(worker->onBufferDrain);
+		wm_zend_fci_cache_discard(&worker->onBufferDrain->fcc);
+	}
+	if (worker->onError != NULL) {
+		efree(worker->onError);
+		wm_zend_fci_cache_discard(&worker->onError->fcc);
+	}
+	//删除并且释放所有连接
+	wmConnection_close_connections();
 
-/**
- * epoll发生错误，直接关闭
- */
-void error_callback(int fd, int coro_id) {
-	wmError("Worker_error_callback error,child worker exit(1)");
+	//从workers中删除
+	WM_HASH_DEL(WM_HASH_INT_STR, _workers, worker->id);
+	WM_HASH_DEL(WM_HASH_INT_STR, _fd_workers, worker->fd);
+
+	wm_free(worker);
+	worker = NULL;
 }
 
 void wmWorker_shutdown() {

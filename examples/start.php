@@ -11,10 +11,10 @@ Warriorman::create(function () {
 	
 	$worker->onWorkerStart = function ($worker) {
 		var_dump("onWorkerStart ->" . $worker->workerId);
-// 		global $db;
-// 		$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "qipai_pingtai");
-// 		$len = $db->query("select count(*) from a_agent");
-// 		var_dump($len);
+		global $db;
+		$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "qipai_pingtai");
+		$len = $db->query("select count(*) from a_agent");
+		var_dump($len);
 	};
 	
 	$worker->onConnect = function ($connection) {
@@ -28,9 +28,9 @@ Warriorman::create(function () {
 		$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worla\r\n";
 		$connection->send($responseStr);
 		
-// 		global $db;
-// 		$len = $db->query("select count(*) from a_agent");
-// 		var_dump($len);
+		global $db;
+		$len = $db->query("select count(*) from a_agent");
+		var_dump($len);
 	};
 	
 	$worker->onBufferFull = function ($connection) {
