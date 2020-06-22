@@ -85,7 +85,7 @@ Warriorman::create(function () {
 
 --------->>>>                           但是还有非常多没实现
 
-作者QQ群: 342016184
+WarriorMan 交流QQ群: 1098698769
 
 ## 特别鸣谢
 

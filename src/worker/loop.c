@@ -4,7 +4,6 @@ static int LOOP_TYPE = EPOLL_CTL_ADD;
 
 static loop_callback_func_t read_handler[7];
 static loop_callback_func_t write_handler[7];
-static loop_callback_func_t error_handler[7];
 
 //把我们自己的events转换成epoll的
 static inline int event_decode(int events) {
@@ -72,7 +71,7 @@ loop_callback_func_t loop_get_handler(int event, int type) {
 		handlers = write_handler;
 		break;
 	default:
-		handlers = error_handler;
+		return NULL;
 	}
 	if (handlers[type] != NULL) {
 		return handlers[type];
@@ -161,7 +160,7 @@ void wmWorkerLoop_loop() {
 
 			int coro_id = (int) (v & 0xffffffff);
 
-			php_printf("loop fd=%d\n",fd);
+			php_printf("loop fd=%d\n", fd);
 
 			//read
 			if (events[i].events & EPOLLIN) {
