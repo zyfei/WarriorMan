@@ -133,12 +133,9 @@ void _listen(wmWorker *worker) {
 			wmWarn("_listen -> _fd_workers_add fail : fd=%d", worker->fd);
 			return;
 		}
-
 		//绑定fd
 		zend_update_property_long(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("fd"), worker->fd);
-
 	}
-
 }
 
 //取消监听
@@ -193,7 +190,6 @@ void wmWorker_runAll() {
 	//设置定时器
 	signal(SIGALRM, alarm_wait);
 	alarm(1);
-
 	initWorkerPids(); //根据count初始化pid数组
 	parseCommand(); //解析用户命令
 	daemonize(); //守护进程模式
@@ -290,11 +286,13 @@ void forkOneWorker(wmWorker* worker, int key) {
 		wmArray_set(pid_arr, key, &pid);
 		return;
 	} else if (pid == 0) { // For child processes.
+
 		for (int k = wmHash_begin(_workers); k != wmHash_end(_workers); k++) {
 			if (!wmHash_exist(_workers, k)) {
 				continue;
 			}
 			wmWorker* worker2 = wmHash_value(_workers, k);
+
 			if (worker2->id != worker->id) {
 				wmWorker_free(worker2);
 			}
@@ -306,7 +304,6 @@ void forkOneWorker(wmWorker* worker, int key) {
 		if (_status == WM_WORKER_STATUS_STARTING) {
 			resetStd();
 		}
-
 		//取消闹钟
 		alarm(0);
 		//清空定时器,为了不遗传给下一代
@@ -321,6 +318,7 @@ void forkOneWorker(wmWorker* worker, int key) {
 		}
 		setUserAndGroup(worker);
 		//创建一个新协程去处理事件
+
 
 		//创建run协程 start
 		zend_fcall_info_cache run;
@@ -1087,7 +1085,7 @@ void wmWorker_free(wmWorker* worker) {
 	}
 	efree(worker->_This);
 	if (worker->host != NULL) {
-		wm_free(worker->host);
+		efree(worker->host);
 	}
 	if (worker->name != NULL) {
 		wmString_free(worker->name);
@@ -1112,27 +1110,27 @@ void wmWorker_free(wmWorker* worker) {
 		efree(worker->onClose);
 		wm_zend_fci_cache_discard(&worker->onClose->fcc);
 	}
-	if (worker->onBufferFull != NULL) {
-		efree(worker->onBufferFull);
-		wm_zend_fci_cache_discard(&worker->onBufferFull->fcc);
-	}
-	if (worker->onBufferDrain != NULL) {
-		efree(worker->onBufferDrain);
-		wm_zend_fci_cache_discard(&worker->onBufferDrain->fcc);
-	}
-	if (worker->onError != NULL) {
-		efree(worker->onError);
-		wm_zend_fci_cache_discard(&worker->onError->fcc);
-	}
-	//删除并且释放所有连接
-	wmConnection_close_connections();
-
-	//从workers中删除
-	WM_HASH_DEL(WM_HASH_INT_STR, _workers, worker->id);
-	WM_HASH_DEL(WM_HASH_INT_STR, _fd_workers, worker->fd);
-
-	wm_free(worker);
-	worker = NULL;
+//	if (worker->onBufferFull != NULL) {
+//		efree(worker->onBufferFull);
+//		wm_zend_fci_cache_discard(&worker->onBufferFull->fcc);
+//	}
+//	if (worker->onBufferDrain != NULL) {
+//		efree(worker->onBufferDrain);
+//		wm_zend_fci_cache_discard(&worker->onBufferDrain->fcc);
+//	}
+//	if (worker->onError != NULL) {
+//		efree(worker->onError);
+//		wm_zend_fci_cache_discard(&worker->onError->fcc);
+//	}
+//	//删除并且释放所有连接
+//	wmConnection_close_connections();
+//
+//	//从workers中删除
+//	WM_HASH_DEL(WM_HASH_INT_STR, _workers, worker->id);
+//	WM_HASH_DEL(WM_HASH_INT_STR, _fd_workers, worker->fd);
+//
+//	wm_free(worker);
+//	worker = NULL;
 }
 
 /**

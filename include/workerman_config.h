@@ -84,9 +84,9 @@ enum wmConnection_status {
 //array
 #define WM_ARRAY_PAGE_MAX  1024 //wmArray默认的page数是多少，每一次扩展都会申请一页的内存
 
-#define wm_malloc              emalloc
-#define wm_free                efree
-#define wm_calloc              ecalloc
-#define wm_realloc             erealloc
+#define wm_malloc              malloc
+#define wm_free                free
+#define wm_calloc              calloc
+#define wm_realloc             realloc
 
 #endif /* WM_CONFIG_H_ */
