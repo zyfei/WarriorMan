@@ -23,6 +23,7 @@ static RUNTIME_SIZE_T socket_write(php_stream *stream, const char *buf, size_t c
 		return 0;
 	}
 	wmSocket *sock = abstract->socket;
+
 	ssize_t didwrite;
 	if (UNEXPECTED(!sock)) {
 		return 0;
@@ -45,14 +46,19 @@ static RUNTIME_SIZE_T socket_read(php_stream *stream, char *buf, size_t count) {
 		return 0;
 	}
 	wmSocket *sock = abstract->socket;
+
+
 	ssize_t nr_bytes = 0;
 	if (UNEXPECTED(!sock)) {
 		return 0;
 	}
 	nr_bytes = wmSocket_read(sock, buf, count);
 	if (nr_bytes == WM_SOCKET_ERROR || nr_bytes == WM_SOCKET_CLOSE) {
+		stream->eof = 1;
+	} else {
 		stream->eof = 0;
 	}
+
 	if (nr_bytes > 0) {
 		php_stream_notify_progress_increment(PHP_STREAM_CONTEXT(stream), nr_bytes, 0);
 	}
@@ -422,6 +428,7 @@ static php_stream_ops tcp_socket_ops = { //
 php_stream *wmRuntime_socket_create(const char *proto, size_t protolen, const char *resourcename, size_t resourcenamelen, //
 	const char *persistent_id, int options, int flags, struct timeval *timeout, php_stream_context *context STREAMS_DC
 	) {
+
 	php_stream *stream;
 	php_wm_netstream_data_t *abstract;
 	wmSocket *sock;
@@ -434,14 +441,14 @@ php_stream *wmRuntime_socket_create(const char *proto, size_t protolen, const ch
 	abstract->socket = sock;
 	abstract->stream.socket = sock->fd;
 
-//设置超时时间
+	//设置超时时间
 	if (timeout) {
 		abstract->stream.timeout = *timeout;
 	} else {
 		abstract->stream.timeout.tv_sec = -1;
 	}
 	persistent_id = NULL;
-//创建一个php stream
+	//创建一个php stream
 	stream = php_stream_alloc_rel(&tcp_socket_ops, abstract, persistent_id, "r+");
 	if (stream == NULL) {
 		wmSocket_free(sock);

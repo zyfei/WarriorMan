@@ -46,15 +46,13 @@ bool loop_callback_coroutine_resume(wmSocket* socket, int event) {
 		return wmCoroutine_resume(socket->write_co);
 	}
 	wmWarn("Error has occurred: loop_callback_coroutine_resume fail. will del event....");
-	socket->events = WM_EVENT_NULL;
 	wmWorkerLoop_del(socket);
 	return false;
 }
 
 bool loop_callback_coroutine_resume_and_del(wmSocket* socket, int event) {
-	bool b = loop_callback_coroutine_resume(socket, event);
-	socket->events = WM_EVENT_NULL;
 	wmWorkerLoop_del(socket);
+	bool b = loop_callback_coroutine_resume(socket, event);
 	return b;
 }
 

@@ -13,7 +13,6 @@ static void hook_func(const char *name, size_t name_len, zif_handler new_handler
 	ori_f->internal_function.handler = new_handler;
 }
 
-
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_runtime_void, 0, 0, 0) //
 ZEND_END_ARG_INFO()
 

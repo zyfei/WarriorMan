@@ -1,7 +1,7 @@
 <?php
 require_once 'MySQL.php';
 
-//Warriorman\Runtime::enableCoroutine();
+Warriorman\Runtime::enableCoroutine();
 Warriorman::create(function () {
 	$worker = new Warriorman\Worker("tcp://0.0.0.0:8080", array(
 		"backlog" => 1234, // 默认102400，等待accept的连接队列长度
@@ -13,7 +13,7 @@ Warriorman::create(function () {
 		var_dump("onWorkerStart ->" . $worker->workerId);
 		global $db;
 		$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "qipai_pingtai");
-		$len = $db->query("select count(*) from a_agent");
+		$len = $db->query("select count(*) from a_agent where id=1");
 		var_dump($len);
 	};
 	

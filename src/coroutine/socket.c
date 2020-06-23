@@ -377,9 +377,6 @@ void wmSocket_free(wmSocket *socket) {
 	if (!socket) {
 		return;
 	}
-	if (socket->events != WM_EVENT_NULL) {
-		wmWorkerLoop_del(socket);
-	}
 	//如果还在连接，那么调用close
 	if (socket->closed == false) {
 		wmSocket_close(socket);
