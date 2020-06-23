@@ -15,10 +15,8 @@ enum wmSocketError_type {
 };
 
 enum wmLoop_type {
-	WM_LOOP_WORKER = 1, //
-	WM_LOOP_CONNECTION = 2, //
-	WM_LOOP_RUNTIME = 3, //
-	WM_LOOP_SIGAL = 4, //
+	WM_LOOP_AUTO = 1, // 默认是全自动resume和yield，每次都自动添加和删除事件
+	WM_LOOP_SEMI_AUTO = 2, //  send的时候默认resume和yield，read的监听事件需要自己添加
 };
 
 enum wmChannel_opcode {
@@ -71,13 +69,11 @@ enum wmConnection_status {
 
 #define WM_MAXEVENTS            1024   //每次epoll可以返回的事件数量上限
 #define WM_BUFFER_SIZE_BIG         65536 //默认一次从管道中读字节长度
+#define WM_BUFFER_SIZE_DEFAULT         512 //初始化的时候的长度
 #define WM_DEFAULT_BACKLOG	102400	//默认listen的时候backlog最大长度，也就是等待accept的队列最大长度
 
 //file
 #define WM_MAX_FILE_CONTENT        (64*1024*1024) //文件最大字节数
-
-//worker
-#define WM_ACCEPT_MAX_COUNT              12  //每次epoll通知可以accept，都会循环12次去accept，swoole设置的64，我们是多进程模型，不需要设置一次读取那么多
 
 //array
 #define WM_ARRAY_PAGE_MAX  1024 //wmArray默认的page数是多少，每一次扩展都会申请一页的内存

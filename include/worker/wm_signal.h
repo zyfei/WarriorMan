@@ -1,8 +1,6 @@
 #ifndef _WM_SIGNAL_H
 #define _WM_SIGNAL_H
 
-#include "wm_socket.h"
-
 /**
  * 保存触发信号之后的回调方法
  */

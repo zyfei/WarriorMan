@@ -12,8 +12,6 @@ typedef struct {
 #endif
 
 void wmRuntime_init() {
-	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_RUNTIME, WM_LOOP_RESUME);
-	wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_RUNTIME, WM_LOOP_RESUME);
 }
 void wmRuntime_shutdown() {
 }
@@ -204,7 +202,7 @@ static inline int socket_accept(php_stream *stream, wmSocket *sock, php_stream_x
 	if (timeout) {
 		//sock->set_timeout(timeout, SW_TIMEOUT_READ);
 	}
-	wmSocket* clisock = wmSocket_accept(sock);
+	wmSocket* clisock = wmSocket_accept(sock, WM_LOOP_AUTO);
 
 	if (clisock == NULL) {
 		error = sock->errCode;
@@ -387,7 +385,7 @@ static int socket_set_option(php_stream *stream, int option, int value, void *pt
 	}
 	case PHP_STREAM_OPTION_READ_TIMEOUT: {
 		struct timeval* a = (struct timeval*) ptrparam;
-		php_printf("time out %ld\n",a->tv_sec);
+		php_printf("time out %ld\n", a->tv_sec);
 		php_printf("PHP_STREAM_OPTION_READ_TIMEOUT  mei shi xian\n");
 		//abstract->socket->set_timeout((struct timeval*) ptrparam, SW_TIMEOUT_READ);
 		break;
@@ -428,12 +426,10 @@ php_stream *wmRuntime_socket_create(const char *proto, size_t protolen, const ch
 	php_wm_netstream_data_t *abstract;
 	wmSocket *sock;
 
-	sock = wmSocket_create(WM_SOCK_TCP);
+	sock = wmSocket_create(WM_SOCK_TCP, WM_LOOP_AUTO);
 	if (!sock) {
 		return NULL;
 	}
-	sock->loop_type = WM_LOOP_RUNTIME;
-
 	abstract = (php_wm_netstream_data_t*) ecalloc(1, sizeof(*abstract));
 	abstract->socket = sock;
 	abstract->stream.socket = sock->fd;

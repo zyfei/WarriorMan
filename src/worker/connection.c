@@ -12,21 +12,19 @@ static void onError(wmConnection *connection);
 void wmConnection_init() {
 	wm_connections = wmHash_init(WM_HASH_INT_STR);
 	_read_buffer_tmp = wmString_new(WM_BUFFER_SIZE_BIG);
-	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_CONNECTION, WM_LOOP_RESUME);
-	wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_CONNECTION, WM_LOOP_RESUME);
 }
 
-wmConnection * wmConnection_create(int fd, int transport) {
+wmConnection * wmConnection_create(wmSocket* socket) {
 	//查找并且删除key为fd的连接
-	WM_HASH_DEL(WM_HASH_INT_STR, wm_connections, fd);
+	WM_HASH_DEL(WM_HASH_INT_STR, wm_connections, socket->fd);
 	wmConnection *connection = (wmConnection *) wm_malloc(sizeof(wmConnection));
-	connection->fd = fd;
-	connection->socket = wmSocket_create_by_fd(fd, transport);
+	connection->fd = socket->fd;
+	connection->socket = socket;
 	connection->socket->owner = (void *) connection;
 	if (connection->socket == NULL) {
+		wm_free(connection);
 		return NULL;
 	}
-	connection->socket->loop_type = WM_LOOP_CONNECTION;
 	connection->socket->maxPackageSize = WM_MAX_PACKAGE_SIZE;
 	connection->socket->maxSendBufferSize = WM_MAX_SEND_BUFFER_SIZE;
 	connection->socket->onBufferWillFull = bufferWillFull;
@@ -86,10 +84,6 @@ void onError_callback(void* _mess_data) {
  * 在一个新协程环境运行
  */
 void wmConnection_read(wmConnection* connection) {
-	//添加读监听start
-	connection->socket->events = WM_EVENT_READ;
-	wmWorkerLoop_add(connection->fd, connection->socket->events, WM_LOOP_CONNECTION);
-	//添加读监听end
 
 	//开始读消息
 	while (connection && connection->_status == WM_CONNECTION_STATUS_ESTABLISHED) {
@@ -220,8 +214,6 @@ int onClose(wmConnection *connection) {
 	if (connection->_status == WM_CONNECTION_STATUS_CLOSED) {
 		return 0;
 	}
-
-	wmWorkerLoop_del(connection->fd); //释放事件
 	int ret = wmSocket_close(connection->socket);
 
 	connection->_status = WM_CONNECTION_STATUS_CLOSED;

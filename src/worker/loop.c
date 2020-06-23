@@ -1,6 +1,7 @@
 #include "loop.h"
-
-static int LOOP_TYPE = EPOLL_CTL_ADD;
+#include "coroutine.h"
+#include "socket.h"
+#include "log.h"
 
 static loop_callback_func_t read_handler[7];
 static loop_callback_func_t write_handler[7];
@@ -8,7 +9,6 @@ static loop_callback_func_t write_handler[7];
 //把我们自己的events转换成epoll的
 static inline int event_decode(int events) {
 	uint32_t flag = 0;
-
 	if (events & WM_EVENT_READ) {
 		flag |= EPOLLIN;
 	}
@@ -22,24 +22,54 @@ static inline int event_decode(int events) {
 }
 
 /**
+ * 删除事件
+ */
+bool _loop_del(int fd) {
+	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, fd, NULL) < 0) {
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		return false;
+	}
+	return true;
+}
+
+/**
  * 恢复协程&用于loop_wait回调
  */
-void loop_callback_coroutine_resume(int fd, int coro_id) {
-	wmCoroutine* co = wmCoroutine_get_by_cid(coro_id);
-	if (co == NULL) {
-		wmWarn("Error has occurred: loop_callback_coroutine_resume . wmCoroutine is NULL");
-		return;
+bool loop_callback_coroutine_resume(wmSocket* socket, int event) {
+	if (!socket) {
+		wmError("Error has occurred: loop_callback_coroutine_resume . wmCoroutine is NULL");
+		return false;
 	}
-	wmCoroutine_resume(co);
+	if (event == EPOLLIN && socket->read_co) {
+		return wmCoroutine_resume(socket->read_co);
+	} else if (event == EPOLLOUT && socket->write_co) {
+		return wmCoroutine_resume(socket->write_co);
+	}
+	wmWarn("Error has occurred: loop_callback_coroutine_resume fail. will del event....");
+	socket->events = WM_EVENT_NULL;
+	wmWorkerLoop_del(socket);
+	return false;
 }
-void loop_callback_coroutine_resume_and_del(int fd, int coro_id) {
-	wmCoroutine* co = wmCoroutine_get_by_cid(coro_id);
-	if (co == NULL) {
-		wmWarn("Error has occurred: loop_callback_coroutine_resume . wmCoroutine is NULL");
-		return;
+
+bool loop_callback_coroutine_resume_and_del(wmSocket* socket, int event) {
+	bool b = loop_callback_coroutine_resume(socket, event);
+	socket->events = WM_EVENT_NULL;
+	wmWorkerLoop_del(socket);
+	return b;
+}
+
+/**
+ * 初始化loop需要的东西
+ */
+int loop_init() {
+	if (!WorkerG.poll) {
+		wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_SEMI_AUTO, loop_callback_coroutine_resume);
+		wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_SEMI_AUTO, loop_callback_coroutine_resume);
+		wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_AUTO, loop_callback_coroutine_resume_and_del);
+		wmWorkerLoop_set_handler(WM_EVENT_WRITE, WM_LOOP_AUTO, loop_callback_coroutine_resume_and_del);
+		return init_wmPoll();
 	}
-	wmWorkerLoop_del(fd); //删除监听
-	wmCoroutine_resume(co);
+	return 0;
 }
 
 /**
@@ -79,63 +109,76 @@ loop_callback_func_t loop_get_handler(int event, int type) {
 	return NULL;
 }
 
-bool wmWorkerLoop_add(int fd, int events, int fdtype) {
+bool wmWorkerLoop_add(wmSocket* socket, int event) {
+	if (socket->events & event) { //如果socket里面有这个事件,那直接返回
+		return true;
+	}
+
+	int LOOP_TYPE = EPOLL_CTL_MOD;
+	if (socket->events == WM_EVENT_NULL) {
+		LOOP_TYPE = EPOLL_CTL_ADD;
+	}
+	socket->events |= event;
+
 	//初始化epoll
-	if (!WorkerG.poll) {
-		init_wmPoll();
-	}
-
-	//没有事件
-	if (events == WM_EVENT_NULL) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		return false;
-	}
-
-	long coro_id = 0;
-	wmCoroutine* co = wmCoroutine_get_current();
-	if (co != NULL) {
-		coro_id = co->cid;
-	}
-
+	loop_init();
 	struct epoll_event *ev;
 	ev = WorkerG.poll->event;
 	//转换epoll能看懂的事件类型
-	ev->events = event_decode(events);
+	ev->events = event_decode(socket->events);
+	ev->data.ptr = socket;
 
-	//将三个数构建在一起前3位是type，然后后29位是fd，最后32位是co_id
-	uint64_t ret = 0;
-	ret |= ((uint64_t) fdtype) << 61;
-	ret |= ((uint64_t) fd) << 32;
-	ret |= ((uint64_t) coro_id);
-
-	ev->data.u64 = ret;
 	//注册到全局的epollfd上面。
-	if (epoll_ctl(WorkerG.poll->epollfd, LOOP_TYPE, fd, ev) < 0) {
+	if (epoll_ctl(WorkerG.poll->epollfd, LOOP_TYPE, socket->fd, ev) < 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 		return false;
 	}
 	return true;
 }
 
-bool wmWorkerLoop_update(int fd, int events, int fdtype) {
-	bool loop_return;
-	LOOP_TYPE = EPOLL_CTL_MOD;
-	loop_return = wmWorkerLoop_add(fd, events, fdtype);
-	LOOP_TYPE = EPOLL_CTL_ADD;
-	return loop_return;
+/**
+ * 减去一个事件
+ */
+bool wmWorkerLoop_remove(wmSocket* socket, int event) {
+	//如果本来就没有,那直接返回
+	if (socket->events == WM_EVENT_NULL) {
+		return true;
+	}
+	if (!(socket->events & event)) { //如果socket里面没有这个事件
+		return true;
+	}
+	socket->events &= (~event); //那么就减去这个事件
+	//如果已经没有事件了，就删除监听
+	if (socket->events == WM_EVENT_NULL) {
+		return wmWorkerLoop_del(socket);
+	}
+
+	//初始化epoll
+	loop_init();
+	struct epoll_event *ev;
+	ev = WorkerG.poll->event;
+	//转换epoll能看懂的事件类型
+	ev->events = event_decode(socket->events);
+	ev->data.ptr = socket;
+
+	//注册到全局的epollfd上面。
+	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_MOD, socket->fd, ev) < 0) {
+		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		return false;
+	}
+	return true;
 }
 
-void wmWorkerLoop_del(int fd) {
-	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, fd, NULL) < 0) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-	}
+bool wmWorkerLoop_del(wmSocket* socket) {
+	socket->events = WM_EVENT_NULL;
+	return _loop_del(socket->fd);
 }
 
 /**
  * 主事件循环，不同于wm_event_wait
  */
 void wmWorkerLoop_loop() {
-	if (init_wmPoll() < 0) {
+	if (loop_init() < 0) {
 		wmError("Need to call init_wmPoll() first.");
 	}
 	WorkerG.is_running = true;
@@ -151,33 +194,23 @@ void wmWorkerLoop_loop() {
 		n = epoll_wait(WorkerG.poll->epollfd, events, WorkerG.poll->ncap, timeout);
 		//循环处理epoll请求
 		for (int i = 0; i < n; i++) {
-			uint64_t v = events[i].data.u64;
-
-			int fdtype = (int) (v >> 61);
-			//成功的把头三位卡没了
-			v = (v << 3) >> 3;
-			int fd = (int) (v >> 32);
-
-			int coro_id = (int) (v & 0xffffffff);
-
-			php_printf("loop fd=%d\n", fd);
+			wmSocket* socket = events[i].data.ptr;
 
 			//read
 			if (events[i].events & EPOLLIN) {
-				fn = loop_get_handler(EPOLLIN, fdtype);
+				fn = loop_get_handler(EPOLLIN, socket->loop_type);
 				if (fn != NULL) {
-					fn(fd, coro_id);
+					fn(socket, EPOLLIN);
 				}
 			}
 
 			//write 如果是可写，那么就恢复协程
 			if (events[i].events & EPOLLOUT) {
-				fn = loop_get_handler(EPOLLOUT, fdtype);
+				fn = loop_get_handler(EPOLLOUT, socket->loop_type);
 				if (fn != NULL) {
-					fn(fd, coro_id);
+					fn(socket, EPOLLOUT);
 				}
 			}
-
 		}
 		//有定时器才更新
 		if (WorkerG.timer.num > 0) {

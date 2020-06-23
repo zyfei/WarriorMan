@@ -1,4 +1,7 @@
+#include "header.h"
 #include "wm_signal.h"
+#include "socket.h"
+#include "loop.h"
 
 /**
  * 创建的信号通道
@@ -7,7 +10,7 @@
  * [1] 是写
  */
 static int signal_fd[2] = { 0, 0 };
-static loop_func_t signal_handler_array[64];
+static signal_func_t signal_handler_array[64];
 static char signals[1024];
 
 /**
@@ -30,10 +33,9 @@ void sig_handler(int signalno) {
  * 等待&处理signal信号
  */
 void wmSignal_wait() {
-	wmSocket* socket = wmSocket_create_by_fd(signal_fd[0], WM_SOCK_TCP);
+	wmSocket* socket = wmSocket_pack(signal_fd[0], WM_SOCK_TCP,WM_LOOP_SEMI_AUTO);
 	//监听read事件
-	socket->events = WM_EVENT_READ;
-	wmWorkerLoop_add(socket->fd, socket->events, WM_LOOP_WORKER);
+	wmWorkerLoop_add(socket, WM_EVENT_READ);
 	while (1) {
 		int ret = wmSocket_read(socket, signals, 1024);
 		if (ret < 0) {

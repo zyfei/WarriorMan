@@ -8,7 +8,6 @@
 #include "coroutine.h"
 #include "socket.h"
 #include "wm_string.h"
-#include "loop.h"
 
 typedef void (*wm_socket_func_t)(void*);
 
@@ -22,6 +21,9 @@ typedef struct {
 	void* owner; //拥有人，比如connection创建的socket，owner就是这个connection
 	int errCode; //错误码
 	const char *errMsg; //错误描述
+
+	wmCoroutine* read_co; //read操作的时候，保存当前的协程，以便正确唤醒
+	wmCoroutine* write_co; //write操作的时候，保存当前的，以便正确唤醒
 
 	/**
 	 * worker和connection类型会自己管理loop。runtime是在read或者write的时候代为管理
@@ -39,15 +41,15 @@ typedef struct {
 	bool shutdown_write;
 } wmSocket;
 
-wmSocket * wmSocket_create(int transport);
-wmSocket * wmSocket_create_by_fd(int fd, int transport);
+wmSocket * wmSocket_create(int transport, int loop_type);
+wmSocket * wmSocket_pack(int fd, int transport, int loop_type);
 int wmSocket_read(wmSocket* socket, char *buf, int len);
 int wmSocket_send(wmSocket *socket, const void *buf, size_t len);
-int wmSocket_write(wmSocket *socket, const void *buf, size_t len);//不管缓冲区
+int wmSocket_write(wmSocket *socket, const void *buf, size_t len); //不管缓冲区
 int wmSocket_close(wmSocket *socket);
 void wmSocket_free(wmSocket *socket);
 bool wmSocket_connect(wmSocket *socket, char* _host, int _port);
-wmSocket * wmSocket_accept(wmSocket* socket);
+wmSocket * wmSocket_accept(wmSocket* socket, int new_socket_loop_type);
 ssize_t wmSocket_peek(wmSocket* socket, void *__buf, size_t __n);
 bool wmSocket_shutdown(wmSocket *socket, int __how);
 ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sockaddr* _addr, socklen_t *_socklen);

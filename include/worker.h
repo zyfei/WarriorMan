@@ -36,6 +36,8 @@ typedef struct _wmWorker {
 	int32_t count; //进程数量
 	wmString* name; //名字
 	bool stopping; //是否正在停止
+
+	wmSocket* socket;//用于监听的fd封装而成
 } wmWorker;
 
 //为了通过php对象，找到上面的c++对象 ======= start

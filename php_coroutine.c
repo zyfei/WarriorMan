@@ -1,6 +1,8 @@
 /**
  * 协程工具入口文件
  */
+#include "header.h"
+#include "coroutine.h"
 #include "wm_signal.h"
 
 //创建协程接口参数声明

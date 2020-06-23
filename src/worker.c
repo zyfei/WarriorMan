@@ -71,8 +71,6 @@ void wmWorker_init() {
 	_fd_workers = wmHash_init(WM_HASH_INT_STR);
 	_worker_pids = wmHash_init(WM_HASH_INT_STR);
 	_pid_array_tmp = wmArray_new(64, sizeof(int));
-
-	wmWorkerLoop_set_handler(WM_EVENT_READ, WM_LOOP_WORKER, WM_LOOP_RESUME);
 }
 
 /**
@@ -103,6 +101,7 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	worker->socketName = wmString_dup(socketName->val, socketName->len);
 	worker->stopping = false;
 	worker->user = NULL;
+	worker->socket = NULL;
 	parseSocketAddress(worker, socketName);
 
 	//写入workers对照表
@@ -173,13 +172,9 @@ void wmWorker_run(wmWorker *worker) {
 	bind_callback(worker->_This, "onError", &worker->onError);
 	//设置回调方法 end
 
-	//注册loop事件
-	wmWorkerLoop_add(worker->fd, WM_EVENT_READ | WM_EVENT_EPOLLEXCLUSIVE, WM_LOOP_WORKER);
-	//死循环accept，遇到消息就新创建协程处理
-	while (1) {
-		wmCoroutine_yield();
-		acceptConnection(worker);
-	}
+	worker->socket = wmSocket_pack(worker->fd, worker->transport, WM_LOOP_SEMI_AUTO);
+
+	acceptConnection(worker);
 }
 
 //全部运行
@@ -284,7 +279,6 @@ void forkOneWorker(wmWorker* worker, int key) {
 		wmArray_set(pid_arr, key, &pid);
 		return;
 	} else if (pid == 0) { // For child processes.
-
 		for (int k = wmHash_begin(_workers); k != wmHash_end(_workers); k++) {
 			if (!wmHash_exist(_workers, k)) {
 				continue;
@@ -752,32 +746,21 @@ void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_f
  * 由run方法循环调用
  */
 void acceptConnection(wmWorker* worker) {
-	int connfd;
+
+	//注册loop事件,半自动
+	wmWorkerLoop_add(worker->socket, WM_EVENT_EPOLLEXCLUSIVE);
+
+	//死循环accept，遇到消息就新创建协程处理
 	wmConnection* conn;
 	zval* __zval;
 	zend_fcall_info_cache call_read;
-	for (int i = 0; i < WM_ACCEPT_MAX_COUNT; i++) {
-
-		connfd = wm_socket_accept(worker->fd);
-		if (connfd < 0) {
-			switch (errno) {
-			case EAGAIN: //队列空了，没有信息要读了
-				return;
-			case EINTR: //被信号中断了，但是还有信息要读
-				continue;
-			default:
-				wmWarn("accept() failed")
-				return;
-			}
+	while (!worker->socket->closed) {
+		wmSocket* socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO);
+		if (socket == NULL) {
+			wmWarn("acceptConnection fail. %s", socket->errMsg);
+			continue;
 		}
-		switch (worker->transport) {
-		case WM_SOCK_TCP:
-			conn = wmConnection_create(connfd, worker->transport);
-			break;
-		default:
-			wmError("unknow transport")
-			;
-		}
+		conn = wmConnection_create(socket);
 		if (conn == NULL) {
 			wmWarn("_wmWorker_acceptConnection() -> wmConnection_create failed")
 			return;
@@ -1127,6 +1110,9 @@ void wmWorker_free(wmWorker* worker) {
 	if (worker->onError != NULL) {
 		efree(worker->onError);
 		wm_zend_fci_cache_discard(&worker->onError->fcc);
+	}
+	if (worker->socket) {
+		wmSocket_free(worker->socket);
 	}
 	//删除并且释放所有连接
 	wmConnection_close_connections();

@@ -1,4 +1,5 @@
 #include "wm_socket.h"
+#include "loop.h"
 
 static bool bufferIsFull(wmSocket *socket);
 static void checkBufferWillFull(wmSocket *socket);
@@ -12,7 +13,10 @@ static inline void set_err(wmSocket* socket, int e) {
 	socket->errMsg = e ? wmCode_str(e) : "";
 }
 
-wmSocket * wmSocket_create(int transport) {
+/**
+ * 创建一个socket对象
+ */
+wmSocket * wmSocket_create(int transport, int loop_type) {
 	int fd = -1;
 	switch (transport) {
 	case WM_SOCK_TCP:
@@ -21,10 +25,13 @@ wmSocket * wmSocket_create(int transport) {
 	if (fd < 0) {
 		return NULL;
 	}
-	return wmSocket_create_by_fd(fd, transport);
+	return wmSocket_pack(fd, transport, loop_type);
 }
 
-wmSocket * wmSocket_create_by_fd(int fd, int transport) {
+/**
+ * 包装一个socket对象
+ */
+wmSocket * wmSocket_pack(int fd, int transport, int loop_type) {
 	wmSocket *socket = (wmSocket *) wm_malloc(sizeof(wmSocket));
 	socket->fd = fd;
 
@@ -32,8 +39,11 @@ wmSocket * wmSocket_create_by_fd(int fd, int transport) {
 	socket->closed = false;
 	socket->maxSendBufferSize = 0; //应用层发送缓冲区
 	socket->maxPackageSize = 0; //接收的最大包包长
-	socket->loop_type = -1;
+	socket->loop_type = loop_type;
 	socket->transport = transport;
+
+	socket->read_co = NULL;
+	socket->write_co = NULL;
 
 	socket->connect_host = NULL;
 	socket->connect_port = 0;
@@ -49,7 +59,10 @@ wmSocket * wmSocket_create_by_fd(int fd, int transport) {
 	return socket;
 }
 
-wmSocket * wmSocket_accept(wmSocket* socket) {
+/**
+ * 等待连接
+ */
+wmSocket * wmSocket_accept(wmSocket* socket, int new_socket_loop_type) {
 	int connfd;
 	while (!socket->closed) {
 		do {
@@ -59,24 +72,24 @@ wmSocket * wmSocket_accept(wmSocket* socket) {
 			if (errno != EAGAIN) {
 				set_err(socket, errno);
 				wmWarn("wmSocket_accept fail. %s", socket->errMsg);
-				return false;
+				return NULL;
 			}
 			if (!event_wait(socket, WM_EVENT_READ)) {
-				set_err(socket, WM_ERROR_SESSION_CLOSED);
+				set_err(socket, WM_ERROR_LOOP_FAIL);
+				wmWarn("wmSocket_accept fail. %s", socket->errMsg);
 				return NULL;
 			}
 			continue;
 		}
 		set_err(socket, 0);
-		wmSocket* socket2 = wmSocket_create_by_fd(connfd, socket->transport);
-		return socket2;
+		return wmSocket_pack(connfd, socket->transport, new_socket_loop_type); //将得到的fd，包装成socket结构体
 	}
 	set_err(socket, WM_ERROR_SESSION_CLOSED);
 	return NULL;
 }
 
 /**
- * 作为客户端连接
+ * 主动连接
  */
 bool wmSocket_connect(wmSocket *socket, char* _host, int _port) {
 	int retval;
@@ -91,8 +104,8 @@ bool wmSocket_connect(wmSocket *socket, char* _host, int _port) {
 				return false;
 			}
 			if (!event_wait(socket, WM_EVENT_WRITE)) {
-				set_err(socket, WM_ERROR_SESSION_CLOSED);
-				return NULL;
+				set_err(socket, WM_ERROR_LOOP_FAIL);
+				return false;
 			}
 			//这里需要使用epoll监听可写事件，然后还需要有一个超时设置，
 			socklen_t len = sizeof(socket->errCode);
@@ -111,7 +124,8 @@ bool wmSocket_connect(wmSocket *socket, char* _host, int _port) {
 }
 
 /**
- * runtime用，自己不用。偷看一下之前读取的数据
+ * 偷看一下之前读取的数据
+ * 暂时只有runtime用
  */
 ssize_t wmSocket_peek(wmSocket* socket, void *__buf, size_t __n) {
 	ssize_t retval;
@@ -125,6 +139,10 @@ ssize_t wmSocket_peek(wmSocket* socket, void *__buf, size_t __n) {
 	return retval;
 }
 
+/**
+ * 读数据
+ * 暂时只有runtime用
+ */
 ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sockaddr* _addr, socklen_t *_socklen) {
 	ssize_t retval;
 	socklen_t addr_len = sizeof(struct sockaddr_in);
@@ -140,24 +158,69 @@ ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sock
 }
 
 /**
- * 读消息,读出的消息放入buf中，返回读的长度
+ * 读数据
  */
 int wmSocket_read(wmSocket* socket, char *buf, int len) {
-	if (socket->closed == true) {
-		set_err(socket, WM_ERROR_SESSION_CLOSED);
-		return WM_SOCKET_CLOSE; //表示关闭
-	}
-	//在这里要通过LOOP TYPE来判断怎么处理
-
+	int ret;
 	while (!socket->closed) {
-		int ret = wm_socket_recv(socket->fd, buf, len, 0);
+		do {
+			ret = wm_socket_recv(socket->fd, buf, len, 0);
+		} while (ret < 0 && errno == EINTR);
+		//正常返回
+		if (ret > 0) {
+			return ret;
+		}
 		//连接关闭
 		if (ret == 0) {
 			socket->closed = true;
 			set_err(socket, WM_ERROR_SESSION_CLOSED_BY_CLIENT);
 			return WM_SOCKET_CLOSE;
 		}
-		if (ret < 0 && errno != EAGAIN && errno != EINTR) {
+		if (ret < 0 && errno == EAGAIN) {
+			if (event_wait(socket, WM_EVENT_READ)) {
+				continue;
+			}
+		}
+		set_err(socket, WM_ERROR_READ_FAIL);
+		return WM_SOCKET_ERROR;
+	}
+	set_err(socket, WM_ERROR_SESSION_CLOSED);
+	return WM_SOCKET_CLOSE;
+}
+
+/**
+ * 所有写入都是协程同步的
+ */
+int wmSocket_send(wmSocket *socket, const void *buf, size_t len) {
+	if (socket->closed == true) {
+		set_err(socket, WM_ERROR_SESSION_CLOSED);
+		return WM_SOCKET_CLOSE;
+	}
+	if (!socket->write_buffer) {
+		socket->write_buffer = wmString_new(WM_BUFFER_SIZE_DEFAULT); //默认是1024
+	}
+	if (socket->write_buffer->offset == socket->write_buffer->length) {
+		socket->write_buffer->length = 0;
+		socket->write_buffer->offset = 0;
+	}
+	if (bufferIsFull(socket)) {
+		set_err(socket, WM_ERROR_SEND_BUFFER_FULL); //发送区满了
+		return WM_SOCKET_ERROR;
+	}
+	wmString_append_ptr(socket->write_buffer, buf, len); //要发送的字符，添加进去
+	checkBufferWillFull(socket); //检查这一次加完，会不会缓冲区满
+
+	int ret;
+	int ret_num = 0; //一共发送多少字节
+	while (!socket->closed) {
+		//能发多少发多少，不用客气
+		do {
+			ret = wm_socket_send(socket->fd, socket->write_buffer->str + socket->write_buffer->offset,
+				socket->write_buffer->length - socket->write_buffer->offset, 0);
+		} while (ret < 0 && errno == EINTR);
+
+		//如果是未知错误，我们检查socket是否关闭
+		if (ret < 0 && errno != EAGAIN) {
 			//在这里判断是否已经关闭
 			socklen_t len = sizeof(socket->errCode);
 			if (getsockopt(socket->fd, SOL_SOCKET, SO_ERROR, &socket->errCode, &len) < 0 || socket->errCode != 0) {
@@ -165,14 +228,80 @@ int wmSocket_read(wmSocket* socket, char *buf, int len) {
 				socket->closed = true;
 				return WM_SOCKET_CLOSE;
 			}
+			ret = 0;
 		}
-		if (ret > 0) {
-			return ret;
+		socket->write_buffer->offset += ret;
+		ret_num += ret;
+
+		if (socket->write_buffer->offset == socket->write_buffer->length) {
+			wmWorkerLoop_remove(socket, WM_EVENT_WRITE);
+			socket->write_buffer->offset = 0;
+			socket->write_buffer->length = 0;
+			return ret_num;
 		}
-		event_wait(socket, WM_EVENT_READ);
+		event_wait(socket, WM_EVENT_WRITE);
+	}
+	wmWorkerLoop_remove(socket, WM_EVENT_WRITE);
+	set_err(socket, WM_ERROR_SESSION_CLOSED);
+	return WM_SOCKET_CLOSE;
+}
+
+/**
+ * 全发送,不管缓冲区
+ */
+int wmSocket_write(wmSocket *socket, const void *buf, size_t len) {
+	if (socket->closed == true) {
+		set_err(socket, WM_ERROR_SESSION_CLOSED);
+		return WM_SOCKET_CLOSE; //表示关闭
+	}
+	int ret;
+	int ret_num = 0;
+	while (!socket->closed) {
+		//能发多少发多少，不用客气
+		do {
+			ret = wm_socket_send(socket->fd, buf, len - ret_num, 0);
+		} while (ret < 0 && errno == EINTR);
+		//如果发生错误
+		if (ret < 0 && errno != EAGAIN) {
+			//在这里判断是否已经关闭
+			socklen_t len = sizeof(socket->errCode);
+			if (getsockopt(socket->fd, SOL_SOCKET, SO_ERROR, &socket->errCode, &len) < 0 || socket->errCode != 0) {
+				set_err(socket, socket->errCode);
+				socket->closed = true;
+				return WM_SOCKET_CLOSE;
+			}
+			ret = 0;
+		}
+		ret_num += ret;
+		if (ret_num >= len) {
+			wmWorkerLoop_remove(socket, WM_EVENT_WRITE);
+			return ret_num;
+		}
+		event_wait(socket, WM_EVENT_WRITE);
 	}
 	set_err(socket, WM_ERROR_SESSION_CLOSED);
 	return WM_SOCKET_CLOSE;
+}
+
+/**
+ * 不同的loop_type操作是不同的
+ */
+bool event_wait(wmSocket* socket, int event) {
+	//如果没有事件监听,就加上
+	if (!(socket->events & event)) {
+		if (!wmWorkerLoop_add(socket, event)) {
+			return false;
+		}
+	}
+	if (event & WM_EVENT_READ) {
+		socket->read_co = wmCoroutine_get_current();
+	}
+	if (event & WM_EVENT_WRITE) {
+		socket->write_co = wmCoroutine_get_current();
+	}
+
+	wmCoroutine_yield();
+	return true;
 }
 
 //检查写缓冲区是不是已经满了
@@ -192,143 +321,6 @@ void checkBufferWillFull(wmSocket *socket) {
 			}
 		}
 	}
-}
-
-/**
- * 写入是协程同步的
- * 小于0是有问题的，等于0没事，大于0正常
- */
-int wmSocket_send(wmSocket *socket, const void *buf, size_t len) {
-	if (socket->closed == true) {
-		set_err(socket, WM_ERROR_SESSION_CLOSED);
-		return WM_SOCKET_CLOSE; //表示关闭
-	}
-	if (!socket->write_buffer) {
-		socket->write_buffer = wmString_new(WM_BUFFER_SIZE_BIG);
-	}
-
-	if (socket->write_buffer->offset == socket->write_buffer->length) {
-		socket->write_buffer->length = 0;
-		socket->write_buffer->offset = 0;
-	}
-	int ret_num = 0;
-	if (bufferIsFull(socket)) {
-		set_err(socket, WM_ERROR_SEND_BUFFER_FULL);
-		return WM_SOCKET_ERROR;
-	}
-	//要发送的字符，添加进去
-	wmString_append_ptr(socket->write_buffer, buf, len);
-
-	//检查这一次加完，会不会缓冲区满
-	checkBufferWillFull(socket);
-
-	//尝试写
-	bool _add_Loop = false;
-	int ret;
-	while (!socket->closed) {
-		//能发多少发多少，不用客气
-		ret = wm_socket_send(socket->fd, socket->write_buffer->str + socket->write_buffer->offset, socket->write_buffer->length - socket->write_buffer->offset,
-			0);
-		//如果发生错误
-		if (ret < 0 && errno != EAGAIN && errno != EINTR) {
-			//在这里判断是否已经关闭
-			socklen_t len = sizeof(socket->errCode);
-			if (getsockopt(socket->fd, SOL_SOCKET, SO_ERROR, &socket->errCode, &len) < 0 || socket->errCode != 0) {
-				set_err(socket, socket->errCode);
-				socket->closed = true;
-				return WM_SOCKET_CLOSE;
-			}
-			ret = 0;
-		}
-		socket->write_buffer->offset += ret;
-		ret_num += ret;
-		//发送完了，就直接返回
-		if (socket->write_buffer->offset == socket->write_buffer->length) {
-			//在这里取消事件注册，使用修改的方式
-			if (_add_Loop) {
-				socket->events &= (~WM_EVENT_WRITE);
-				wmWorkerLoop_update(socket->fd, socket->events, socket->loop_type);
-			}
-			socket->write_buffer->offset = 0;
-			socket->write_buffer->length = 0;
-			return ret_num;
-		}
-		if (!_add_Loop) {
-			socket->events |= WM_EVENT_WRITE;
-			wmWorkerLoop_update(socket->fd, socket->events, socket->loop_type);
-			_add_Loop = true;
-		}
-		//可写的时候，自动唤醒
-		event_wait(socket, WM_EVENT_READ);
-	}
-	set_err(socket, WM_ERROR_SESSION_CLOSED);
-	return WM_SOCKET_CLOSE;
-}
-
-/**
- * 全发送,不管缓冲区
- */
-int wmSocket_write(wmSocket *socket, const void *buf, size_t len) {
-	if (socket->closed == true) {
-		set_err(socket, WM_ERROR_SESSION_CLOSED);
-		return WM_SOCKET_CLOSE; //表示关闭
-	}
-	//尝试写
-	bool _add_Loop = false;
-	int ret;
-	int ret_num = 0;
-	while (!socket->closed) {
-		//能发多少发多少，不用客气
-		ret = wm_socket_send(socket->fd, buf, len - ret_num, 0);
-		//如果发生错误
-		if (ret < 0 && errno != EAGAIN && errno != EINTR) {
-			//在这里判断是否已经关闭
-			socklen_t len = sizeof(socket->errCode);
-			if (getsockopt(socket->fd, SOL_SOCKET, SO_ERROR, &socket->errCode, &len) < 0 || socket->errCode != 0) {
-				set_err(socket, socket->errCode);
-				socket->closed = true;
-				return WM_SOCKET_CLOSE;
-			}
-			ret = 0;
-		}
-		ret_num += ret;
-		if (ret_num >= len) {
-			//在这里取消事件注册，使用修改的方式
-			if (_add_Loop) {
-				socket->events = socket->events - WM_EVENT_WRITE;
-				wmWorkerLoop_update(socket->fd, socket->events, socket->loop_type);
-			}
-			return ret_num;
-		}
-		if (!_add_Loop) {
-			socket->events |= WM_EVENT_WRITE;
-			wmWorkerLoop_update(socket->fd, socket->events, socket->loop_type);
-			_add_Loop = true;
-		}
-		//可写的时候，自动唤醒
-		event_wait(socket, WM_EVENT_READ);
-	}
-	set_err(socket, WM_ERROR_SESSION_CLOSED);
-	return WM_SOCKET_CLOSE;
-}
-
-/**
- * 不同的loop_type操作是不同的
- */
-bool event_wait(wmSocket* socket, int event) {
-	/**
-	 * runtime中是不同的，只有每次调用read或者相关方法的时候，才会去监听
-	 */
-	if (socket->loop_type == WM_LOOP_RUNTIME) {
-		if (!wmWorkerLoop_add(socket->fd, event, socket->loop_type)) {
-			return false;
-		}
-	}
-	wmCoroutine_yield();
-	if (socket->loop_type == WM_LOOP_RUNTIME) {
-		wmWorkerLoop_del(socket->fd); //删除监听
-	}
-	return true;
 }
 
 /**
@@ -368,6 +360,10 @@ int wmSocket_close(wmSocket *socket) {
 	if (socket->closed == true) {
 		return 0;
 	}
+	if (socket->events != WM_EVENT_NULL) {
+		wmWorkerLoop_del(socket); //释放事件
+	}
+
 	int ret = wm_socket_close(socket->fd);
 	socket->closed = true;
 	set_err(socket, WM_ERROR_SESSION_CLOSED);
@@ -381,12 +377,18 @@ void wmSocket_free(wmSocket *socket) {
 	if (!socket) {
 		return;
 	}
+	if (socket->events != WM_EVENT_NULL) {
+		wmWorkerLoop_del(socket);
+	}
 	//如果还在连接，那么调用close
 	if (socket->closed == false) {
 		wmSocket_close(socket);
 	}
 	if (socket->write_buffer) {
 		wmString_free(socket->write_buffer);
+	}
+	if (socket->events != WM_EVENT_NULL) {
+		wmWorkerLoop_del(socket); //释放事件
 	}
 	wm_free(socket);	//释放socket
 	socket = NULL;
