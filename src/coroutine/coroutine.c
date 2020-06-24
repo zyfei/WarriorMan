@@ -1,6 +1,7 @@
 #include "coroutine.h"
 
 static long last_cid = 0; //自增id
+static long total_num = 0; //协程总数
 static wmHash_INT_PTR *coroutines = NULL; //保存所有协程
 static wmHash_INT_PTR *user_yield_coros = NULL; //被yield的协程
 
@@ -54,6 +55,7 @@ long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc, zval *a
 		wm_free(task);
 		return -1;
 	}
+	total_num++; //总数量+1
 
 	//保存current_task或者main_task协程信息 。如果current_task等于空，代表是主协程
 	//也就是把上一个协程堆栈，保存到main_task或者current_task中
@@ -327,6 +329,7 @@ bool wmCoroutine_resume(wmCoroutine *task) {
 void close_coro(wmCoroutine *task) {
 	//在hash表中删除
 	WM_HASH_DEL(WM_HASH_INT_STR, coroutines, task->cid);
+	total_num--; //总数量-1
 
 	//yield表中删除
 	WM_HASH_DEL(WM_HASH_INT_STR, user_yield_coros, task->cid);

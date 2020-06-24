@@ -47,7 +47,6 @@ static RUNTIME_SIZE_T socket_read(php_stream *stream, char *buf, size_t count) {
 	}
 	wmSocket *sock = abstract->socket;
 
-
 	ssize_t nr_bytes = 0;
 	if (UNEXPECTED(!sock)) {
 		return 0;
@@ -428,7 +427,6 @@ static php_stream_ops tcp_socket_ops = { //
 php_stream *wmRuntime_socket_create(const char *proto, size_t protolen, const char *resourcename, size_t resourcenamelen, //
 	const char *persistent_id, int options, int flags, struct timeval *timeout, php_stream_context *context STREAMS_DC
 	) {
-
 	php_stream *stream;
 	php_wm_netstream_data_t *abstract;
 	wmSocket *sock;

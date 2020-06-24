@@ -14,6 +14,47 @@ static inline void set_err(wmSocket* socket, int e) {
 }
 
 /**
+ * 获取socket执行某个类型的协程
+ */
+static inline wmCoroutine* get_bound_co(wmSocket* socket, const enum wmEvent_type event) {
+	if (event & WM_EVENT_READ) {
+		if (socket->read_co) {
+			return socket->read_co;
+		}
+	}
+	if (event & WM_EVENT_WRITE) {
+		if (socket->write_co) {
+			return socket->write_co;
+		}
+	}
+	return NULL;
+}
+
+static inline void check_bound_co(wmSocket* socket, const enum wmEvent_type event) {
+	wmCoroutine* co = get_bound_co(socket, event);
+	if (co) {
+		wmCoroutine* curr_co = wmCoroutine_get_current();
+		wmError("Socket#%d has already been bound to another coroutine#%ld,%s of the same socket in coroutine#%ld at the same time is not allowed", socket->fd,
+			co->cid,
+			(event == WM_EVENT_READ ?
+				"reading" :
+				(event == WM_EVENT_WRITE ? "writing" : (socket->read_co && socket->write_co ? "reading or writing" : (socket->read_co ? "reading" : "writing")))),
+			curr_co->cid);
+	}
+}
+
+static inline bool is_available(wmSocket* socket, const enum wmEvent_type event) {
+	if (event != WM_EVENT_NULL) {
+		check_bound_co(socket, event);
+	}
+	if (socket->closed) {
+		set_err(socket, ECONNRESET);
+		return false;
+	}
+	return true;
+}
+
+/**
  * 创建一个socket对象
  */
 wmSocket * wmSocket_create(int transport, int loop_type) {
@@ -63,6 +104,9 @@ wmSocket * wmSocket_pack(int fd, int transport, int loop_type) {
  * 等待连接
  */
 wmSocket * wmSocket_accept(wmSocket* socket, int new_socket_loop_type) {
+	if (!is_available(socket, WM_EVENT_READ)) {
+		return NULL;
+	}
 	int connfd;
 	while (!socket->closed) {
 		do {
@@ -92,11 +136,16 @@ wmSocket * wmSocket_accept(wmSocket* socket, int new_socket_loop_type) {
  * 主动连接
  */
 bool wmSocket_connect(wmSocket *socket, char* _host, int _port) {
+	if (!is_available(socket, WM_EVENT_WRITE) || !is_available(socket, WM_EVENT_READ)) {
+		return false;
+	}
+
 	int retval;
 	if (!socket->closed) {
 		do {
 			retval = wm_socket_connect(socket->fd, _host, _port);
 		} while (retval < 0 && errno == EINTR);
+
 		if (retval < 0) {
 			if (errno != EINPROGRESS) {
 				set_err(socket, errno);
@@ -144,6 +193,10 @@ ssize_t wmSocket_peek(wmSocket* socket, void *__buf, size_t __n) {
  * 暂时只有runtime用
  */
 ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sockaddr* _addr, socklen_t *_socklen) {
+	if (!is_available(socket, WM_EVENT_READ)) {
+		return -1;
+	}
+
 	ssize_t retval;
 	socklen_t addr_len = sizeof(struct sockaddr_in);
 	struct sockaddr_in servaddr;
@@ -161,6 +214,10 @@ ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sock
  * 读数据
  */
 int wmSocket_read(wmSocket* socket, char *buf, int len) {
+	if (!is_available(socket, WM_EVENT_READ)) {
+		return WM_SOCKET_CLOSE;
+	}
+
 	int ret;
 	while (!socket->closed) {
 		do {
@@ -192,8 +249,7 @@ int wmSocket_read(wmSocket* socket, char *buf, int len) {
  * 所有写入都是协程同步的
  */
 int wmSocket_send(wmSocket *socket, const void *buf, size_t len) {
-	if (socket->closed == true) {
-		set_err(socket, WM_ERROR_SESSION_CLOSED);
+	if (!is_available(socket, WM_EVENT_WRITE)) {
 		return WM_SOCKET_CLOSE;
 	}
 	if (!socket->write_buffer) {
@@ -250,9 +306,8 @@ int wmSocket_send(wmSocket *socket, const void *buf, size_t len) {
  * 全发送,不管缓冲区
  */
 int wmSocket_write(wmSocket *socket, const void *buf, size_t len) {
-	if (socket->closed == true) {
-		set_err(socket, WM_ERROR_SESSION_CLOSED);
-		return WM_SOCKET_CLOSE; //表示关闭
+	if (!is_available(socket, WM_EVENT_WRITE)) {
+		return WM_SOCKET_CLOSE;
 	}
 	int ret;
 	int ret_num = 0;
@@ -299,8 +354,15 @@ bool event_wait(wmSocket* socket, int event) {
 	if (event & WM_EVENT_WRITE) {
 		socket->write_co = wmCoroutine_get_current();
 	}
-
 	wmCoroutine_yield();
+
+	//下面删除对应的co
+	if (event & WM_EVENT_READ) {
+		socket->read_co = NULL;
+	}
+	if (event & WM_EVENT_WRITE) {
+		socket->write_co = NULL;
+	}
 	return true;
 }
 
@@ -357,16 +419,21 @@ bool wmSocket_shutdown(wmSocket *socket, int __how) {
  * 关闭这个连接
  */
 int wmSocket_close(wmSocket *socket) {
+	if (socket->events != WM_EVENT_NULL) {
+		socket->events = WM_EVENT_NULL;
+		wmWorkerLoop_del(socket); //释放事件
+		if (socket->read_co) {
+			wmCoroutine_resume(socket->read_co);
+		}
+		if (socket->write_co) {
+			wmCoroutine_resume(socket->write_co);
+		}
+	}
 	if (socket->closed == true) {
 		return 0;
 	}
-	if (socket->events != WM_EVENT_NULL) {
-		wmWorkerLoop_del(socket); //释放事件
-	}
-
-	int ret = wm_socket_close(socket->fd);
 	socket->closed = true;
-	set_err(socket, WM_ERROR_SESSION_CLOSED);
+	int ret = wm_socket_close(socket->fd);
 	return ret;
 }
 

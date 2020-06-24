@@ -494,13 +494,6 @@ bool wmWorker_stop(wmWorker* worker) {
 
 //检查环境
 void checkEnv() {
-	//检查是不是在协程环境
-	wmCoroutine * cor = wmCoroutine_get_current();
-	if (cor == NULL) {
-		wmError("Only run in coroutine mode \n");
-		return;
-	}
-
 	//检查是否是cli模式
 	zend_string* _php_sapi = zend_string_init("PHP_SAPI", strlen("PHP_SAPI"), 0);
 	zval* _php_sapi_zval = zend_get_constant(_php_sapi);

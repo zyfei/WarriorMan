@@ -135,7 +135,6 @@ ssize_t wm_socket_send(int sock, const void *buf, size_t len, int flag) {
 
 int wm_socket_close(int fd) {
 	int ret;
-
 	ret = close(fd);
 	if (ret < 0) {
 		wmWarn("Error has occurred: (fd=%d,errno %d) %s", fd, errno, strerror(errno));

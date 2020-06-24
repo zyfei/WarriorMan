@@ -22,17 +22,6 @@ static inline int event_decode(int events) {
 }
 
 /**
- * 删除事件
- */
-bool _loop_del(int fd) {
-	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, fd, NULL) < 0) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		return false;
-	}
-	return true;
-}
-
-/**
  * 恢复协程&用于loop_wait回调
  */
 bool loop_callback_coroutine_resume(wmSocket* socket, int event) {
@@ -45,7 +34,7 @@ bool loop_callback_coroutine_resume(wmSocket* socket, int event) {
 	} else if (event == EPOLLOUT && socket->write_co) {
 		return wmCoroutine_resume(socket->write_co);
 	}
-	wmWarn("Error has occurred: loop_callback_coroutine_resume fail. will del event....");
+	wmWarn("Error has occurred: loop_callback_coroutine_resume fail. fd=%d event=%d .will del event....", socket->fd, socket->events);
 	wmWorkerLoop_del(socket);
 	return false;
 }
@@ -169,7 +158,11 @@ bool wmWorkerLoop_remove(wmSocket* socket, int event) {
 
 bool wmWorkerLoop_del(wmSocket* socket) {
 	socket->events = WM_EVENT_NULL;
-	return _loop_del(socket->fd);
+	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, socket->fd, NULL) < 0) {
+		wmWarn("Error has occurred: fd=%d (errno %d) %s", socket->fd, errno, strerror(errno));
+		return false;
+	}
+	return true;
 }
 
 /**

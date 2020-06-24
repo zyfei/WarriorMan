@@ -41,8 +41,8 @@ typedef struct {
 	bool shutdown_write;
 } wmSocket;
 
-wmSocket * wmSocket_create(int transport, int loop_type);
-wmSocket * wmSocket_pack(int fd, int transport, int loop_type);
+wmSocket* wmSocket_create(int transport, int loop_type);
+wmSocket* wmSocket_pack(int fd, int transport, int loop_type);
 int wmSocket_read(wmSocket* socket, char *buf, int len);
 int wmSocket_send(wmSocket *socket, const void *buf, size_t len);
 int wmSocket_write(wmSocket *socket, const void *buf, size_t len); //不管缓冲区
