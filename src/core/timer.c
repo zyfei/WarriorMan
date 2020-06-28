@@ -95,21 +95,22 @@ void wmTimerWheel_add(wmTimerWheel *tw, wmTimerWheel_Node *node, uint32_t ticks)
 }
 
 //快速的添加
-void wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void *ud, uint32_t ticks) {
+wmTimerWheel_Node* wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void *ud, uint32_t ticks) {
 	wmTimerWheel_Node *node1 = (wmTimerWheel_Node *) wm_malloc(sizeof(wmTimerWheel_Node));
 	bzero(node1, sizeof(wmTimerWheel_Node));
 	wmTimerWheel_node_init(node1, cb, ud);
 	wmTimerWheel_add(tw, node1, ticks);
+	return node1;
 }
 
 // 删除结点
-//int wmTimerWheel_del(wmTimerWheel *tw, wmTimerWheel_Node *node) {
-//	if (!wmList_is_empty((wmListNode*) node)) {
-//		wmList_remote((wmListNode*) node);
-//		return 1;
-//	}
-//	return 0;
-//}
+int wmTimerWheel_del(wmTimerWheel *tw, wmTimerWheel_Node *node) {
+	if (!wmList_is_empty((wmListNode*) node)) {
+		wmList_remote((wmListNode*) node);
+		return 1;
+	}
+	return 0;
+}
 
 /**
  * 其余表盘开始走

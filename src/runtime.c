@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "wm_socket.h"
 
 typedef struct {
 	php_netstream_data_t stream;
@@ -51,7 +52,7 @@ static RUNTIME_SIZE_T socket_read(php_stream *stream, char *buf, size_t count) {
 	if (UNEXPECTED(!sock)) {
 		return 0;
 	}
-	nr_bytes = wmSocket_read(sock, buf, count);
+	nr_bytes = wmSocket_read(sock, buf, count,1000);
 	if (nr_bytes == WM_SOCKET_ERROR || nr_bytes == WM_SOCKET_CLOSE) {
 		stream->eof = 1;
 	} else {
@@ -271,7 +272,7 @@ static inline int socket_recvfrom(wmSocket *sock, char *buf, size_t buflen, zend
 			}
 		}
 	} else {
-		ret = wmSocket_read(sock, buf, buflen);
+		ret = wmSocket_read(sock, buf, buflen,1000);
 	}
 	return ret;
 }

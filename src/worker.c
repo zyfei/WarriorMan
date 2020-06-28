@@ -1,7 +1,8 @@
 #include "worker.h"
-
-#include "../include/worker/wm_signal.h"
+#include "wm_signal.h"
+#include "connection.h"
 #include "coroutine.h"
+#include "loop.h"
 
 static unsigned int _last_id = 0;
 static wmString *_processTitle = NULL;

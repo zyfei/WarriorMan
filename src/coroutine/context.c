@@ -1,3 +1,4 @@
+#include "header.h"
 #include "context.h"
 
 static void wmContext_func(void *arg);

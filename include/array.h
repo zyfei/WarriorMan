@@ -1,9 +1,6 @@
 #ifndef WM_ARRAY_H
 #define WM_ARRAY_H
 
-#include "header.h"
-#include "log.h"
-
 typedef struct _wmArray {
 	void **pages;
 	uint16_t page_num; //当前的页数

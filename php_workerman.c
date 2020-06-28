@@ -2,6 +2,7 @@
 #include "workerman.h"
 #include "base.h"
 #include "worker.h"
+#include "connection.h"
 #include "runtime.h"
 
 //创建协程接口方法声明

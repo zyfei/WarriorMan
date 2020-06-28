@@ -5,8 +5,6 @@
 #define _COROUTINE_SOCKET_H
 
 #include "base.h"
-#include "coroutine.h"
-#include "loop.h"
 #include "wm_socket.h"
 
 extern zend_class_entry workerman_connection_ce;

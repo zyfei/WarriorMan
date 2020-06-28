@@ -1,4 +1,6 @@
+#include "header.h"
 #include "array.h"
+#include "log.h"
 
 /**
  *  创建数组

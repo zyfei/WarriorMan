@@ -78,6 +78,11 @@ enum wmConnection_status {
 //array
 #define WM_ARRAY_PAGE_MAX  1024 //wmArray默认的page数是多少，每一次扩展都会申请一页的内存
 
+
+//socket
+#define WM_SOCKET_MAX_TIMEOUT 2147483647 //
+#define WM_SOCKET_DEFAULT_CONNECT_TIMEOUT 1 //
+
 #define wm_malloc              malloc
 #define wm_free                free
 #define wm_calloc              calloc

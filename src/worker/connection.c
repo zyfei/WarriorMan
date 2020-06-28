@@ -1,4 +1,6 @@
 #include "connection.h"
+#include "coroutine.h"
+#include "loop.h"
 
 static long wm_coroutine_socket_last_id = 0;
 static wmHash_INT_PTR *wm_connections = NULL; //记录着正在连接状态的conn
@@ -87,8 +89,7 @@ void wmConnection_read(wmConnection* connection) {
 
 	//开始读消息
 	while (connection && connection->_status == WM_CONNECTION_STATUS_ESTABLISHED) {
-
-		int ret = wmSocket_read(connection->socket, _read_buffer_tmp->str, _read_buffer_tmp->size);
+		int ret = wmSocket_read(connection->socket, _read_buffer_tmp->str, _read_buffer_tmp->size, WM_SOCKET_MAX_TIMEOUT);
 
 		//触发onError
 		if (ret == WM_SOCKET_ERROR) {

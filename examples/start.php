@@ -47,8 +47,8 @@ $worker->onError = function ($connection, $code, $msg) {
 $worker->onClose = function ($connection) {
 	echo "connection closed\n";
 };
-
-// 监听另外一个端口
+	
+	// 监听另外一个端口
 $worker2 = new Warriorman\Worker("tcp://0.0.0.0:8081", array(
 	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
 	"count" => 1 // 进程数量

@@ -33,11 +33,11 @@ void sig_handler(int signalno) {
  * 等待&处理signal信号
  */
 void wmSignal_wait() {
-	wmSocket* socket = wmSocket_pack(signal_fd[0], WM_SOCK_TCP,WM_LOOP_SEMI_AUTO);
+	wmSocket* socket = wmSocket_pack(signal_fd[0], WM_SOCK_TCP, WM_LOOP_SEMI_AUTO);
 	//监听read事件
 	wmWorkerLoop_add(socket, WM_EVENT_READ);
 	while (1) {
-		int ret = wmSocket_read(socket, signals, 1024);
+		int ret = wmSocket_read(socket, signals, 1024, WM_SOCKET_MAX_TIMEOUT);
 		if (ret < 0) {
 			break;
 		}

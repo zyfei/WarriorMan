@@ -1,10 +1,6 @@
 #ifndef WM_FILE_H
 #define WM_FILE_H
 
-#include "header.h"
-#include "log.h"
-#include "wm_string.h"
-
 int wm_tmpfile(char *filename);
 long wm_file_get_size(FILE *fp);
 long wm_file_size(const char *filename);

@@ -29,6 +29,7 @@ bool loop_callback_coroutine_resume(wmSocket* socket, int event) {
 		wmError("Error has occurred: loop_callback_coroutine_resume . wmCoroutine is NULL");
 		return false;
 	}
+
 	if (event == EPOLLIN && socket->read_co) {
 		return wmCoroutine_resume(socket->read_co);
 	} else if (event == EPOLLOUT && socket->write_co) {
@@ -78,7 +79,7 @@ bool wmWorkerLoop_set_handler(int event, int type, loop_callback_func_t fn) {
 	return true;
 }
 
-loop_callback_func_t loop_get_handler(int event, int type) {
+loop_callback_func_t wmWorkerLoop_get_handler(int event, int type) {
 	loop_callback_func_t *handlers;
 	switch (event) {
 	case EPOLLIN:
@@ -189,7 +190,7 @@ void wmWorkerLoop_loop() {
 
 			//read
 			if (events[i].events & EPOLLIN) {
-				fn = loop_get_handler(EPOLLIN, socket->loop_type);
+				fn = wmWorkerLoop_get_handler(EPOLLIN, socket->loop_type);
 				if (fn != NULL) {
 					fn(socket, EPOLLIN);
 				}
@@ -197,7 +198,7 @@ void wmWorkerLoop_loop() {
 
 			//write 如果是可写，那么就恢复协程
 			if (events[i].events & EPOLLOUT) {
-				fn = loop_get_handler(EPOLLOUT, socket->loop_type);
+				fn = wmWorkerLoop_get_handler(EPOLLOUT, socket->loop_type);
 				if (fn != NULL) {
 					fn(socket, EPOLLOUT);
 				}

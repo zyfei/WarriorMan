@@ -5,8 +5,7 @@
 #define _WM_SERVER_H
 
 #include "base.h"
-#include "connection.h"
-#include "coroutine.h"
+#include "wm_socket.h"
 
 extern zend_class_entry workerman_worker_ce;
 extern zend_class_entry *workerman_worker_ce_ptr;

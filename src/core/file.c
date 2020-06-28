@@ -1,3 +1,6 @@
+#include "header.h"
+#include "log.h"
+#include "wm_string.h"
 #include "file.h"
 
 int wm_tmpfile(char *filename) {

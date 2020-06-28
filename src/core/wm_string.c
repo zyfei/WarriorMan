@@ -1,3 +1,5 @@
+#include "header.h"
+#include "log.h"
 #include "wm_string.h"
 
 /**

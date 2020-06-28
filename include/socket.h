@@ -4,8 +4,6 @@
 #ifndef _SOCKET_H
 #define _SOCKET_H
 
-#include "header.h"
-#include "log.h"
 
 int wm_socket_create(int domain, int type, int protocol); //创建套接字
 int wm_socket_set_nonblock(int sock); //设置为非阻塞

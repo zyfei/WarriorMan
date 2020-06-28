@@ -1,9 +1,6 @@
 #ifndef _WM_STRING_H
 #define _WM_STRING_H
 
-#include "header.h"
-#include "log.h"
-
 typedef struct {
 	size_t length; //当前字符串长度
 	size_t size; //为字符串申请总空间大小

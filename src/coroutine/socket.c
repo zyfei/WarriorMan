@@ -1,4 +1,5 @@
 #include "wm_socket.h"
+#include "socket.h"
 #include "loop.h"
 
 static bool bufferIsFull(wmSocket *socket);
@@ -30,6 +31,9 @@ static inline wmCoroutine* get_bound_co(wmSocket* socket, const enum wmEvent_typ
 	return NULL;
 }
 
+/**
+ * 如果读写某个协程正在被使用，不允许再被使用s
+ */
 static inline void check_bound_co(wmSocket* socket, const enum wmEvent_type event) {
 	wmCoroutine* co = get_bound_co(socket, event);
 	if (co) {
@@ -43,6 +47,9 @@ static inline void check_bound_co(wmSocket* socket, const enum wmEvent_type even
 	}
 }
 
+/**
+ * 是否运行执行
+ */
 static inline bool is_available(wmSocket* socket, const enum wmEvent_type event) {
 	if (event != WM_EVENT_NULL) {
 		check_bound_co(socket, event);
@@ -52,6 +59,88 @@ static inline bool is_available(wmSocket* socket, const enum wmEvent_type event)
 		return false;
 	}
 	return true;
+}
+
+/**
+ * 读超时处理
+ */
+void timer_read_callback(void *_socket) {
+	wmSocket* socket = (wmSocket*) _socket;
+	set_err(socket, ETIMEDOUT);
+	socket->read_timer = NULL;
+	loop_callback_func_t fn = wmWorkerLoop_get_handler(EPOLLIN, socket->loop_type);
+	fn(socket, EPOLLIN);
+}
+
+/**
+ * 写超时处理
+ */
+void timer_write_callback(void *_socket) {
+	wmSocket* socket = (wmSocket*) _socket;
+	socket->write_timer = NULL;
+	loop_callback_func_t fn = wmWorkerLoop_get_handler(EPOLLOUT, socket->loop_type);
+	fn(socket, EPOLLOUT);
+}
+
+/**
+ * 添加一个写定时器
+ */
+void timer_add(wmSocket *socket, int event, uint32_t ticks) {
+	if (event == WM_EVENT_READ) {
+		if (socket->read_timer) {
+			return;
+		}
+		//添加定时器,1秒之后回调timer_callback接口
+		socket->read_timer = wmTimerWheel_add_quick(&WorkerG.timer, timer_read_callback, (void*) socket, ticks);
+	} else if (event == WM_EVENT_WRITE) {
+		if (socket->write_timer) {
+			return;
+		}
+		//添加定时器,1秒之后回调timer_callback接口
+		socket->write_timer = wmTimerWheel_add_quick(&WorkerG.timer, timer_write_callback, (void*) socket, ticks);
+	} else {
+		abort();
+	}
+}
+
+/**
+ * 判断是否调用了定时器，并且相应处理
+ * 如果调用了定时器，返回true
+ */
+void timer_del(wmSocket *socket, int event) {
+	if (event == WM_EVENT_READ) {
+		if (socket->read_timer) { //如果没使用相应定时器，那么删除
+			wmTimerWheel_del(&WorkerG.timer, socket->read_timer); //没触发超时的话，删除定时器节点
+			socket->read_timer = NULL;
+		}
+	} else if (event & WM_EVENT_WRITE) {
+		if (socket->write_timer) { //如果没使用相应定时器，那么删除
+			wmTimerWheel_del(&WorkerG.timer, socket->write_timer); //没触发超时的话，删除定时器节点
+			socket->write_timer = NULL;
+		}
+	} else {
+		abort();
+	}
+}
+
+/**
+ * 检查timer是否使用过
+ */
+bool timer_used(wmSocket *socket, int event) {
+	if (event == WM_EVENT_READ) {
+		if (!socket->read_timer) { //如果使用了
+			return true;
+		}
+		return false;
+	} else if (event & WM_EVENT_WRITE) {
+		if (!socket->write_timer) { //如果没使用相应定时器，那么删除
+			return true;
+		}
+		return false;
+	} else {
+		abort();
+	}
+	return false;
 }
 
 /**
@@ -85,6 +174,8 @@ wmSocket * wmSocket_pack(int fd, int transport, int loop_type) {
 
 	socket->read_co = NULL;
 	socket->write_co = NULL;
+	socket->read_timer = NULL;
+	socket->write_timer = NULL;
 
 	socket->connect_host = NULL;
 	socket->connect_port = 0;
@@ -152,10 +243,12 @@ bool wmSocket_connect(wmSocket *socket, char* _host, int _port) {
 				wmWarn("wmSocket_connect fail. host=%s port=%d errno=%d", _host, _port, errno);
 				return false;
 			}
+
 			if (!event_wait(socket, WM_EVENT_WRITE)) {
 				set_err(socket, WM_ERROR_LOOP_FAIL);
 				return false;
 			}
+
 			//这里需要使用epoll监听可写事件，然后还需要有一个超时设置，
 			socklen_t len = sizeof(socket->errCode);
 			if (getsockopt(socket->fd, SOL_SOCKET, SO_ERROR, &socket->errCode, &len) < 0 || socket->errCode != 0) {
@@ -213,11 +306,10 @@ ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sock
 /**
  * 读数据
  */
-int wmSocket_read(wmSocket* socket, char *buf, int len) {
+int wmSocket_read(wmSocket* socket, char *buf, int len, int timeout) {
 	if (!is_available(socket, WM_EVENT_READ)) {
 		return WM_SOCKET_CLOSE;
 	}
-
 	int ret;
 	while (!socket->closed) {
 		do {
@@ -225,22 +317,29 @@ int wmSocket_read(wmSocket* socket, char *buf, int len) {
 		} while (ret < 0 && errno == EINTR);
 		//正常返回
 		if (ret > 0) {
+			timer_del(socket, WM_EVENT_READ);
 			return ret;
 		}
 		//连接关闭
 		if (ret == 0) {
 			socket->closed = true;
 			set_err(socket, WM_ERROR_SESSION_CLOSED_BY_CLIENT);
+			timer_del(socket, WM_EVENT_READ);
 			return WM_SOCKET_CLOSE;
 		}
 		if (ret < 0 && errno == EAGAIN) {
+			//添加一个读定时器，不会重复添加
+			timer_add(socket, WM_EVENT_READ, timeout);
 			if (event_wait(socket, WM_EVENT_READ)) {
 				continue;
 			}
+			//判断是否使用了定时器
+			if (timer_used(socket, WM_EVENT_READ)) {
+				return WM_SOCKET_ERROR;
+			}
 		}
-		set_err(socket, WM_ERROR_READ_FAIL);
-		return WM_SOCKET_ERROR;
 	}
+	timer_del(socket, WM_EVENT_READ);
 	set_err(socket, WM_ERROR_SESSION_CLOSED);
 	return WM_SOCKET_CLOSE;
 }
@@ -363,6 +462,7 @@ bool event_wait(wmSocket* socket, int event) {
 	if (event & WM_EVENT_WRITE) {
 		socket->write_co = NULL;
 	}
+
 	return true;
 }
 

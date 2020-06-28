@@ -6,8 +6,8 @@
 
 #include "header.h"
 #include "coroutine.h"
-#include "socket.h"
 #include "wm_string.h"
+#include "timer.h"
 
 typedef void (*wm_socket_func_t)(void*);
 
@@ -39,11 +39,18 @@ typedef struct {
 	 */
 	bool shutdown_read;
 	bool shutdown_write;
+
+	/**
+	 * 判断操作是否超时
+	 */
+	wmTimerWheel_Node* read_timer;
+	wmTimerWheel_Node* write_timer;
+
 } wmSocket;
 
 wmSocket* wmSocket_create(int transport, int loop_type);
 wmSocket* wmSocket_pack(int fd, int transport, int loop_type);
-int wmSocket_read(wmSocket* socket, char *buf, int len);
+int wmSocket_read(wmSocket* socket, char *buf, int len, int timeout);
 int wmSocket_send(wmSocket *socket, const void *buf, size_t len);
 int wmSocket_write(wmSocket *socket, const void *buf, size_t len); //不管缓冲区
 int wmSocket_close(wmSocket *socket);
