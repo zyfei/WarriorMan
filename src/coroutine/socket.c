@@ -5,6 +5,7 @@
 static bool bufferIsFull(wmSocket *socket);
 static void checkBufferWillFull(wmSocket *socket);
 static bool event_wait(wmSocket* socket, int event);
+static int total_num = 0;
 
 /**
  * 设置socket的各种错误
@@ -192,6 +193,8 @@ wmSocket * wmSocket_pack(int fd, int transport, int loop_type) {
 	socket->shutdown_write = false;
 
 	wm_socket_set_nonblock(socket->fd);
+
+	total_num++;
 	return socket;
 }
 
@@ -549,9 +552,6 @@ int wmSocket_close(wmSocket *socket) {
 			wmCoroutine_resume(socket->write_co);
 		}
 	}
-	if (socket->closed == true) {
-		return 0;
-	}
 	socket->closed = true;
 	int ret = wm_socket_close(socket->fd);
 	return ret;
@@ -564,10 +564,6 @@ void wmSocket_free(wmSocket *socket) {
 	if (!socket) {
 		return;
 	}
-	//如果还在连接，那么调用close
-	if (socket->closed == false) {
-		wmSocket_close(socket);
-	}
 	if (socket->write_buffer) {
 		wmString_free(socket->write_buffer);
 	}
@@ -576,4 +572,5 @@ void wmSocket_free(wmSocket *socket) {
 	}
 	wm_free(socket);	//释放socket
 	socket = NULL;
+	total_num--;
 }

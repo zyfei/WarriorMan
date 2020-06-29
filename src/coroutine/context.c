@@ -23,7 +23,6 @@ void wmContext_init(wmContext *ctx, size_t stack_size, coroutine_func_t fn, void
 	//而make_fcontext这个设置上下文的函数式用的boost.asm里面的库。
 	ctx->ctx_ = make_fcontext(sp, ctx->stack_size_, (void (*)(intptr_t)) &wmContext_func); //
 }
-;
 
 /**
  * 执行php协程，并且切换上下文
