@@ -749,7 +749,7 @@ void acceptConnection(wmWorker* worker) {
 	zval* __zval;
 	zend_fcall_info_cache call_read;
 	while (!worker->socket->closed) {
-		wmSocket* socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO);
+		wmSocket* socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO, WM_SOCKET_MAX_TIMEOUT);
 		if (socket == NULL) {
 			wmWarn("acceptConnection fail. %s", socket->errMsg);
 			continue;

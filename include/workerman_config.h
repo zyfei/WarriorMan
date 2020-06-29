@@ -81,7 +81,7 @@ enum wmConnection_status {
 
 //socket
 #define WM_SOCKET_MAX_TIMEOUT 2147483647 //
-#define WM_SOCKET_DEFAULT_CONNECT_TIMEOUT 1 //
+#define WM_SOCKET_DEFAULT_CONNECT_TIMEOUT 1000 //
 
 #define wm_malloc              malloc
 #define wm_free                free

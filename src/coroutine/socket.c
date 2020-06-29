@@ -131,15 +131,18 @@ bool timer_used(wmSocket *socket, int event) {
 		if (!socket->read_timer) { //如果使用了
 			return true;
 		}
+		errno = ETIMEDOUT;
 		return false;
 	} else if (event & WM_EVENT_WRITE) {
 		if (!socket->write_timer) { //如果没使用相应定时器，那么删除
 			return true;
 		}
+		errno = ETIMEDOUT;
 		return false;
 	} else {
 		abort();
 	}
+	errno = ETIMEDOUT;
 	return false;
 }
 
@@ -176,6 +179,7 @@ wmSocket * wmSocket_pack(int fd, int transport, int loop_type) {
 	socket->write_co = NULL;
 	socket->read_timer = NULL;
 	socket->write_timer = NULL;
+	socket->read_timeout = -1; //这个socket读操作的超时时间
 
 	socket->connect_host = NULL;
 	socket->connect_port = 0;
@@ -194,7 +198,7 @@ wmSocket * wmSocket_pack(int fd, int transport, int loop_type) {
 /**
  * 等待连接
  */
-wmSocket * wmSocket_accept(wmSocket* socket, int new_socket_loop_type) {
+wmSocket * wmSocket_accept(wmSocket* socket, int new_socket_loop_type, uint32_t timeout) {
 	if (!is_available(socket, WM_EVENT_READ)) {
 		return NULL;
 	}
@@ -204,29 +208,29 @@ wmSocket * wmSocket_accept(wmSocket* socket, int new_socket_loop_type) {
 			connfd = wm_socket_accept(socket->fd);
 		} while (connfd < 0 && errno == EINTR);
 		if (connfd < 0) {
-			if (errno != EAGAIN) {
-				set_err(socket, errno);
-				wmWarn("wmSocket_accept fail. %s", socket->errMsg);
-				return NULL;
+			//添加一个读定时器,如果读成功了，就不加了
+			timer_add(socket, WM_EVENT_READ, timeout);
+			if (errno == EAGAIN && event_wait(socket, WM_EVENT_READ) && !timer_used(socket, WM_EVENT_READ)) {
+				continue;
 			}
-			if (!event_wait(socket, WM_EVENT_READ)) {
-				set_err(socket, WM_ERROR_LOOP_FAIL);
-				wmWarn("wmSocket_accept fail. %s", socket->errMsg);
-				return NULL;
-			}
-			continue;
+			set_err(socket, errno);
+			wmWarn("wmSocket_accept fail. %s", socket->errMsg);
+			timer_del(socket, WM_EVENT_READ);
+			return NULL;
 		}
 		set_err(socket, 0);
+		timer_del(socket, WM_EVENT_READ);
 		return wmSocket_pack(connfd, socket->transport, new_socket_loop_type); //将得到的fd，包装成socket结构体
 	}
 	set_err(socket, WM_ERROR_SESSION_CLOSED);
+	timer_del(socket, WM_EVENT_READ);
 	return NULL;
 }
 
 /**
  * 主动连接
  */
-bool wmSocket_connect(wmSocket *socket, char* _host, int _port) {
+bool wmSocket_connect(wmSocket *socket, char* _host, int _port, uint32_t timeout) {
 	if (!is_available(socket, WM_EVENT_WRITE) || !is_available(socket, WM_EVENT_READ)) {
 		return false;
 	}
@@ -243,9 +247,10 @@ bool wmSocket_connect(wmSocket *socket, char* _host, int _port) {
 				wmWarn("wmSocket_connect fail. host=%s port=%d errno=%d", _host, _port, errno);
 				return false;
 			}
-
-			if (!event_wait(socket, WM_EVENT_WRITE)) {
-				set_err(socket, WM_ERROR_LOOP_FAIL);
+			//添加一个写定时器
+			timer_add(socket, WM_EVENT_WRITE, timeout);
+			if (!event_wait(socket, WM_EVENT_WRITE) || timer_used(socket, WM_EVENT_WRITE)) {
+				set_err(socket, errno);
 				return false;
 			}
 
@@ -253,12 +258,14 @@ bool wmSocket_connect(wmSocket *socket, char* _host, int _port) {
 			socklen_t len = sizeof(socket->errCode);
 			if (getsockopt(socket->fd, SOL_SOCKET, SO_ERROR, &socket->errCode, &len) < 0 || socket->errCode != 0) {
 				set_err(socket, socket->errCode);
+				timer_del(socket, WM_EVENT_WRITE);
 				return false;
 			}
 		}
 		socket->connect_host = _host;
 		socket->connect_port = _port;
 		set_err(socket, 0);
+		timer_del(socket, WM_EVENT_WRITE);
 		return retval;
 	}
 	set_err(socket, WM_ERROR_SESSION_CLOSED);
@@ -285,28 +292,44 @@ ssize_t wmSocket_peek(wmSocket* socket, void *__buf, size_t __n) {
  * 读数据
  * 暂时只有runtime用
  */
-ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sockaddr* _addr, socklen_t *_socklen) {
+ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sockaddr* _addr, socklen_t *_socklen, uint32_t timeout) {
 	if (!is_available(socket, WM_EVENT_READ)) {
 		return -1;
 	}
-
 	ssize_t retval;
 	socklen_t addr_len = sizeof(struct sockaddr_in);
 	struct sockaddr_in servaddr;
-	do {
-		bzero(&servaddr, sizeof(servaddr));
-		retval = recvfrom(socket->fd, __buf, __n, 0, (struct sockaddr*) &servaddr, &addr_len);
+	while (!socket->closed) {
+		do {
+			bzero(&servaddr, sizeof(servaddr));
+			retval = recvfrom(socket->fd, __buf, __n, 0, (struct sockaddr*) &servaddr, &addr_len);
 
-		wmTrace("recvfrom %ld/%ld bytes, errno=%d", retval, __n, errno);
-	} while (retval < 0 && ((errno == EINTR) || (errno == 0 && event_wait(socket, WM_EVENT_READ))));
-	set_err(socket, retval < 0 ? errno : 0);
+			wmTrace("recvfrom %ld/%ld bytes, errno=%d", retval, __n, errno);
+		} while (retval < 0 && errno == EINTR);
+		//正常返回
+		if (retval >= 0) {
+			set_err(socket, 0);
+			timer_del(socket, WM_EVENT_READ);
+			return retval;
+		}
+		//添加一个读定时器,如果读成功了，就不加了
+		timer_add(socket, WM_EVENT_READ, timeout);
+		if (errno == 0 && event_wait(socket, WM_EVENT_READ) && !timer_used(socket, WM_EVENT_READ)) {
+			continue;
+		}
+		set_err(socket, errno);
+		timer_del(socket, WM_EVENT_READ);
+		return WM_SOCKET_ERROR;
+	}
+	set_err(socket, WM_ERROR_SESSION_CLOSED);
+	timer_del(socket, WM_EVENT_READ);
 	return retval;
 }
 
 /**
  * 读数据
  */
-int wmSocket_read(wmSocket* socket, char *buf, int len, int timeout) {
+int wmSocket_read(wmSocket* socket, char *buf, int len, uint32_t timeout) {
 	if (!is_available(socket, WM_EVENT_READ)) {
 		return WM_SOCKET_CLOSE;
 	}
@@ -327,17 +350,14 @@ int wmSocket_read(wmSocket* socket, char *buf, int len, int timeout) {
 			timer_del(socket, WM_EVENT_READ);
 			return WM_SOCKET_CLOSE;
 		}
-		if (ret < 0 && errno == EAGAIN) {
-			//添加一个读定时器，不会重复添加
-			timer_add(socket, WM_EVENT_READ, timeout);
-			if (event_wait(socket, WM_EVENT_READ)) {
-				continue;
-			}
-			//判断是否使用了定时器
-			if (timer_used(socket, WM_EVENT_READ)) {
-				return WM_SOCKET_ERROR;
-			}
+		//添加一个读定时器,如果读成功了，就不加了
+		timer_add(socket, WM_EVENT_READ, timeout);
+		if (errno == EAGAIN && event_wait(socket, WM_EVENT_READ) && !timer_used(socket, WM_EVENT_READ)) {
+			continue;
 		}
+		set_err(socket, errno);
+		timer_del(socket, WM_EVENT_READ);
+		return WM_SOCKET_ERROR;
 	}
 	timer_del(socket, WM_EVENT_READ);
 	set_err(socket, WM_ERROR_SESSION_CLOSED);

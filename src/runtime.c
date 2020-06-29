@@ -52,7 +52,7 @@ static RUNTIME_SIZE_T socket_read(php_stream *stream, char *buf, size_t count) {
 	if (UNEXPECTED(!sock)) {
 		return 0;
 	}
-	nr_bytes = wmSocket_read(sock, buf, count,1000);
+	nr_bytes = wmSocket_read(sock, buf, count, sock->read_timeout);
 	if (nr_bytes == WM_SOCKET_ERROR || nr_bytes == WM_SOCKET_CLOSE) {
 		stream->eof = 1;
 	} else {
@@ -166,10 +166,11 @@ static int socket_connect(php_stream *stream, wmSocket *sock, php_stream_xport_p
 	if (host == NULL) {
 		return FAILURE;
 	}
+	uint32_t timeout = WM_SOCKET_DEFAULT_CONNECT_TIMEOUT;
 	if (xparam->inputs.timeout) { //暂时没有超时设置
-		//sock->set_timeout(xparam->inputs.timeout, SW_TIMEOUT_CONNECT);
+		timeout = xparam->inputs.timeout->tv_sec * 1000 + (uint32_t) xparam->inputs.timeout->tv_usec / 1000;
 	}
-	if (wmSocket_connect(sock, host, portno) == false) {
+	if (wmSocket_connect(sock, host, portno, timeout) == false) {
 		xparam->outputs.error_code = sock->errCode;
 		if (sock->errMsg) {
 			xparam->outputs.error_text = zend_string_init(sock->errMsg, strlen(sock->errMsg), 0);
@@ -205,10 +206,11 @@ static inline int socket_accept(php_stream *stream, wmSocket *sock, php_stream_x
 	php_sockaddr_storage sa;
 	socklen_t sl = sizeof(sa);
 
+	uint32_t timeout2 = WM_SOCKET_DEFAULT_CONNECT_TIMEOUT;
 	if (timeout) {
-		//sock->set_timeout(timeout, SW_TIMEOUT_READ);
+		timeout2 = timeout->tv_sec * 1000 + (uint32_t) timeout->tv_usec / 1000;
 	}
-	wmSocket* clisock = wmSocket_accept(sock, WM_LOOP_AUTO);
+	wmSocket* clisock = wmSocket_accept(sock, WM_LOOP_AUTO, timeout2);
 
 	if (clisock == NULL) {
 		error = sock->errCode;
@@ -259,7 +261,7 @@ static inline int socket_recvfrom(wmSocket *sock, char *buf, size_t buflen, zend
 		php_sockaddr_storage sa;
 		socklen_t sl = sizeof(sa);
 
-		ret = wmSocket_recvfrom(sock, buf, buflen, (struct sockaddr*) &sa, &sl);
+		ret = wmSocket_recvfrom(sock, buf, buflen, (struct sockaddr*) &sa, &sl,sock->read_timeout);
 		if (sl) {
 			php_network_populate_name_from_sockaddr((struct sockaddr*) &sa, sl, textaddr, addr, addrlen);
 		} else {
@@ -272,7 +274,7 @@ static inline int socket_recvfrom(wmSocket *sock, char *buf, size_t buflen, zend
 			}
 		}
 	} else {
-		ret = wmSocket_read(sock, buf, buflen,1000);
+		ret = wmSocket_read(sock, buf, buflen, 1000);
 	}
 	return ret;
 }
@@ -390,10 +392,8 @@ static int socket_set_option(php_stream *stream, int option, int value, void *pt
 		break;
 	}
 	case PHP_STREAM_OPTION_READ_TIMEOUT: {
-		struct timeval* a = (struct timeval*) ptrparam;
-		php_printf("time out %ld\n", a->tv_sec);
-		php_printf("PHP_STREAM_OPTION_READ_TIMEOUT  mei shi xian\n");
-		//abstract->socket->set_timeout((struct timeval*) ptrparam, SW_TIMEOUT_READ);
+		struct timeval* _read_timeout = (struct timeval*) ptrparam;
+		abstract->socket->read_timeout = _read_timeout->tv_sec * 1000 + (uint32_t) _read_timeout->tv_usec / 1000;
 		break;
 	}
 	case PHP_STREAM_OPTION_CHECK_LIVENESS: {

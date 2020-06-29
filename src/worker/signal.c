@@ -38,7 +38,7 @@ void wmSignal_wait() {
 	wmWorkerLoop_add(socket, WM_EVENT_READ);
 	while (1) {
 		int ret = wmSocket_read(socket, signals, 1024, WM_SOCKET_MAX_TIMEOUT);
-		if (ret < 0) {
+		if (ret < 0 && errno != ETIMEDOUT) {
 			break;
 		}
 		//每个信号值占1字节，所以按字节来逐个接收信号
