@@ -112,11 +112,13 @@ void timer_del(wmSocket *socket, int event) {
 	if (event == WM_EVENT_READ) {
 		if (socket->read_timer) { //如果没使用相应定时器，那么删除
 			wmTimerWheel_del(&WorkerG.timer, socket->read_timer); //没触发超时的话，删除定时器节点
+			wm_free(socket->read_timer);
 			socket->read_timer = NULL;
 		}
 	} else if (event & WM_EVENT_WRITE) {
 		if (socket->write_timer) { //如果没使用相应定时器，那么删除
 			wmTimerWheel_del(&WorkerG.timer, socket->write_timer); //没触发超时的话，删除定时器节点
+			wm_free(socket->write_timer);
 			socket->write_timer = NULL;
 		}
 	} else {
@@ -175,6 +177,7 @@ wmSocket * wmSocket_pack(int fd, int transport, int loop_type) {
 	socket->maxPackageSize = 0; //接收的最大包包长
 	socket->loop_type = loop_type;
 	socket->transport = transport;
+	socket->removed = false;
 
 	socket->read_co = NULL;
 	socket->write_co = NULL;
@@ -552,8 +555,13 @@ int wmSocket_close(wmSocket *socket) {
 			wmCoroutine_resume(socket->write_co);
 		}
 	}
-	socket->closed = true;
-	int ret = wm_socket_close(socket->fd);
+	int ret = 0;
+	if(!socket->removed){
+		socket->closed = true;
+		ret = wm_socket_close(socket->fd);
+		socket->removed = true;
+	}
+
 	return ret;
 }
 
@@ -564,11 +572,20 @@ void wmSocket_free(wmSocket *socket) {
 	if (!socket) {
 		return;
 	}
+	wmSocket_close(socket);
 	if (socket->write_buffer) {
 		wmString_free(socket->write_buffer);
 	}
 	if (socket->events != WM_EVENT_NULL) {
 		wmWorkerLoop_del(socket); //释放事件
+	}
+	if (socket->read_timer) {
+		wmTimerWheel_del(&WorkerG.timer, socket->read_timer);
+		wm_free(socket->read_timer);
+	}
+	if (socket->write_timer) {
+		wmTimerWheel_del(&WorkerG.timer, socket->write_timer);
+		wm_free(socket->write_timer);
 	}
 	wm_free(socket);	//释放socket
 	socket = NULL;

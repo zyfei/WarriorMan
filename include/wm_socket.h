@@ -17,7 +17,8 @@ typedef struct {
 	int maxSendBufferSize; //应用层发送缓冲区
 	int maxPackageSize; //接收的最大包包长
 	int events; //loop监听了什么事件
-	bool closed; //是否关闭
+	bool closed; //连接是否关闭
+	bool removed; //连接是否close
 	void* owner; //拥有人，比如connection创建的socket，owner就是这个connection
 	int errCode; //错误码
 	const char *errMsg; //错误描述
@@ -47,7 +48,6 @@ typedef struct {
 	wmTimerWheel_Node* write_timer;
 
 	uint32_t read_timeout; //读超时默认时间
-
 } wmSocket;
 
 wmSocket* wmSocket_create(int transport, int loop_type);
