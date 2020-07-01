@@ -18,7 +18,7 @@ PHP7 or Higher
 
 ## Basic Usage
 
-### A tcp server  (目前只支持tcp)
+### A tcp server  (支持tcp和udp)
 ```php
 <?php
 require_once 'MySQL.php';
@@ -78,6 +78,15 @@ $worker2 = new Warriorman\Worker("tcp://0.0.0.0:8081", array(
 $worker2->onMessage = function ($connection, $data) {
 	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";
 	$connection->send($responseStr);
+};
+
+// 监听另外一个端口
+$worker3 = new Warriorman\Worker("udp://0.0.0.0:8080", array(
+	"count" => 1 // 进程数量
+));
+$worker3->onMessage = function ($connection, $data) {
+	var_dump("udp:" . $data);
+	$connection->send("hello world");
 };
 
 Warriorman\Worker::runAll();
