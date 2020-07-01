@@ -104,10 +104,11 @@ void main_func(void *arg) {
 	zval _retval, *retval = &_retval;
 	//初始化一个新php栈，并且放入EG
 	vm_stack_init();
-	call = (zend_execute_data *) (EG(vm_stack_top));
 
-	//因为php中内存分配是有对齐的，所以取真实地址
-	EG(vm_stack_top) = (zval *) ((char *) call + PHP_CORO_TASK_SLOT * sizeof(zval));
+	//不需要预留内存了,我们的wmCoroutine是提前申请内存的
+	//call = (zend_execute_data *) (EG(vm_stack_top));
+	//EG(vm_stack_top) = (zval *) ((char *) call + PHP_CORO_TASK_SLOT * sizeof(zval));
+
 	//函数分配一块用于当前作用域的内存空间，返回结果是zend_execute_data的起始位置。
 #if PHP_VERSION_ID < 70400
 	call = zend_vm_stack_push_call_frame(ZEND_CALL_TOP_FUNCTION | ZEND_CALL_ALLOCATED, func, argc, fci_cache.called_scope, fci_cache.object);
@@ -248,7 +249,7 @@ void vm_stack_init() {
 
 	//修改现在的PHP栈，让它指向我们申请出来的新的PHP栈空间。
 	EG(vm_stack) = page;
-	EG(vm_stack)->top++;
+	EG(vm_stack)->top++; //++是为了什么，没搞懂。方便检查内存越界？
 	EG(vm_stack_top) = EG(vm_stack)->top;
 	EG(vm_stack_end) = EG(vm_stack)->end;
 #if PHP_VERSION_ID >= 70300

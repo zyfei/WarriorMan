@@ -36,7 +36,8 @@ static int _maxUserNameLength = 0; //用户名字的最大长度
 static int _maxWorkerNameLength = 0; //名字的最大长度
 static int _maxSocketNameLength = 0; //listen的最大长度
 
-static void acceptConnection(wmWorker* worker);
+static void acceptConnectionTcp(wmWorker* worker);
+static void acceptConnectionUdp(wmWorker* worker);
 static void parseSocketAddress(wmWorker* worker, zend_string *listen); //解析地址
 static void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_fcc);
 static void checkEnv();
@@ -60,9 +61,9 @@ static void alarm_wait();
 static void displayUI();
 static void echoWin(const char *format, ...);
 static char* getCurrentUser();
-void _log(const char *format, ...);
-void setUserAndGroup(wmWorker * worker);
-void resetStd(); //重设默认输出到文件
+static void _log(const char *format, ...);
+static void setUserAndGroup(wmWorker * worker);
+static void resetStd(); //重设默认输出到文件
 
 //初始化一下参数
 void wmWorker_init() {
@@ -114,33 +115,41 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 
 //服务器监听启动
 void _listen(wmWorker *worker) {
-	if (worker->fd == 0) {
-		worker->fd = wm_socket_create(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		wm_socket_set_nonblock(worker->fd);
+	if (worker->socket == NULL) {
+		worker->socket = wmSocket_create(worker->transport, WM_LOOP_SEMI_AUTO);
+		if (worker->socket == NULL) {
+			wmError("transport error");
+		}
+		worker->fd = worker->socket->fd;
 		if (wm_socket_bind(worker->fd, worker->host, worker->port) < 0) {
 			wmWarn("Error has occurred: port=%d (errno %d) %s", worker->port, errno, strerror(errno));
 			return;
 		}
+		//绑定fd
+		zend_update_property_long(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("fd"), worker->fd);
 
-		if (wm_socket_listen(worker->fd, worker->backlog) < 0) {
-			wmWarn("Error has occurred: fd=%d (errno %d) %s", worker->fd, errno, strerror(errno));
-			return;
+		//udp不需要listen
+		if (worker->transport == WM_SOCK_TCP) {
+			if (wm_socket_listen(worker->fd, worker->backlog) < 0) {
+				wmWarn("Error has occurred: fd=%d (errno %d) %s", worker->fd, errno, strerror(errno));
+				return;
+			}
 		}
 
 		if (WM_HASH_ADD(WM_HASH_INT_STR, _fd_workers, worker->fd,worker) < 0) {
 			wmWarn("_listen -> _fd_workers_add fail : fd=%d", worker->fd);
 			return;
 		}
-		//绑定fd
-		zend_update_property_long(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("fd"), worker->fd);
+
 	}
 }
 
 //取消监听
 void _unlisten(wmWorker *worker) {
-	if (worker->fd != 0) {
-		wm_socket_close(worker->fd);
+	if (worker->socket) {
 		worker->fd = 0;
+		wmSocket_free(worker->socket);
+		worker->socket = NULL;
 	}
 }
 
@@ -173,9 +182,17 @@ void wmWorker_run(wmWorker *worker) {
 	bind_callback(worker->_This, "onError", &worker->onError);
 	//设置回调方法 end
 
-	worker->socket = wmSocket_pack(worker->fd, worker->transport, WM_LOOP_SEMI_AUTO);
+	switch (worker->transport) {
+	case WM_SOCK_TCP:
+		acceptConnectionTcp(worker);
+		break;
+	case WM_SOCK_UDP:
+		acceptConnectionUdp(worker);
+		break;
+	default:
+		wmError("unknow transport")
+	}
 
-	acceptConnection(worker);
 }
 
 //全部运行
@@ -224,9 +241,9 @@ void monitorWorkers() {
 						if (WIFEXITED(status) == 0) { //不是正常结束的
 							int exit_code = WEXITSTATUS(status);
 							if (WIFSIGNALED(status)) {
-								_log("worker:%s pid:%d exit(%d) with status %d", worker->name->str, pid, exit_code, WTERMSIG(status));
+								_log("worker:%s pid:%d exit(%d) with status %d (WIFSIGNALED)", worker->name->str, pid, exit_code, WTERMSIG(status));
 							} else if (WIFSTOPPED(status)) {
-								_log("worker:%s pid:%d exit(%d) with status %d", worker->name->str, pid, exit_code, WSTOPSIG(status));
+								_log("worker:%s pid:%d exit(%d) with status %d (WIFSTOPPED)", worker->name->str, pid, exit_code, WSTOPSIG(status));
 							} else {
 								_log("worker:%s pid:%d exit(%d)", worker->name->str, pid, exit_code);
 							}
@@ -738,8 +755,9 @@ void bind_callback(zval* _This, const char* fun_name, php_fci_fcc **handle_fci_f
 
 /**
  * 由run方法循环调用
+ * 监控tcp连接
  */
-void acceptConnection(wmWorker* worker) {
+void acceptConnectionTcp(wmWorker* worker) {
 
 	//注册loop事件,半自动
 	wmWorkerLoop_add(worker->socket, WM_EVENT_EPOLLEXCLUSIVE);
@@ -748,6 +766,7 @@ void acceptConnection(wmWorker* worker) {
 	wmConnection* conn;
 	zval* __zval;
 	zend_fcall_info_cache call_read;
+
 	while (!worker->socket->closed) {
 		wmSocket* socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO, WM_SOCKET_MAX_TIMEOUT);
 		if (socket == NULL) {
@@ -813,6 +832,42 @@ void acceptConnection(wmWorker* worker) {
 }
 
 /**
+ * 由run方法循环调用
+ * 监控udp消息
+ */
+void acceptConnectionUdp(wmWorker* worker) {
+
+	//注册loop事件,半自动
+	wmWorkerLoop_add(worker->socket, WM_EVENT_EPOLLEXCLUSIVE);
+
+	//死循环accept，遇到消息就新创建协程处理
+	wmConnection* conn;
+	while (!worker->socket->closed) {
+		conn = wmConnection_create_udp(worker->fd);
+		//新的Connection对象
+		zend_object *obj = wm_connection_create_object(workerman_connection_ce_ptr);
+		zval *z = emalloc(sizeof(zval));
+		ZVAL_OBJ(z, obj);
+
+		wmConnectionObject* connection_object = (wmConnectionObject *) wm_connection_fetch_object(obj);
+
+		//接客
+		connection_object->connection = conn;
+		connection_object->connection->worker = (void*) worker;
+		connection_object->connection->_This = z;
+
+		//设置属性 start
+		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("id"), connection_object->connection->id);
+		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("fd"), connection_object->connection->fd);
+		//设置属性 end
+		//设置回调方法 start
+		conn->onMessage = worker->onMessage;
+		//设置回调方法 end
+		wmConnection_recvfrom(conn, worker->socket);
+	}
+}
+
+/**
  * 解析地址
  */
 void parseSocketAddress(wmWorker* worker, zend_string *listen) {
@@ -823,8 +878,7 @@ void parseSocketAddress(wmWorker* worker, zend_string *listen) {
 	}
 	if (strncmp("tcp", listen->val, transport_len) == 0) {
 		worker->transport = WM_SOCK_TCP;
-	}
-	if (strncmp("dup", listen->val, transport_len) == 0) {
+	} else if (strncmp("udp", listen->val, transport_len) == 0) {
 		worker->transport = WM_SOCK_UDP;
 	}
 	if (worker->transport == 0) {

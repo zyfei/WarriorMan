@@ -46,7 +46,6 @@ PHP_MSHUTDOWN_FUNCTION(workerman) {
  * 请求初始化阶段
  */
 PHP_RINIT_FUNCTION(workerman) {
-	php_printf("PHP_RINIT_FUNCTION\n");
 	//初始化base相关
 	workerman_base_init();
 	wmCoroutine_init();

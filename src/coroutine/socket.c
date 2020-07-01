@@ -157,6 +157,12 @@ wmSocket * wmSocket_create(int transport, int loop_type) {
 	switch (transport) {
 	case WM_SOCK_TCP:
 		fd = wm_socket_create(AF_INET, SOCK_STREAM, 0);
+		break;
+	case WM_SOCK_UDP:
+		fd = wm_socket_create(AF_INET, SOCK_DGRAM, 0);
+		break;
+	default:
+		return NULL;
 	}
 	if (fd < 0) {
 		return NULL;
@@ -300,17 +306,12 @@ ssize_t wmSocket_peek(wmSocket* socket, void *__buf, size_t __n) {
  */
 ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sockaddr* _addr, socklen_t *_socklen, uint32_t timeout) {
 	if (!is_available(socket, WM_EVENT_READ)) {
-		return -1;
+		return WM_SOCKET_CLOSE;
 	}
 	ssize_t retval;
-	socklen_t addr_len = sizeof(struct sockaddr_in);
-	struct sockaddr_in servaddr;
 	while (!socket->closed) {
 		do {
-			bzero(&servaddr, sizeof(servaddr));
-			retval = recvfrom(socket->fd, __buf, __n, 0, (struct sockaddr*) &servaddr, &addr_len);
-
-			wmTrace("recvfrom %ld/%ld bytes, errno=%d", retval, __n, errno);
+			retval = recvfrom(socket->fd, __buf, __n, 0, _addr, _socklen);
 		} while (retval < 0 && errno == EINTR);
 		//正常返回
 		if (retval >= 0) {
@@ -320,7 +321,7 @@ ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sock
 		}
 		//添加一个读定时器,如果读成功了，就不加了
 		timer_add(socket, WM_EVENT_READ, timeout);
-		if (errno == 0 && event_wait(socket, WM_EVENT_READ) && !timer_used(socket, WM_EVENT_READ)) {
+		if (errno == EAGAIN && event_wait(socket, WM_EVENT_READ) && !timer_used(socket, WM_EVENT_READ)) {
 			continue;
 		}
 		set_err(socket, errno);
@@ -329,7 +330,7 @@ ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sock
 	}
 	set_err(socket, WM_ERROR_SESSION_CLOSED);
 	timer_del(socket, WM_EVENT_READ);
-	return retval;
+	return WM_SOCKET_CLOSE;
 }
 
 /**
@@ -545,6 +546,7 @@ bool wmSocket_shutdown(wmSocket *socket, int __how) {
  * 关闭这个连接
  */
 int wmSocket_close(wmSocket *socket) {
+	socket->closed = true;
 	if (socket->events != WM_EVENT_NULL) {
 		socket->events = WM_EVENT_NULL;
 		wmWorkerLoop_del(socket); //释放事件
@@ -556,7 +558,7 @@ int wmSocket_close(wmSocket *socket) {
 		}
 	}
 	int ret = 0;
-	if(!socket->removed){
+	if (!socket->removed) {
 		socket->closed = true;
 		ret = wm_socket_close(socket->fd);
 		socket->removed = true;
@@ -575,9 +577,6 @@ void wmSocket_free(wmSocket *socket) {
 	wmSocket_close(socket);
 	if (socket->write_buffer) {
 		wmString_free(socket->write_buffer);
-	}
-	if (socket->events != WM_EVENT_NULL) {
-		wmWorkerLoop_del(socket); //释放事件
 	}
 	if (socket->read_timer) {
 		wmTimerWheel_del(&WorkerG.timer, socket->read_timer);

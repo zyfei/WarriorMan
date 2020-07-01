@@ -38,6 +38,7 @@ static void wm_connection_free_object(zend_object *object) {
 	if (sock->connection && sock->connection != NULL) {
 		//现在有这个时候，把别的正常的fd关闭的情况
 		wmConnection_free(sock->connection);
+		sock->connection = NULL;
 	}
 	//free_obj
 	zend_object_std_dtor(&sock->std);
@@ -123,7 +124,6 @@ PHP_METHOD(workerman_connection, send) {
 		php_error_docref(NULL, E_WARNING, "send error");
 		RETURN_FALSE
 	}
-
 	if (!wmConnection_send(conn, data, length)) {
 		php_error_docref(NULL, E_WARNING, "send error");
 		RETURN_FALSE
