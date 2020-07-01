@@ -217,9 +217,7 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 		}
 		return true;
 	} else if (connection->transport == WM_SOCK_UDP) {
-		php_printf("a\n");
 		int ret = sendto(connection->fd, buf, len, 0, connection->addr, connection->addr_len);
-		php_printf("b %d error %d %s\n", ret, errno, wmCode_str(errno));
 		if (ret < 0) {
 			return false;
 		}
