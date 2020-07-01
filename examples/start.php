@@ -51,7 +51,6 @@ $worker2 = new Warriorman\Worker("tcp://0.0.0.0:8081", array(
 	"count" => 1 // 进程数量
 ));
 $worker2->onMessage = function ($connection, $data) {
-	var_dump($data);
 	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";
 	$connection->send($responseStr);
 };
