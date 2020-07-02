@@ -13,6 +13,10 @@ $worker->onWorkerStart = function ($worker) {
 	var_dump("onWorkerStart ->" . $worker->workerId);
 	global $db;
 	$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "qipai_pingtai");
+	
+	$timer_id = Warriorman\Lib\Timer::add(0.01, function () {
+		echo "Timer run \n";
+	}, false);
 };
 
 $worker->onConnect = function ($connection) {

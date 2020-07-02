@@ -1,7 +1,16 @@
 # WarriorMan
 ## What is it
 协程版本的WarriorMan，完全按照WarriorMan的文档制作，协程同步的C编码风格，支持协程的创建和切换。虽然目前还在开发中，但是有兴趣的同学可以给在下提提建议，找找BUG。    
-已经初步的hook了tcp相关操作，使pdo redis等PHP自带的客户端默认使用协程特性，模拟mysql查询成功。另外此项目将会长期维护   
+  
+目前已经实现:  
+1 hook了tcp相关操作，使pdo redis等PHP自带的客户端默认使用协程特性  
+2 Timer模块支持  
+3 支持start和stop  
+4 支持监听tcp和udp
+5 支持多进程  
+6 支持信号  
+7 支持守护进程  
+8 一般基础的都支持了
 
 ## Requires
 PHP7 or Higher
@@ -38,6 +47,10 @@ $worker->onWorkerStart = function ($worker) {
 	$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "数据库名");
 	$len = $db->query("select count(*) from 表名 where id=1");
 	var_dump($len);
+	
+	$timer_id = Warriorman\Lib\Timer::add(0.01, function () {
+		echo "Timer run \n";
+	}, false);
 };
 
 $worker->onConnect = function ($connection) {

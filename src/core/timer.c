@@ -104,11 +104,18 @@ wmTimerWheel_Node* wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void 
 }
 
 // 删除结点
-int wmTimerWheel_del(wmTimerWheel *tw, wmTimerWheel_Node *node) {
-	if (!wmList_is_empty((wmListNode*) node)) {
-		wmList_remote((wmListNode*) node);
+int wmTimerWheel_del(wmTimerWheel_Node *node) {
+	if (!node) {
 		return 1;
 	}
+	if (!wmList_is_empty((wmListNode*) node)) {
+		wmList_remote((wmListNode*) node);
+		wm_free(node);
+		node = NULL;
+		return 1;
+	}
+	php_printf("wmTimerWheel_del error\n");
+	//理论上永远不会走到这里，如果是空，说明是根节点，不可以删除
 	return 0;
 }
 
@@ -185,6 +192,7 @@ void _wmTimerWheelick(wmTimerWheel *tw) {
 			node->callback(node->userdata);
 			//释放申请的节点
 			wm_free(node);
+			node = NULL;
 		}
 	}
 }
@@ -228,6 +236,7 @@ void wmTimerWheel_clear(wmTimerWheel *tw) {
 			//拿出这个节点
 			wmList_remote(head.next);
 			wm_free(node);
+			node = NULL;
 		}
 	}
 	//清空后面几个轮
@@ -243,6 +252,7 @@ void wmTimerWheel_clear(wmTimerWheel *tw) {
 				//拿出这个节点
 				wmList_remote(head.next);
 				wm_free(node);
+				node = NULL;
 			}
 		}
 	}
@@ -257,6 +267,7 @@ void wmTimerWheel_clear(wmTimerWheel *tw) {
 		//拿出这个节点
 		wmList_remote(head.next);
 		wm_free(node);
+		node = NULL;
 	}
 	//元素设置为0
 	tw->num = 0;

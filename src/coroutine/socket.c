@@ -111,14 +111,12 @@ void timer_add(wmSocket *socket, int event, uint32_t ticks) {
 void timer_del(wmSocket *socket, int event) {
 	if (event == WM_EVENT_READ) {
 		if (socket->read_timer) { //如果没使用相应定时器，那么删除
-			wmTimerWheel_del(&WorkerG.timer, socket->read_timer); //没触发超时的话，删除定时器节点
-			wm_free(socket->read_timer);
+			wmTimerWheel_del(socket->read_timer); //没触发超时的话，删除定时器节点
 			socket->read_timer = NULL;
 		}
 	} else if (event & WM_EVENT_WRITE) {
 		if (socket->write_timer) { //如果没使用相应定时器，那么删除
-			wmTimerWheel_del(&WorkerG.timer, socket->write_timer); //没触发超时的话，删除定时器节点
-			wm_free(socket->write_timer);
+			wmTimerWheel_del(socket->write_timer); //没触发超时的话，删除定时器节点
 			socket->write_timer = NULL;
 		}
 	} else {
@@ -579,12 +577,10 @@ void wmSocket_free(wmSocket *socket) {
 		wmString_free(socket->write_buffer);
 	}
 	if (socket->read_timer) {
-		wmTimerWheel_del(&WorkerG.timer, socket->read_timer);
-		wm_free(socket->read_timer);
+		wmTimerWheel_del(socket->read_timer);
 	}
 	if (socket->write_timer) {
-		wmTimerWheel_del(&WorkerG.timer, socket->write_timer);
-		wm_free(socket->write_timer);
+		wmTimerWheel_del(socket->write_timer);
 	}
 	wm_free(socket);	//释放socket
 	socket = NULL;

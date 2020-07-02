@@ -32,6 +32,8 @@ PHP_MINIT_FUNCTION(workerman) {
 	workerman_channel_init();
 	//初始化runtime
 	workerman_runtime_init();
+	//初始化定时器
+	workerman_timer_init();
 	return SUCCESS;
 }
 
@@ -52,6 +54,7 @@ PHP_RINIT_FUNCTION(workerman) {
 	wmWorker_init();
 	wmConnection_init();
 	wmRuntime_init();
+	php_wmTimer_init();
 	return SUCCESS;
 }
 
@@ -64,6 +67,7 @@ PHP_RSHUTDOWN_FUNCTION(workerman) {
 	wmWorker_shutdown();
 	wmConnection_shutdown();
 	wmRuntime_shutdown();
+	php_wmTimer_shutdown();
 	return SUCCESS;
 }
 

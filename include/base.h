@@ -243,6 +243,11 @@ void workerman_worker_init();
 void workerman_channel_init();
 //runtime注册方法
 void workerman_runtime_init();
+//定时器注册方法
+void workerman_timer_init();
+//定时器请求初始化
+void php_wmTimer_init();
+void php_wmTimer_shutdown();
 
 //定义的一些结构体
 typedef struct {

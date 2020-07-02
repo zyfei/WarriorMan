@@ -73,6 +73,7 @@ if test "$PHP_WM" != "no"; then
         php_worker.c \
         php_connection.c \
         php_runtime.c \
+        php_timer.c \
         ${WM_ASM_DIR}make_${WM_CONTEXT_ASM_FILE} \
         ${WM_ASM_DIR}jump_${WM_CONTEXT_ASM_FILE}
     "

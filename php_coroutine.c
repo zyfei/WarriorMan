@@ -30,7 +30,8 @@ ZEND_ARG_CALLABLE_INFO(0, func, 0)
 ZEND_END_ARG_INFO()
 
 //sleep
-ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_coroutine_sleep, 0, 0, 1) ZEND_ARG_INFO(0, seconds)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_coroutine_sleep, 0, 0, 1) //
+ZEND_ARG_INFO(0, seconds)
 ZEND_END_ARG_INFO()
 
 //协程创建实现
@@ -169,7 +170,7 @@ zend_class_entry workerman_coroutine_ce;
 zend_class_entry *workerman_coroutine_ce_ptr;
 
 /**
- * 注册我们的WorkerMan\Coroutine这个类
+ * 注册我们的Warriorman\Coroutine这个类
  * 考虑到以后我们会有许多的类，我们不在MINIT里面直接写注册的代码，而是让study_coroutine_util.cc提供一个函数，我们在这个函数里面实现注册功能：
  */
 void workerman_coroutine_init() {

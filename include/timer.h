@@ -69,7 +69,7 @@ void wmTimerWheel_add(wmTimerWheel *tw, wmTimerWheel_Node *node, uint32_t ticks)
 // 快速添加
 wmTimerWheel_Node* wmTimerWheel_add_quick(wmTimerWheel *tw, timer_cb_t cb, void *ud, uint32_t ticks);
 // 删除结点
-int wmTimerWheel_del(wmTimerWheel *tw, wmTimerWheel_Node *node);
+int wmTimerWheel_del(wmTimerWheel_Node *node);
 // 更新时间轮
 void wmTimerWheel_update(wmTimerWheel *tw, uint64_t currtime);
 // 清空时间轮

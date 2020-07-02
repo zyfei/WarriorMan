@@ -1,5 +1,6 @@
 开始按照workerman文档制作函数，并且制作差异文档
 完善udp协议 OK
+定时器 OK
 
 检查内存泄漏
 _DONT_UNLOAD_MODULES=1 USE_ZEND_ALLOC=0 valgrind --leak-check=full --show-reachable=yes --track-origins=yes --log-file=/mnt/d/a.log php start.php start
