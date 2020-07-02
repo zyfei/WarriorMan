@@ -6,7 +6,7 @@
 1 hook了tcp相关操作，使pdo redis等PHP自带的客户端默认使用协程特性  
 2 Timer模块支持  
 3 支持start和stop  
-4 支持监听tcp和udp
+4 支持监听tcp和udp  
 5 支持多进程  
 6 支持信号  
 7 支持守护进程  
