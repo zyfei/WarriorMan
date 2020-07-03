@@ -1,6 +1,6 @@
 # WarriorMan
 ## What is it
-协程版本的WarriorMan，完全按照WarriorMan的文档制作，协程同步的C编码风格，支持协程的创建和切换。虽然目前还在开发中，但是有兴趣的同学可以给在下提提建议，找找BUG。    
+协程版本的WarriorMan，按照Workerman的文档制作，协程同步的C编码风格，支持协程的创建和切换。虽然目前还在开发中，但是有兴趣的同学可以给在下提提建议，找找BUG。    
   
 目前已经实现:  
 1 hook了tcp相关操作，使pdo redis等PHP自带的客户端默认使用协程特性  
