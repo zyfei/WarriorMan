@@ -63,6 +63,39 @@ static inline bool is_available(wmSocket* socket, const enum wmEvent_type event)
 }
 
 /**
+ * 检查errno
+ */
+static inline int check_error(int err) {
+	switch (err) {
+	case EFAULT:
+		abort();
+		return WM_SOCKET_ERROR;
+	case EBADF:
+	case ECONNRESET:
+#ifdef __CYGWIN__
+		case ECONNABORTED:
+#endif
+	case EPIPE:
+	case ENOTCONN:
+	case ETIMEDOUT:
+	case ECONNREFUSED:
+	case ENETDOWN:
+	case ENETUNREACH:
+	case EHOSTDOWN:
+	case EHOSTUNREACH:
+		return WM_SOCKET_CLOSE;
+	case EAGAIN:
+#ifdef HAVE_KQUEUE
+		case ENOBUFS:
+#endif
+	case 0:
+		return WM_SOCKET_SUCCESS;
+	default:
+		return WM_SOCKET_ERROR;
+	}
+}
+
+/**
  * 读超时处理
  */
 void timer_read_callback(void *_socket) {
@@ -389,7 +422,6 @@ int wmSocket_send(wmSocket *socket, const void *buf, size_t len) {
 	}
 	wmString_append_ptr(socket->write_buffer, buf, len); //要发送的字符，添加进去
 	checkBufferWillFull(socket); //检查这一次加完，会不会缓冲区满
-
 	int ret;
 	int ret_num = 0; //一共发送多少字节
 	while (!socket->closed) {
@@ -400,11 +432,9 @@ int wmSocket_send(wmSocket *socket, const void *buf, size_t len) {
 		} while (ret < 0 && errno == EINTR);
 
 		//如果是未知错误，我们检查socket是否关闭
-		if (ret < 0 && errno != EAGAIN) {
-			//在这里判断是否已经关闭
-			socklen_t len = sizeof(socket->errCode);
-			if (getsockopt(socket->fd, SOL_SOCKET, SO_ERROR, &socket->errCode, &len) < 0 || socket->errCode != 0) {
-				set_err(socket, socket->errCode);
+		if (ret < 0) {
+			if (check_error(errno) == WM_SOCKET_CLOSE) {
+				set_err(socket, errno);
 				socket->closed = true;
 				return WM_SOCKET_CLOSE;
 			}
@@ -412,7 +442,6 @@ int wmSocket_send(wmSocket *socket, const void *buf, size_t len) {
 		}
 		socket->write_buffer->offset += ret;
 		ret_num += ret;
-
 		if (socket->write_buffer->offset == socket->write_buffer->length) {
 			wmWorkerLoop_remove(socket, WM_EVENT_WRITE);
 			socket->write_buffer->offset = 0;
@@ -441,11 +470,9 @@ int wmSocket_write(wmSocket *socket, const void *buf, size_t len) {
 			ret = wm_socket_send(socket->fd, buf, len - ret_num, 0);
 		} while (ret < 0 && errno == EINTR);
 		//如果发生错误
-		if (ret < 0 && errno != EAGAIN) {
-			//在这里判断是否已经关闭
-			socklen_t len = sizeof(socket->errCode);
-			if (getsockopt(socket->fd, SOL_SOCKET, SO_ERROR, &socket->errCode, &len) < 0 || socket->errCode != 0) {
-				set_err(socket, socket->errCode);
+		if (ret < 0) {
+			if (check_error(errno) == WM_SOCKET_CLOSE) {
+				set_err(socket, errno);
 				socket->closed = true;
 				return WM_SOCKET_CLOSE;
 			}

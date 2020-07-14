@@ -120,10 +120,11 @@ void onError_callback(void* _mess_data) {
  * 在一个新协程环境运行
  */
 void wmConnection_read(wmConnection* connection) {
+	zval z1;
+	zval retval_ptr;
 	//开始读消息
 	while (connection && connection->_status == WM_CONNECTION_STATUS_ESTABLISHED) {
 		int ret = wmSocket_read(connection->socket, _read_buffer_tmp->str, _read_buffer_tmp->size, WM_SOCKET_MAX_TIMEOUT);
-
 		//触发onError
 		if (ret == WM_SOCKET_ERROR) {
 			onError(connection);
@@ -134,28 +135,93 @@ void wmConnection_read(wmConnection* connection) {
 			onClose(connection);
 			return;
 		}
-		wmString* read_packet_buffer = connection->read_packet_buffer;
-		if (read_packet_buffer == NULL) {
-			read_packet_buffer = wmString_new(ret);
-		}
-		wmString_append_ptr(read_packet_buffer, _read_buffer_tmp->str, ret);
-
-		//判断是否满足一个完整的包体.  PS:现在通过长度模拟一下而已
-		int packet_len = read_packet_buffer->length;
-		while ((read_packet_buffer->length - read_packet_buffer->offset) >= packet_len) {
+		/**
+		 * 如果只是单纯的tcp协议
+		 */
+		wmWorker* worker = connection->worker;
+		if (!worker->protocol) {
 			//创建一个单独协程处理
 			if (connection->onMessage) {
 				//构建zval，默认的引用计数是1，在php方法调用完毕释放
 				zval* _mess_data = (zval*) emalloc(sizeof(zval) * 2);
 				//_mess_data[0] = *connection->_This;
 				ZVAL_COPY_VALUE(_mess_data, connection->_This);
-				zend_string* _zs = zend_string_init((read_packet_buffer->str + read_packet_buffer->offset), packet_len, 0);
+				zend_string* _zs = zend_string_init(_read_buffer_tmp->str, ret, 0);
 				ZVAL_STR(&_mess_data[1], _zs);
 				long _cid = wmCoroutine_create(&(connection->onMessage->fcc), 2, _mess_data); //创建新协程
 				wmCoroutine_set_callback(_cid, onMessage_callback, _mess_data);
 			}
-			read_packet_buffer->offset += packet_len;
+			continue;
 		}
+
+		/**
+		 * 如果是http，websocket等高级协议
+		 */
+		wmString* read_packet_buffer = connection->read_packet_buffer;
+		if (read_packet_buffer == NULL) {
+			read_packet_buffer = wmString_new(ret);
+		}
+		wmString_append_ptr(read_packet_buffer, _read_buffer_tmp->str, ret);
+
+		/**
+		 * 在这里不断的判断是否是整包
+		 */
+		while (1) {
+			if ((read_packet_buffer->length - read_packet_buffer->offset) <= 0) {
+				break;
+			}
+			/**
+			 * 调用input
+			 */
+			ZVAL_STR(&z1, zend_string_init((read_packet_buffer->str + read_packet_buffer->offset), read_packet_buffer->length - read_packet_buffer->offset, 0));
+			//调用协议的input方法
+			zend_call_method(NULL, worker->protocol_ce, NULL, ZEND_STRL("input"), &retval_ptr, 2, &z1, connection->_This);
+			zval_ptr_dtor(&z1);
+
+			if (UNEXPECTED(EG(exception))) {
+				zend_exception_error(EG(exception), E_ERROR);
+			}
+			//判断是否是一个完整的协议包
+			if (Z_TYPE(retval_ptr) == IS_LONG) { //判断是否返回的是数字
+				zend_long packet_len = Z_LVAL(retval_ptr);
+				if (packet_len == 0) {
+					break;
+				}
+				//在这里可以处理一个包
+				//创建一个单独协程处理
+				if (connection->onMessage) {
+					//解码
+					ZVAL_STR(&z1, zend_string_init((read_packet_buffer->str + read_packet_buffer->offset), packet_len, 0));
+					zend_call_method(NULL, worker->protocol_ce, NULL, ZEND_STRL("decode"), &retval_ptr, 2, &z1, connection->_This);
+					if (Z_TYPE(retval_ptr) != IS_STRING) { //判断是否返回的是字符串
+						zval_ptr_dtor(&z1);
+						zval_ptr_dtor(&retval_ptr);
+						wmSocket_close(connection->socket);
+						connection->socket->errCode = WM_ERROR_PROTOCOL_FAIL;
+						connection->socket->errMsg = wmCode_str(WM_ERROR_PROTOCOL_FAIL);
+						onError(connection);
+						return;
+					}
+					//构建zval，默认的引用计数是1，在php方法调用完毕释放
+					zval* _mess_data = (zval*) emalloc(sizeof(zval) * 2);
+					ZVAL_COPY_VALUE(_mess_data, connection->_This);
+					ZVAL_STR(&_mess_data[1], retval_ptr.value.str);
+					long _cid = wmCoroutine_create(&(connection->onMessage->fcc), 2, _mess_data); //创建新协程
+					wmCoroutine_set_callback(_cid, onMessage_callback, _mess_data);
+					zval_ptr_dtor(&z1);
+					//zval_ptr_dtor(&retval_ptr);
+				}
+				read_packet_buffer->offset += packet_len;
+			} else { //其他类型直接协议错误
+				zval_ptr_dtor(&retval_ptr);
+				wmSocket_close(connection->socket);
+				connection->socket->errCode = WM_ERROR_PROTOCOL_FAIL;
+				connection->socket->errMsg = wmCode_str(WM_ERROR_PROTOCOL_FAIL);
+				onError(connection);
+				return;
+			}
+		}
+
 		//大于0代表有消息被onMessage处理了，重新创建string缓冲区
 		if (read_packet_buffer->offset > 0) {
 			//重新创建一个read_packet缓冲区
@@ -204,7 +270,33 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 		if (connection->_status != WM_CONNECTION_STATUS_ESTABLISHED) {
 			return false;
 		}
-		int ret = wmSocket_send(connection->socket, buf, len);
+		int ret;
+		zval retval_ptr;
+		zval z1;
+		//使用协议包装
+		if (connection->worker->protocol) {
+			ZVAL_STR(&z1, zend_string_init(buf, len, 0));
+			//调用协议的input方法
+			zend_call_method(NULL, connection->worker->protocol_ce, NULL, ZEND_STRL("encode"), &retval_ptr, 2, &z1, connection->_This);
+			if (UNEXPECTED(EG(exception))) {
+				zend_exception_error(EG(exception), E_ERROR);
+			}
+			if (Z_TYPE(retval_ptr) != IS_STRING) { //判断是否返回的是字符串
+				zval_ptr_dtor(&z1);
+				zval_ptr_dtor(&retval_ptr);
+				wmSocket_close(connection->socket);
+				connection->socket->errCode = WM_ERROR_PROTOCOL_FAIL;
+				connection->socket->errMsg = wmCode_str(WM_ERROR_PROTOCOL_FAIL);
+				onError(connection);
+				return false;
+			}
+			ret = wmSocket_send(connection->socket, retval_ptr.value.str->val, retval_ptr.value.str->len);
+			zval_ptr_dtor(&z1);
+			zval_ptr_dtor(&retval_ptr);
+		} else {
+			ret = wmSocket_send(connection->socket, buf, len);
+		}
+
 		//触发onError
 		if (ret == WM_SOCKET_ERROR) {
 			onError(connection);

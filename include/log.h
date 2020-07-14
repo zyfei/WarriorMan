@@ -27,6 +27,7 @@ enum wmCode {
 	WM_ERROR_SEND_BUFFER_FULL = 1005, //发送失败
 	WM_ERROR_READ_FAIL = 1006, //接收失败
 	WM_ERROR_LOOP_FAIL = 1007, //LOOP相关错误
+	WM_ERROR_PROTOCOL_FAIL = 1008, //错误的协议
 };
 
 #define wmDebug(wmr, ...)                                                         \

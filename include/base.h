@@ -149,15 +149,37 @@ static inline int php_workerman_array_length_safe(zval *zarray) {
 }
 
 /**
+ * Worker类
+ */
+extern zend_class_entry workerman_worker_ce;
+extern zend_class_entry *workerman_worker_ce_ptr;
+/**
+ * Connection类
+ */
+extern zend_class_entry workerman_connection_ce;
+extern zend_class_entry *workerman_connection_ce_ptr;
+/**
  * Coroutine类
  */
 extern zend_class_entry workerman_coroutine_ce;
 extern zend_class_entry *workerman_coroutine_ce_ptr;
 /**
- * Socket类
+ * Channel类
  */
-extern zend_class_entry workerman_socket_ce;
-extern zend_class_entry *workerman_socket_ce_ptr;
+extern zend_class_entry workerman_channel_ce;
+extern zend_class_entry *workerman_channel_ce_ptr;
+/**
+ * Runtime类
+ */
+extern zend_class_entry workerman_runtime_ce;
+extern zend_class_entry *workerman_runtime_ce_ptr;
+/**
+ * Timer类
+ */
+extern zend_class_entry workerman_timer_ce;
+extern zend_class_entry *workerman_timer_ce_ptr;
+
+
 
 //定义一些全局方法
 static inline zval *wm_zend_read_property(zend_class_entry *ce, zval *obj, const char *s, int len, int silent) {

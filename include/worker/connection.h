@@ -5,10 +5,7 @@
 #define _COROUTINE_SOCKET_H
 
 #include "base.h"
-#include "wm_socket.h"
-
-extern zend_class_entry workerman_connection_ce;
-extern zend_class_entry *workerman_connection_ce_ptr;
+#include "worker.h"
 
 /**
  * 协程化socket结构体
@@ -33,7 +30,7 @@ typedef struct {
 
 	wmString* read_packet_buffer; //用来保存返回给用户整个包的缓冲区
 
-	void* worker; //所属于哪一个worker对象
+	wmWorker* worker; //所属于哪一个worker对象
 	struct sockaddr *addr; //udp使用
 	socklen_t addr_len; //udp使用
 } wmConnection;

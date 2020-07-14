@@ -1,7 +1,7 @@
 #ifndef WM_RUNTIME_H
 #define WM_RUNTIME_H
 
-#include "header.h"
+#include "base.h"
 
 void wmRuntime_init();
 void wmRuntime_shutdown();

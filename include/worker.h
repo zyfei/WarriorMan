@@ -7,9 +7,6 @@
 #include "base.h"
 #include "wm_socket.h"
 
-extern zend_class_entry workerman_worker_ce;
-extern zend_class_entry *workerman_worker_ce_ptr;
-
 typedef struct _wmWorker {
 	uint32_t id; //worker id
 	uint32_t fd; //监听端口的fd
@@ -27,16 +24,18 @@ typedef struct _wmWorker {
 	int _status; //当前状态
 	int32_t backlog; //listen队列长度
 	wmString* socketName; // tcp://127.0.0.1:8080
-	char* user;//当前用户
+	char* user; //当前用户
 	int transport; //协议
-	int sock_type;//是什么socket类型，比如tcp，udp等
+	zend_string* protocol; //具体是什么协议，例如http协议的解析php脚本地址
+	zend_class_entry* protocol_ce; //具体协议的ce指针
+	int sock_type; //是什么socket类型，比如tcp，udp等
 	char* host; //监听地址
 	int32_t port; //监听端口
 	int32_t count; //进程数量
 	wmString* name; //名字
 	bool stopping; //是否正在停止
 
-	wmSocket* socket;//用于监听的fd封装而成
+	wmSocket* socket; //用于监听的fd封装而成
 } wmWorker;
 
 //为了通过php对象，找到上面的c++对象 ======= start

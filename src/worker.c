@@ -104,6 +104,8 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	worker->stopping = false;
 	worker->user = NULL;
 	worker->socket = NULL;
+	worker->protocol = NULL;
+	worker->protocol_ce = NULL;
 	parseSocketAddress(worker, socketName);
 
 	//写入workers对照表
@@ -400,6 +402,24 @@ void initWorkers() {
 		if (!worker->name) {
 			worker->name = wmString_dup("none", 4);
 			zend_update_property_stringl(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), worker->name->str, 4);
+		}
+
+		//检查高级协议
+		_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("protocol"), 0);
+		if (_zval) {
+			if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
+				worker->protocol = _zval->value.str;
+				worker->protocol_ce = zend_lookup_class(worker->protocol);
+				if (!worker->protocol_ce) {
+					wmError("worker->protocol error 1");
+				}
+				if ((worker->protocol_ce->ce_flags & (ZEND_ACC_INTERFACE | ZEND_ACC_TRAIT)) != 0) {
+					wmError("worker->protocol error 2");
+				}
+				//模拟调用inout
+				//zval retval_ptr;
+				//zend_call_method(NULL, worker->protocol_ce, NULL, ZEND_STRL("input"), &retval_ptr, 0, NULL, NULL);
+			}
 		}
 
 		_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("user"), 0);
@@ -788,7 +808,7 @@ void acceptConnectionTcp(wmWorker* worker) {
 
 		//接客
 		connection_object->connection = conn;
-		connection_object->connection->worker = (void*) worker;
+		connection_object->connection->worker = worker;
 		connection_object->connection->_This = z;
 
 		//设置属性 start

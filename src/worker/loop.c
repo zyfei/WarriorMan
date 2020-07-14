@@ -29,7 +29,6 @@ bool loop_callback_coroutine_resume(wmSocket* socket, int event) {
 		wmError("Error has occurred: loop_callback_coroutine_resume . wmCoroutine is NULL");
 		return false;
 	}
-
 	if (event == EPOLLIN && socket->read_co) {
 		return wmCoroutine_resume(socket->read_co);
 	} else if (event == EPOLLOUT && socket->write_co) {

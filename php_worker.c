@@ -114,11 +114,25 @@ PHP_METHOD(workerman_worker, run) {
 	wmWorker_run(worker_obj->worker);
 }
 
+/**
+ * 命名空间改为Workerman
+ */
+PHP_METHOD(workerman_worker, rename) {
+	//将Warriorman修改成Workerman
+	zend_register_ns_class_alias("Workerman", "Worker", workerman_worker_ce_ptr);
+	zend_register_ns_class_alias("Workerman", "Lib\\Timer", workerman_timer_ce_ptr);
+	zend_register_ns_class_alias("Workerman", "Runtime", workerman_runtime_ce_ptr);
+	zend_register_ns_class_alias("Workerman", "Coroutine", workerman_coroutine_ce_ptr);
+	zend_register_ns_class_alias("Workerman", "Connection", workerman_connection_ce_ptr);
+	zend_register_ns_class_alias("Workerman", "Channel", workerman_channel_ce_ptr);
+}
+
 static const zend_function_entry workerman_worker_methods[] = { //
 	PHP_ME(workerman_worker, __construct, arginfo_workerman_worker_construct, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR) // ZEND_ACC_CTOR is used to declare that this method is a constructor of this class.
 		PHP_ME(workerman_worker, runAll, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC)
 		PHP_ME(workerman_worker, stop, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC)
 		PHP_ME(workerman_worker, run, arginfo_workerman_worker_void, ZEND_ACC_PRIVATE)
+		PHP_ME(workerman_worker, rename, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC| ZEND_ACC_STATIC)
 		PHP_FE_END };
 
 /**
@@ -149,6 +163,7 @@ void workerman_worker_init() {
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onError"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("name"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("user"), ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("protocol"), ZEND_ACC_PUBLIC);
 
 	//静态变量
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);

@@ -54,6 +54,7 @@
 #include "zend_closures.h"
 #include "zend_exceptions.h"
 #include "zend_object_handlers.h"
+#include "zend_interfaces.h"
 
 //公共配置
 #include "workerman_config.h"

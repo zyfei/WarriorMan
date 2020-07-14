@@ -69,7 +69,9 @@ const char* wmCode_str(int code) {
 	case WM_ERROR_SEND_BUFFER_FULL:
 		return "send buffer full";
 		break;
-
+	case WM_ERROR_PROTOCOL_FAIL:
+		return "protocol fail";
+		break;
 	default:
 		snprintf(wm_error, sizeof(wm_error), "Unknown error: %d", code);
 		return wm_error;
