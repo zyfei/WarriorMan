@@ -1,6 +1,6 @@
 # WarriorMan
 ## What is it
-协程版本的WarriorMan，按照Workerman的文档制作，协程同步的C编码风格，支持协程的创建和切换。虽然目前还在开发中，但是有兴趣的同学可以给在下提提建议，找找BUG。    
+协程版本的Workerman，按照Workerman的文档制作，协程同步的C编码风格，支持协程的创建和切换,目标是无感或者改动非常少的替换Workerman。开发中，但是有兴趣的同学可以给在下提提建议，找找BUG。    
   
 目前已经实现:  
 1 hook了tcp相关操作，使pdo redis等PHP自带的客户端默认使用协程特性  
@@ -11,6 +11,7 @@
 6 支持信号  
 7 支持守护进程  
 8 一般基础的都支持了
+9 支持自定义协议
 
 ## Requires
 PHP7 or Higher
@@ -29,26 +30,30 @@ PHP7 or Higher
 
 ### A tcp server  (支持tcp和udp)
 ```php
-<?php
 require_once 'MySQL.php';
 
+use Workerman\Worker;
+use Workerman\Lib\Timer;
+
+require_once 'Workerman/Autoloader.php';
+
+Warriorman\Worker::rename(); // 将Workerman改为Workerman
 Warriorman\Runtime::enableCoroutine(); // hook相关函数
 
-$worker = new Warriorman\Worker("tcp://0.0.0.0:8080", array(
+$worker = new Worker("tcp://0.0.0.0:8080", array(
 	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
 	"count" => 1 // 进程数量
 ));
+
 $worker->name = "tcpServer"; // 设置名字
+$worker->protocol = "\Workerman\Protocols\Text"; // 设置协议
 
 $worker->onWorkerStart = function ($worker) {
 	var_dump("onWorkerStart ->" . $worker->workerId);
-	
 	global $db;
-	$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "数据库名");
-	$len = $db->query("select count(*) from 表名 where id=1");
-	var_dump($len);
+	$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "test");
 	
-	$timer_id = Warriorman\Lib\Timer::add(0.01, function () {
+	$timer_id = Timer::add(0.01, function () {
 		echo "Timer run \n";
 	}, false);
 };
@@ -63,10 +68,6 @@ $worker->onConnect = function ($connection) {
 $worker->onMessage = function ($connection, $data) {
 	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worla\r\n";
 	$connection->send($responseStr);
-	
-	global $db;
-	$len = $db->query("select count(*) from 表名");
-	var_dump($len);
 };
 
 $worker->onBufferFull = function ($connection) {
@@ -84,17 +85,18 @@ $worker->onClose = function ($connection) {
 };
 
 // 监听另外一个端口
-$worker2 = new Warriorman\Worker("tcp://0.0.0.0:8081", array(
+$worker2 = new Worker("tcp://0.0.0.0:8081", array(
 	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
-	"count" => 1 // 进程数量
+	"count" => 2 // 进程数量
 ));
+
 $worker2->onMessage = function ($connection, $data) {
 	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";
 	$connection->send($responseStr);
 };
 
 // 监听另外一个端口
-$worker3 = new Warriorman\Worker("udp://0.0.0.0:8080", array(
+$worker3 = new Worker("udp://0.0.0.0:8080", array(
 	"count" => 1 // 进程数量
 ));
 $worker3->onMessage = function ($connection, $data) {
@@ -102,7 +104,7 @@ $worker3->onMessage = function ($connection, $data) {
 	$connection->send("hello world");
 };
 
-Warriorman\Worker::runAll();
+Worker::runAll();
 
 
 //更多协程例子在examples文件夹下

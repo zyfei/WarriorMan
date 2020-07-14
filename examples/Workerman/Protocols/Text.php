@@ -26,8 +26,8 @@ class Text {
 	 * @return int
 	 */
 	public static function input($buffer = NULL, $connection = NULL) {
-		return strlen($buffer);
 		var_dump("input");
+		return strlen($buffer);
 		// Judge whether the package length exceeds the limit.
 		if (isset($connection->maxPackageSize) && \strlen($buffer) >= $connection->maxPackageSize) {
 			$connection->close();
@@ -50,7 +50,7 @@ class Text {
 	 * @return string
 	 */
 	public static function encode($buffer) {
-		//var_dump("encode");
+		var_dump("encode");
 		// Add "\n"
 		return $buffer . "\n";
 	}
@@ -62,7 +62,7 @@ class Text {
 	 * @return string
 	 */
 	public static function decode($buffer) {
-		//var_dump("decode");
+		var_dump("decode");
 		// Remove "\n"
 		return \rtrim($buffer, "\r\n");
 	}
