@@ -37,7 +37,7 @@ use Workerman\Lib\Timer;
 
 require_once 'Workerman/Autoloader.php';
 
-Warriorman\Worker::rename(); // 将Workerman改为Workerman
+Warriorman\Worker::rename(); // Warriorman\Worker = Workerman\Worker
 Warriorman\Runtime::enableCoroutine(); // hook相关函数
 
 $worker = new Worker("tcp://0.0.0.0:8080", array(
