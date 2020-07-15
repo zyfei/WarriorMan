@@ -36,7 +36,7 @@ $worker->protocol = "\Workerman\Protocols\Http"; // 设置协议
 
 $worker->onWorkerStart = function ($worker) {
 	var_dump("onWorkerStart ->" . $worker->workerId);
-    //定时器
+    
 	$timer_id = Timer::add(0.01, function () {
  
 		echo "Timer run \n";
