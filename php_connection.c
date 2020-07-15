@@ -156,7 +156,7 @@ static const zend_function_entry workerman_connection_methods[] = { //
 void workerman_connection_init() {
 
 	//定义好一个类
-	INIT_NS_CLASS_ENTRY(workerman_connection_ce, "Warriorman", "Connection", workerman_connection_methods);
+	INIT_NS_CLASS_ENTRY(workerman_connection_ce, "Warriorman", "Connection\\TcpConnection", workerman_connection_methods);
 	//在zedn中注册类
 	workerman_connection_ce_ptr = zend_register_internal_class(&workerman_connection_ce TSRMLS_CC); // 在 Zend Engine 中注册
 

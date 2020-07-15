@@ -46,7 +46,7 @@ $worker = new Worker("tcp://0.0.0.0:8080", array(
 ));
 
 $worker->name = "tcpServer"; // 设置名字
-$worker->protocol = "\Workerman\Protocols\Text"; // 设置协议
+$worker->protocol = "\Workerman\Protocols\Http"; // 设置协议
 
 $worker->onWorkerStart = function ($worker) {
 	var_dump("onWorkerStart ->" . $worker->workerId);
@@ -117,17 +117,14 @@ Worker::runAll();
 
 ## Documentation
 
-目标是完全和workerman的文档一样: [http://doc.workerman.net](http://doc.workerman.net) 
-
---------->>>>                           但是还有非常多没实现
-
+仿照Workerman文档制作: [http://doc.workerman.net](http://doc.workerman.net) 
 WarriorMan 交流QQ群: 1098698769
 
 ## 特别鸣谢
 
-感谢Workerman项目 [Workerman](https://github.com/walkor/Workerman)，我完全依照Workerman文档制作。  
-感谢Swoole项目 [Swoole](https://github.com/swoole/swoole-src)，给了我很多思路，并且我直接copy了不少Swoole的代码  
-最后特别感谢 [Study](https://github.com/php-extension-research/study) 项目，我是学习这个教学项目之后，才有了此项目  
+[Workerman](https://github.com/walkor/Workerman)  
+[Swoole](https://github.com/swoole/swoole-src)  
+[Study](https://github.com/php-extension-research/study)  
 
 
 

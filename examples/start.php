@@ -35,7 +35,9 @@ $worker->onConnect = function ($connection) {
 };
 
 $worker->onMessage = function ($connection, $data) {
-	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worla\r\n";
+	//var_dump($data);
+	// $responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worla\r\n";
+	$responseStr = "hello worla";
 	$connection->send($responseStr);
 };
 
@@ -58,6 +60,7 @@ $worker2 = new Worker("tcp://0.0.0.0:8081", array(
 	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
 	"count" => 2 // 进程数量
 ));
+$worker2->protocol = "\Workerman\Protocols\Http"; // 设置协议
 
 $worker2->onMessage = function ($connection, $data) {
 	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";

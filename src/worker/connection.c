@@ -181,35 +181,28 @@ void wmConnection_read(wmConnection* connection) {
 			if (UNEXPECTED(EG(exception))) {
 				zend_exception_error(EG(exception), E_ERROR);
 			}
+
+			//php_var_dump(&retval_ptr,1);
 			//判断是否是一个完整的协议包
 			if (Z_TYPE(retval_ptr) == IS_LONG) { //判断是否返回的是数字
 				zend_long packet_len = Z_LVAL(retval_ptr);
 				if (packet_len == 0) {
 					break;
 				}
-				//在这里可以处理一个包
-				//创建一个单独协程处理
+				//创建一个单独协程处理包
 				if (connection->onMessage) {
 					//解码
 					ZVAL_STR(&z1, zend_string_init((read_packet_buffer->str + read_packet_buffer->offset), packet_len, 0));
 					zend_call_method(NULL, worker->protocol_ce, NULL, ZEND_STRL("decode"), &retval_ptr, 2, &z1, connection->_This);
-					if (Z_TYPE(retval_ptr) != IS_STRING) { //判断是否返回的是字符串
-						zval_ptr_dtor(&z1);
-						zval_ptr_dtor(&retval_ptr);
-						wmSocket_close(connection->socket);
-						connection->socket->errCode = WM_ERROR_PROTOCOL_FAIL;
-						connection->socket->errMsg = wmCode_str(WM_ERROR_PROTOCOL_FAIL);
-						onError(connection);
-						return;
-					}
+					zval_ptr_dtor(&z1);
+
 					//构建zval，默认的引用计数是1，在php方法调用完毕释放
 					zval* _mess_data = (zval*) emalloc(sizeof(zval) * 2);
 					ZVAL_COPY_VALUE(_mess_data, connection->_This);
-					ZVAL_STR(&_mess_data[1], retval_ptr.value.str);
+					ZVAL_COPY_VALUE(&_mess_data[1], &retval_ptr);
+
 					long _cid = wmCoroutine_create(&(connection->onMessage->fcc), 2, _mess_data); //创建新协程
 					wmCoroutine_set_callback(_cid, onMessage_callback, _mess_data);
-					zval_ptr_dtor(&z1);
-					//zval_ptr_dtor(&retval_ptr);
 				}
 				read_packet_buffer->offset += packet_len;
 			} else { //其他类型直接协议错误

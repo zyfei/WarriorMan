@@ -123,7 +123,7 @@ PHP_METHOD(workerman_worker, rename) {
 	zend_register_ns_class_alias("Workerman", "Lib\\Timer", workerman_timer_ce_ptr);
 	zend_register_ns_class_alias("Workerman", "Runtime", workerman_runtime_ce_ptr);
 	zend_register_ns_class_alias("Workerman", "Coroutine", workerman_coroutine_ce_ptr);
-	zend_register_ns_class_alias("Workerman", "Connection", workerman_connection_ce_ptr);
+	zend_register_ns_class_alias("Workerman", "Connection\\TcpConnection", workerman_connection_ce_ptr);
 	zend_register_ns_class_alias("Workerman", "Channel", workerman_channel_ce_ptr);
 }
 
