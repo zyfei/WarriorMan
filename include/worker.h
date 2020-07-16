@@ -35,6 +35,8 @@ typedef struct _wmWorker {
 	wmString* name; //名字
 	bool stopping; //是否正在停止
 
+	bool reloadable; //是否支持reload,默认是支持的
+
 	wmSocket* socket; //用于监听的fd封装而成
 } wmWorker;
 
@@ -55,5 +57,6 @@ void wmWorker_runAll(); //启动服务器
 bool wmWorker_stop(wmWorker* worker); //关闭服务器
 void wmWorker_free(wmWorker* worker);
 wmWorker* wmWorker_find_by_fd(int fd);
+wmWorker* wmWorker_getCurrent();
 
 #endif

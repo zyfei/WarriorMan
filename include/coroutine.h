@@ -42,5 +42,6 @@ void wmCoroutine_set_callback(long cid, coroutine_func_t _defer, void *_defer_da
 wmCoroutine* wmCoroutine_get_current();
 void wmCoroutine_init();
 void wmCoroutine_shutdown();
+int wmCoroutine_getTotalNum(); //获取一共有多少个协程
 
 #endif	/* WM_COROUTINE_H */

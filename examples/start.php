@@ -22,9 +22,13 @@ $worker->onWorkerStart = function ($worker) {
 	global $db;
 	$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "test");
 	
-	$timer_id = Timer::add(0.01, function () {
-		echo "Timer run \n";
+	$timer_id = Timer::add(1, function () {
+		echo "coro_num = " . Warriorman\Coroutine::getTotalNum() . " \n";
 	}, false);
+};
+
+$worker->onWorkerReload = function ($worker) {
+	var_dump("onWorkerReload ->" . $worker->workerId);
 };
 
 $worker->onConnect = function ($connection) {
@@ -35,7 +39,7 @@ $worker->onConnect = function ($connection) {
 };
 
 $worker->onMessage = function ($connection, $data) {
-	//var_dump($data);
+	// var_dump($data);
 	// $responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worla\r\n";
 	$responseStr = "hello worla";
 	$connection->send($responseStr);
@@ -55,25 +59,25 @@ $worker->onClose = function ($connection) {
 	echo "connection closed\n";
 };
 
-// 监听另外一个端口
-$worker2 = new Worker("tcp://0.0.0.0:8081", array(
-	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
-	"count" => 2 // 进程数量
-));
-$worker2->protocol = "\Workerman\Protocols\Http"; // 设置协议
+// // 监听另外一个端口
+// $worker2 = new Worker("tcp://0.0.0.0:8081", array(
+// "backlog" => 1234, // 默认102400，等待accept的连接队列长度
+// "count" => 2 // 进程数量
+// ));
+// $worker2->protocol = "\Workerman\Protocols\Http"; // 设置协议
 
-$worker2->onMessage = function ($connection, $data) {
-	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";
-	$connection->send($responseStr);
-};
+// $worker2->onMessage = function ($connection, $data) {
+// $responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";
+// $connection->send($responseStr);
+// };
 
-// 监听另外一个端口
-$worker3 = new Worker("udp://0.0.0.0:8080", array(
-	"count" => 1 // 进程数量
-));
-$worker3->onMessage = function ($connection, $data) {
-	var_dump("udp:" . $data);
-	$connection->send("hello world");
-};
+// // 监听另外一个端口
+// $worker3 = new Worker("udp://0.0.0.0:8080", array(
+// "count" => 1 // 进程数量
+// ));
+// $worker3->onMessage = function ($connection, $data) {
+// var_dump("udp:" . $data);
+// $connection->send("hello world");
+// };
 
 Worker::runAll();

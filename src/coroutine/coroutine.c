@@ -403,6 +403,10 @@ void wmCoroutine_shutdown() {
 	wmHash_destroy(WM_HASH_INT_STR, user_yield_coros);
 }
 
+int wmCoroutine_getTotalNum() {
+	return total_num;
+}
+
 void wmCoroutine_sleep(double seconds) {
 	if (seconds < 0.001) {
 		seconds = 0.001;

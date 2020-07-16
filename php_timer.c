@@ -3,6 +3,7 @@
  */
 #include "base.h"
 #include "timer.h"
+#include "worker.h"
 #include "coroutine.h"
 
 /**
@@ -58,7 +59,7 @@ static void timer_add_callback(void* _timer) {
 	php_worker_timer* timer = (php_worker_timer*) _timer;
 	timer->timer = NULL;
 	timer->cid = wmCoroutine_create(&timer->fcc, timer->fci.param_count, timer->fci.params);
-	if (!timer->persistent) {
+	if (!timer->persistent || wmWorker_getCurrent()->_status == WM_WORKER_STATUS_RUNNING) {
 		timer_free(timer);
 		return;
 	}
@@ -88,15 +89,17 @@ PHP_METHOD(workerman_timer, add) {
 		RETURN_FALSE
 	}
 	//如果第一个参数数数组的话
-	if (Z_TYPE_P(args1) == IS_ARRAY) {
-		if (args2 && Z_TYPE_P(args2) == IS_FALSE) {
+	if (args1) {
+		if (Z_TYPE_P(args1) == IS_ARRAY) {
+			if (args2 && Z_TYPE_P(args2) == IS_FALSE) {
+				timer->persistent = false;
+			}
+			//在这里解析数组
+			zend_fcall_info_args(&timer->fci, args1);
+			timer->fci.retval = NULL;
+		} else if (Z_TYPE_P(args1) == IS_FALSE) {
 			timer->persistent = false;
 		}
-		//在这里解析数组
-		zend_fcall_info_args(&timer->fci, args1);
-		timer->fci.retval = NULL;
-	} else if (Z_TYPE_P(args1) == IS_FALSE) {
-		timer->persistent = false;
 	}
 	timer->id = ++last_id;
 	timer->ticks = seconds * 1000;

@@ -16,6 +16,8 @@ static wmWorker* _main_worker = NULL; //当前子进程所属的worker
 static wmHash_INT_PTR* _worker_pids = NULL;
 static wmArray* _pid_array_tmp = NULL; //临时存放pid数组的
 
+static wmArray* _pidsToReload = NULL; //等待reload的pid
+
 /**
  * key是fd,value是对应的worker
  */
@@ -64,6 +66,7 @@ static char* getCurrentUser();
 static void _log(const char *format, ...);
 static void setUserAndGroup(wmWorker * worker);
 static void resetStd(); //重设默认输出到文件
+static void reload(); //平滑重启
 
 //初始化一下参数
 void wmWorker_init() {
@@ -73,6 +76,7 @@ void wmWorker_init() {
 	_fd_workers = wmHash_init(WM_HASH_INT_STR);
 	_worker_pids = wmHash_init(WM_HASH_INT_STR);
 	_pid_array_tmp = wmArray_new(64, sizeof(int));
+	_pidsToReload = wmArray_new(64, sizeof(int));
 }
 
 /**
@@ -106,6 +110,7 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	worker->socket = NULL;
 	worker->protocol = NULL;
 	worker->protocol_ce = NULL;
+	worker->reloadable = true;
 	parseSocketAddress(worker, socketName);
 
 	//写入workers对照表
@@ -175,6 +180,7 @@ void wmWorker_run(wmWorker *worker) {
 	reinstallSignal();
 
 	//设置回调方法 start
+	bind_callback(worker->_This, "onWorkerReload", &worker->onWorkerReload);
 	bind_callback(worker->_This, "onWorkerStop", &worker->onWorkerStop);
 	bind_callback(worker->_This, "onConnect", &worker->onConnect);
 	bind_callback(worker->_This, "onMessage", &worker->onMessage);
@@ -234,7 +240,7 @@ void monitorWorkers() {
 					continue;
 				}
 				wmArray* pid_arr = wmHash_value(_worker_pids, k);
-				int worker_id = wmHash_key(_workers, k);
+				int worker_id = wmHash_key(_worker_pids, k);
 				for (int i = 0; i < pid_arr->offset; i++) {
 					int *_pid = wmArray_find(pid_arr, i);
 					if (*_pid == pid) { //找到正主了，就是这个孙子自己先退出了，办他
@@ -256,6 +262,15 @@ void monitorWorkers() {
 				//
 				if (_status != WM_WORKER_STATUS_SHUTDOWN) {
 					forkWorkers();
+
+					for (int i = 0; i < _pidsToReload->offset; i++) {
+						int *reload_pid = wmArray_find(_pidsToReload, i);
+						if (*reload_pid == pid) {
+							wmArray_set(_pidsToReload, i, &zero);
+							reload();
+							break;
+						}
+					}
 				}
 			}
 
@@ -464,7 +479,9 @@ void initWorkers() {
  */
 void _kill(void* _pid) {
 	int* pid = (int*) _pid;
-	kill(*pid, SIGKILL);
+	if (*pid != 0) {
+		kill(*pid, SIGKILL);
+	}
 }
 
 //worker简易调度器/定时器，由alarm实现
@@ -730,6 +747,7 @@ void parseCommand() {
 	case 1: //如果是start，就继续运行
 		break;
 	case 2: //stop
+	case 3: //restart
 		_log("WarriorMan[%s] is stopping ...", start_file->val);
 		kill(_masterPid, SIGINT); //给主进程发送信号
 		for (i = 0; i < 5; i++) {
@@ -741,9 +759,18 @@ void parseCommand() {
 		}
 		if (command_ret == 1) {
 			_log("WarriorMan[%s] stop success", start_file->val);
+			if (command_type == 2) {
+				exit(0);
+				return;
+			}
 		} else {
 			_log("WarriorMan[%s] stop fail", start_file->val);
+			exit(0);
+			return;
 		}
+		return;
+	case 4: //reload
+		kill(_masterPid, SIGUSR1); //给主进程平滑重启信号
 		exit(0);
 		return;
 	default:
@@ -786,11 +813,13 @@ void acceptConnectionTcp(wmWorker* worker) {
 	wmConnection* conn;
 	zval* __zval;
 	zend_fcall_info_cache call_read;
-
-	while (!worker->socket->closed) {
+	while (worker->_status == WM_WORKER_STATUS_RUNNING) {
 		wmSocket* socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO, WM_SOCKET_MAX_TIMEOUT);
 		if (socket == NULL) {
-			wmWarn("acceptConnection fail. %s", socket->errMsg);
+			if (worker->_status != WM_WORKER_STATUS_RUNNING) {
+				break;
+			}
+			wmWarn("acceptConnection fail. socket = NULL");
 			continue;
 		}
 		conn = wmConnection_create(socket);
@@ -957,22 +986,119 @@ void saveMasterPid() {
 }
 
 /**
+ * 平滑重启
+ */
+void reload() {
+	if (_masterPid == getpid()) { //主进程
+		if (_status != WM_WORKER_STATUS_RELOADING && _status != WM_WORKER_STATUS_SHUTDOWN) {
+			_log("WarriorMan[%s] reloading", _startFile->str);
+			_status = WM_WORKER_STATUS_RELOADING;
+		}
+		/////////////////////////////////////////////////////////
+		//保存需要reload的pid
+		wmArray* reloadable_pid_array = wmArray_new(64, sizeof(int));
+		for (int k = wmHash_begin(_worker_pids); k != wmHash_end(_worker_pids); k++) {
+			if (!wmHash_exist(_worker_pids, k)) {
+				continue;
+			}
+			wmArray* pid_arr = wmHash_value(_worker_pids, k);
+			int worker_id = wmHash_key(_worker_pids, k);
+			wmWorker* worker = WM_HASH_GET(WM_HASH_INT_STR, _workers, worker_id);
+
+			//循环所有这个worker的子进程
+			for (int i = 0; i < pid_arr->offset; i++) {
+				int *_pid = wmArray_find(pid_arr, i);
+				if (worker->reloadable) {
+					wmArray_add(reloadable_pid_array, _pid);
+				} else { //如果不可以reload，直接发送信号，子进程会自己判断
+					kill(*_pid, SIGUSR1);
+				}
+			}
+		}
+
+		//获取所有需要被reload的pid
+		int zero = 0;
+		for (int i = 0; i < _pidsToReload->offset; i++) {
+			int *_pid = wmArray_find(_pidsToReload, i);
+			int _en = 0;
+			for (int i2 = 0; i2 < reloadable_pid_array->offset; i2++) {
+				int *_pid2 = wmArray_find(reloadable_pid_array, i2);
+				if (*_pid == *_pid2) {
+					_en = 1;
+					break;
+				}
+			}
+			if (_en == 0) {
+				wmArray_set(_pidsToReload, i, &zero);
+			}
+		}
+
+		wmArray_free(reloadable_pid_array);
+		/**
+		 * 取一个pid reload，这块要配合monitorWorkers，在monitorWorkers中pid死亡如果在_pidToReload中会触发reload方法，继续reload
+		 */
+		int* reload_pid = NULL;
+		for (int i = 0; i < _pidsToReload->offset; i++) {
+			int *_pid = wmArray_find(_pidsToReload, i);
+			if (*_pid != 0) {
+				reload_pid = _pid;
+				break;
+			}
+		}
+		if (!reload_pid) {
+			if (_status != WM_WORKER_STATUS_SHUTDOWN) {
+				_status = WM_WORKER_STATUS_RUNNING;
+			}
+			return;
+		}
+		//发送信号
+		kill(*reload_pid, SIGUSR1);
+		//两秒后强制杀死
+		wmTimerWheel_add_quick(&WorkerG.timer, _kill, (void*) reload_pid, WM_KILL_WORKER_TIMER_TIME);
+	} else { //子进程,注意这里子进程是运行在信号的协程中，可以使用协程方法
+		//调用
+		if (_main_worker->onWorkerReload) {
+			_main_worker->onWorkerReload->fci.param_count = 1;
+			_main_worker->onWorkerReload->fci.params = _main_worker->_This;
+			if (call_closure_func(_main_worker->onWorkerReload) != SUCCESS) {
+				php_error_docref(NULL, E_ERROR, "call onWorkerStart error");
+				return;
+			}
+		}
+
+		if (_main_worker->reloadable) {
+			_main_worker->_status = WM_WORKER_STATUS_RELOADING;
+			_unlisten(_main_worker);
+			while (1) {
+				int coro_num = wmCoroutine_getTotalNum();
+				if (coro_num <= 2) {
+					stopAll();
+					break;
+				}
+				wmCoroutine_sleep(0.1);
+			}
+		}
+	}
+}
+
+/**
  * 信号处理函数
  */
 void signalHandler(int signal) {
 	switch (signal) {
-	// Stop.
-	case SIGINT:
+	case SIGINT: // Stop.
 		stopAll();
 		break;
-		// Reload.
-	case SIGUSR1:
-		printf("Reload haven't started to do\n");
-		//static::$_pidsToRestart = static::getAllWorkerPids();
-		//_reload();
+	case SIGUSR1: // Reload.
+		getAllWorkerPids();
+		wmArray_clear(_pidsToReload);
+		for (int i = 0; i < _pid_array_tmp->offset; i++) {
+			int *_pid = wmArray_find(_pid_array_tmp, i);
+			wmArray_add(_pidsToReload, _pid);
+		}
+		reload();
 		break;
-		// Show status.
-	case SIGUSR2:
+	case SIGUSR2:		// Show status.
 		printf("Status haven't started to do\n");
 		//static::writeStatisticsToStatusFile();
 		break;
@@ -1014,6 +1140,13 @@ void reinstallSignal() {
 	wm_get_internal_function(NULL, workerman_coroutine_ce_ptr, ZEND_STRL("signal_wait"), &signal_wait);
 	wmCoroutine_create(&signal_wait, 0, NULL);
 	//创建signal_wait协程 end
+}
+
+/**
+ * 获得当前worker
+ */
+wmWorker* wmWorker_getCurrent() {
+	return _main_worker;
 }
 
 char* getCurrentUser() {

@@ -15,7 +15,6 @@
 #include "array.h"
 #include "hash.h"
 
-
 //构造函数用到
 typedef struct {
 	zend_fcall_info fci;
@@ -179,8 +178,6 @@ extern zend_class_entry *workerman_runtime_ce_ptr;
 extern zend_class_entry workerman_timer_ce;
 extern zend_class_entry *workerman_timer_ce_ptr;
 
-
-
 //定义一些全局方法
 static inline zval *wm_zend_read_property(zend_class_entry *ce, zval *obj, const char *s, int len, int silent) {
 	zval rv, *property = zend_read_property(ce, obj, s, len, silent, &rv);
@@ -242,7 +239,7 @@ static inline void wm_zend_fci_cache_free(void* fci_cache) {
 //调用闭包函数
 int call_closure_func(php_fci_fcc* fci_fcc);
 
-void wm_get_internal_function(zval *object,zend_class_entry* obj_ce,const char *function_name,size_t function_name_len,zend_fcall_info_cache *fcic);
+void wm_get_internal_function(zval *object, zend_class_entry* obj_ce, const char *function_name, size_t function_name_len, zend_fcall_info_cache *fcic);
 
 bool set_process_title(char* process_title);
 
@@ -281,7 +278,7 @@ typedef struct {
 } wmPoll_t;
 
 typedef struct {
-	bool is_running;
+	bool is_running; //epoll是否正常营业
 	wmPoll_t *poll;
 	wmTimerWheel timer; //核心定时器
 	wmString *buffer_stack; //用于整个项目的临时字符串存储

@@ -86,6 +86,11 @@ PHP_METHOD(workerman_coroutine, getCid) {
 	RETURN_LONG(co->cid);
 }
 
+//获取协程数量
+PHP_METHOD(workerman_coroutine, getTotalNum) {
+	RETURN_LONG(wmCoroutine_getTotalNum());
+}
+
 //判断协程是否存在
 PHP_METHOD(workerman_coroutine, isExist) {
 	zend_long cid = 0;
@@ -156,6 +161,7 @@ const zend_function_entry workerman_coroutine_methods[] = { //
 		PHP_ME(workerman_coroutine, yield, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 		PHP_ME(workerman_coroutine, resume, arginfo_workerman_coroutine_resume, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 		PHP_ME(workerman_coroutine, getCid, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
+		PHP_ME(workerman_coroutine, getTotalNum, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 		PHP_ME(workerman_coroutine, isExist, arginfo_workerman_coroutine_isExist, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 		PHP_ME(workerman_coroutine, defer, arginfo_workerman_coroutine_defer, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 		PHP_ME(workerman_coroutine, sleep, arginfo_workerman_coroutine_sleep, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //

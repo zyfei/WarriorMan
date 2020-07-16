@@ -123,7 +123,7 @@ void wmConnection_read(wmConnection* connection) {
 	zval z1;
 	zval retval_ptr;
 	//开始读消息
-	while (connection && connection->_status == WM_CONNECTION_STATUS_ESTABLISHED) {
+	while (connection->worker->_status == WM_WORKER_STATUS_RUNNING && connection && connection->_status == WM_CONNECTION_STATUS_ESTABLISHED) {
 		int ret = wmSocket_read(connection->socket, _read_buffer_tmp->str, _read_buffer_tmp->size, WM_SOCKET_MAX_TIMEOUT);
 		//触发onError
 		if (ret == WM_SOCKET_ERROR) {
