@@ -141,6 +141,7 @@ void workerman_worker_init() {
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("user"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("protocol"), ZEND_ACC_PUBLIC);
 	zend_declare_property_long(workerman_worker_ce_ptr, ZEND_STRL("count"), 1, ZEND_ACC_PUBLIC);
+	zend_declare_property_long(workerman_worker_ce_ptr, ZEND_STRL("workerId"), 0, ZEND_ACC_PUBLIC);
 
 	//静态变量
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
