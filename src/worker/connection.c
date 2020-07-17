@@ -262,7 +262,7 @@ void wmConnection_recvfrom(wmConnection* connection, wmSocket* socket) {
 /**
  * 发送数据
  */
-bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
+bool wmConnection_send(wmConnection *connection, const void *buf, size_t len, bool raw) {
 	if (connection->transport == WM_SOCK_TCP) {
 		if (connection->_status != WM_CONNECTION_STATUS_ESTABLISHED) {
 			return false;
@@ -271,7 +271,7 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 		zval retval_ptr;
 		zval z1;
 		//使用协议包装
-		if (connection->worker->protocol) {
+		if (connection->worker->protocol && raw == false) {
 			ZVAL_STR(&z1, zend_string_init(buf, len, 0));
 			//调用协议的input方法
 			zend_call_method(NULL, connection->worker->protocol_ce, NULL, ZEND_STRL("encode"), &retval_ptr, 2, &z1, connection->_This);
@@ -313,6 +313,16 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len) {
 		return true;
 	}
 	return false;
+}
+
+/**
+ * Remove $length of data from receive buffer.
+ */
+void wmConnection_consumeRecvBuffer(wmConnection* connection, zend_long length) {
+	if (connection->read_packet_buffer && (connection->read_packet_buffer->length - connection->read_packet_buffer->offset) > length) {
+		connection->read_packet_buffer->length = connection->read_packet_buffer->length - length;
+		connection->read_packet_buffer->str[connection->read_packet_buffer->length] = '\0';
+	}
 }
 
 //应用层发送缓冲区是否这次添加之后，已经满了

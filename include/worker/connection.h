@@ -20,7 +20,7 @@ typedef struct {
 	wmSocket* socket; //创建的socket对象
 	zval* _This; //指向当前PHP类的指针
 	int _status; //当前连接的状态
-	int transport;//TCP还是UDP
+	int transport; //TCP还是UDP
 
 	php_fci_fcc *onMessage;
 	php_fci_fcc *onClose;
@@ -52,11 +52,12 @@ wmConnection* wmConnection_find_by_fd(int fd);
 ssize_t wmConnection_recv(wmConnection *socket, int32_t length);
 void wmConnection_read(wmConnection* connection);
 void wmConnection_recvfrom(wmConnection* connection, wmSocket* socket);
-bool wmConnection_send(wmConnection *connection, const void *buf, size_t len);
+bool wmConnection_send(wmConnection *connection, const void *buf, size_t len, bool raw);
 int wmConnection_close(wmConnection *connection);
 void wmConnection_free(wmConnection *socket);
 void wmConnection_closeConnections();
 long wmConnection_getConnectionsNum();
 unsigned long wmConnection_getTotalRequestNum();
+void wmConnection_consumeRecvBuffer(wmConnection* connection, zend_long length);
 
 #endif

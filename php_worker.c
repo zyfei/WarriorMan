@@ -170,4 +170,9 @@ void workerman_worker_init() {
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("logFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("stdoutFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
 	zend_declare_property_bool(workerman_worker_ce_ptr, ZEND_STRL("daemonize"), 0, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
+
+	//常量
+	zval VERSION;
+	ZVAL_NEW_STR(&VERSION, zend_string_init(ZEND_STRL(PHP_WORKERMAN_VERSION), 1));
+	zend_declare_class_constant(workerman_worker_ce_ptr, ZEND_STRL("VERSION"), &VERSION);
 }

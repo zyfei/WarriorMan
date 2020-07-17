@@ -51,11 +51,16 @@ ZEND_END_ARG_INFO()
 //发送数据方法
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_connection_send, 0, 0, 2) //
 ZEND_ARG_INFO(0, data)
-ZEND_ARG_INFO(0, fd)
+ZEND_ARG_INFO(0, raw)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_connection_set, 0, 0, 1) //
 ZEND_ARG_INFO(0, options) //
+ZEND_END_ARG_INFO()
+
+//consumeRecvBuffer截取readbuffer
+ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_connection_consumeRecvBuffer, 0, 0, 1) //
+ZEND_ARG_INFO(0, length)
 ZEND_END_ARG_INFO()
 
 /**
@@ -108,14 +113,14 @@ PHP_METHOD(workerman_connection, send) {
 	wmConnectionObject* connection_object;
 	wmConnection *conn;
 
-	zend_long fd = 0;
+	zend_bool raw = 0;
 	char *data;
 	size_t length;
 
 	ZEND_PARSE_PARAMETERS_START(1, 2)
 				Z_PARAM_STRING(data, length)
 				Z_PARAM_OPTIONAL
-				Z_PARAM_LONG(fd)
+				Z_PARAM_BOOL(raw)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
 	connection_object = (wmConnectionObject *) wm_connection_fetch_object(Z_OBJ_P(getThis()));
@@ -124,7 +129,7 @@ PHP_METHOD(workerman_connection, send) {
 		php_error_docref(NULL, E_WARNING, "send error");
 		RETURN_FALSE
 	}
-	if (!wmConnection_send(conn, data, length)) {
+	if (!wmConnection_send(conn, data, length, raw)) {
 		php_error_docref(NULL, E_WARNING, "send error");
 		RETURN_FALSE
 	}
@@ -143,10 +148,28 @@ PHP_METHOD(workerman_connection, close) {
 	RETURN_LONG(ret);
 }
 
+/**
+ * Remove $length of data from receive buffer.
+ */
+PHP_METHOD(workerman_connection, consumeRecvBuffer) {
+	zend_long length = 0;
+
+	ZEND_PARSE_PARAMETERS_START(1, 1)
+				Z_PARAM_LONG(length)
+			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
+	wmConnectionObject* connection_object = (wmConnectionObject *) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+
+	wmConnection_consumeRecvBuffer(connection_object->connection, length);
+}
+
 static const zend_function_entry workerman_connection_methods[] = { //
 	PHP_ME(workerman_connection, set, arginfo_workerman_connection_set, ZEND_ACC_PUBLIC) //
+		//公有
 		PHP_ME(workerman_connection, send, arginfo_workerman_connection_send, ZEND_ACC_PUBLIC) //
 		PHP_ME(workerman_connection, close, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_connection, consumeRecvBuffer, arginfo_workerman_connection_consumeRecvBuffer, ZEND_ACC_PUBLIC) //
+
+		//私有
 		PHP_ME(workerman_connection, read, arginfo_workerman_connection_void, ZEND_ACC_PRIVATE) //
 		PHP_FE_END };
 
