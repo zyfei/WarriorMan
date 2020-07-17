@@ -58,8 +58,8 @@ PHP_METHOD(workerman_worker, __construct) {
 	//初始化worker
 	worker_obj->worker = wmWorker_create(worker_zval, socketName);
 
-	//设置worker id
-	zend_update_property_long(workerman_worker_ce_ptr, getThis(), ZEND_STRL("id"), worker_obj->worker->id);
+	//设置workerId
+	zend_update_property_long(workerman_worker_ce_ptr, getThis(), ZEND_STRL("workerId"), worker_obj->worker->workerId);
 }
 
 PHP_METHOD(workerman_worker, stop) {
@@ -140,6 +140,7 @@ void workerman_worker_init() {
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("name"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("user"), ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("protocol"), ZEND_ACC_PUBLIC);
+	zend_declare_property_long(workerman_worker_ce_ptr, ZEND_STRL("count"), 1, ZEND_ACC_PUBLIC);
 
 	//静态变量
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);

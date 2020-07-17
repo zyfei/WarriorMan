@@ -10,12 +10,12 @@ Warriorman\Worker::rename(); // 将Workerman改为Workerman
 Warriorman\Runtime::enableCoroutine(); // hook相关函数
 
 $worker = new Worker("tcp://0.0.0.0:8080");
-
+$worker->count = 4;
 $worker->name = "tcpServer"; // 设置名字
 $worker->protocol = "\Workerman\Protocols\Text"; // 设置协议
 
 $worker->onWorkerStart = function ($worker) {
-	var_dump("onWorkerStart ->" . $worker->id);
+	var_dump("onWorkerStart ->" . $worker->workerId . " id=".$worker->id);
 	global $db;
 	$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "test");
 	
@@ -58,7 +58,7 @@ $worker->onClose = function ($connection) {
 
 // 监听另外一个端口
 $worker2 = new Worker("tcp://0.0.0.0:8081");
-$worker2->protocol = "\Workerman\Protocols\Http"; // 设置协议
+//$worker2->protocol = "\Workerman\Protocols\Http"; // 设置协议
 
 $worker2->onMessage = function ($connection, $data) {
 	$responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";

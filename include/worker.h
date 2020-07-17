@@ -8,7 +8,8 @@
 #include "wm_socket.h"
 
 typedef struct _wmWorker {
-	uint32_t id; //worker id
+	uint32_t workerId; //这是worker的Id
+	uint32_t id; //这是worker下面每个进程的id，从0开始
 	uint32_t fd; //监听端口的fd
 	zval* _This; //指向当前php实例的指针
 	php_fci_fcc *onWorkerStart;

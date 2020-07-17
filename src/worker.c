@@ -98,12 +98,12 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	worker->onBufferFull = NULL;
 	worker->onBufferDrain = NULL;
 	worker->onError = NULL;
-	worker->id = _last_id++; //worker id
+	worker->workerId = _last_id++; //worker id
 	worker->fd = 0;
 	worker->backlog = WM_DEFAULT_BACKLOG;
 	worker->host = NULL;
 	worker->port = 0;
-	worker->count = 0;
+	worker->count = 1; //默认是一个进程
 	worker->transport = 0;
 	worker->_This = _This;
 	worker->name = NULL;
@@ -117,7 +117,7 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	parseSocketAddress(worker, socketName);
 
 	//写入workers对照表
-	if (WM_HASH_ADD(WM_HASH_INT_STR, _workers, worker->id,worker) < 0) {
+	if (WM_HASH_ADD(WM_HASH_INT_STR, _workers, worker->workerId,worker) < 0) {
 		wmError("wmWorker_create -> _workers_add error!");
 	}
 	return worker;
@@ -212,10 +212,10 @@ void wmWorker_runAll() {
 	//设置定时器
 	signal(SIGALRM, alarm_wait);
 	alarm(1);
+	initWorkers(); //初始化进程相关资料
 	initWorkerPids(); //根据count初始化pid数组
 	parseCommand(); //解析用户命令
 	daemonize(); //守护进程模式
-	initWorkers(); //初始化进程相关资料
 	installSignal(); //装载信号
 	saveMasterPid();
 	displayUI();
@@ -313,7 +313,7 @@ void forkOneWorker(wmWorker* worker, int key) {
 	//拿到一个未fork的进程
 	int pid = fork();
 	if (pid > 0) { // For master process.
-		wmArray* pid_arr = WM_HASH_GET(WM_HASH_INT_STR, _worker_pids, worker->id);
+		wmArray* pid_arr = WM_HASH_GET(WM_HASH_INT_STR, _worker_pids, worker->workerId);
 		wmArray_set(pid_arr, key, &pid);
 		return;
 	} else if (pid == 0) { // For child processes.
@@ -323,10 +323,13 @@ void forkOneWorker(wmWorker* worker, int key) {
 			}
 			wmWorker* worker2 = wmHash_value(_workers, k);
 
-			if (worker2->id != worker->id) {
+			if (worker2->workerId != worker->workerId) {
 				wmWorker_free(worker2);
 			}
 		}
+		worker->id = key;
+		zend_update_property_long(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("id"), key);
+
 		//设置当前子进程运行的是哪个worker
 		_main_worker = worker;
 
@@ -389,7 +392,7 @@ void getAllWorkerPids() {
  * 在idmap中，通过value查询key
  */
 int getKey_by_pid(wmWorker* worker, int pid) {
-	wmArray* pid_arr = WM_HASH_GET(WM_HASH_INT_STR, _worker_pids, worker->id);
+	wmArray* pid_arr = WM_HASH_GET(WM_HASH_INT_STR, _worker_pids, worker->workerId);
 	int id = -1;
 	for (int i = 0; i < pid_arr->offset; i++) {
 		int* _pid = (int*) wmArray_find(pid_arr, i);
@@ -422,7 +425,18 @@ void initWorkers() {
 			zend_update_property_stringl(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), worker->name->str, 4);
 		}
 
-		//检查高级协议
+		//检查count
+		_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("count"), 0);
+		if (_zval) {
+			if (Z_TYPE_INFO_P(_zval) != IS_LONG) {
+				wmError("count must be a number");
+			}
+			worker->count = Z_LVAL_P(_zval);
+		} else {
+			zend_update_property_long(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("count"), worker->count);
+		}
+
+		//检查应用级协议
 		_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("protocol"), 0);
 		if (_zval) {
 			if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
@@ -434,9 +448,6 @@ void initWorkers() {
 				if ((worker->protocol_ce->ce_flags & (ZEND_ACC_INTERFACE | ZEND_ACC_TRAIT)) != 0) {
 					wmError("worker->protocol error 2");
 				}
-				//模拟调用inout
-				//zval retval_ptr;
-				//zend_call_method(NULL, worker->protocol_ce, NULL, ZEND_STRL("input"), &retval_ptr, 0, NULL, NULL);
 			}
 		}
 
@@ -681,7 +692,7 @@ void initWorkerPids() {
 		for (int i = 0; i < worker->count; i++) {
 			wmArray_add(new_ids, &value);
 		}
-		if (WM_HASH_ADD(WM_HASH_INT_STR, _worker_pids, worker->id,new_ids) < 0) {
+		if (WM_HASH_ADD(WM_HASH_INT_STR, _worker_pids, worker->workerId,new_ids) < 0) {
 			wmError("initWorkerPids -> _worker_pids_add  fail");
 		}
 	}
@@ -1435,7 +1446,7 @@ void wmWorker_free(wmWorker* worker) {
 	wmConnection_closeConnections();
 
 	//从workers中删除
-	WM_HASH_DEL(WM_HASH_INT_STR, _workers, worker->id);
+	WM_HASH_DEL(WM_HASH_INT_STR, _workers, worker->workerId);
 	WM_HASH_DEL(WM_HASH_INT_STR, _fd_workers, worker->fd);
 
 	wm_free(worker);
