@@ -9,16 +9,13 @@ require_once 'Workerman/Autoloader.php';
 Warriorman\Worker::rename(); // 将Workerman改为Workerman
 Warriorman\Runtime::enableCoroutine(); // hook相关函数
 
-$worker = new Worker("tcp://0.0.0.0:8080", array(
-	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
-	"count" => 1 // 进程数量
-));
+$worker = new Worker("tcp://0.0.0.0:8080");
 
 $worker->name = "tcpServer"; // 设置名字
 $worker->protocol = "\Workerman\Protocols\Text"; // 设置协议
 
 $worker->onWorkerStart = function ($worker) {
-	var_dump("onWorkerStart ->" . $worker->workerId);
+	var_dump("onWorkerStart ->" . $worker->id);
 	global $db;
 	$db = new test\MySQL("127.0.0.1", "3306", "root", "root", "test");
 	
@@ -28,7 +25,7 @@ $worker->onWorkerStart = function ($worker) {
 };
 
 $worker->onWorkerReload = function ($worker) {
-	var_dump("onWorkerReload ->" . $worker->workerId);
+	var_dump("onWorkerReload ->" . $worker->id);
 };
 
 $worker->onConnect = function ($connection) {
@@ -60,10 +57,7 @@ $worker->onClose = function ($connection) {
 };
 
 // 监听另外一个端口
-$worker2 = new Worker("tcp://0.0.0.0:8081", array(
-	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
-	"count" => 2 // 进程数量
-));
+$worker2 = new Worker("tcp://0.0.0.0:8081");
 $worker2->protocol = "\Workerman\Protocols\Http"; // 设置协议
 
 $worker2->onMessage = function ($connection, $data) {
@@ -72,9 +66,7 @@ $worker2->onMessage = function ($connection, $data) {
 };
 
 // 监听另外一个端口
-$worker3 = new Worker("udp://0.0.0.0:8080", array(
-	"count" => 1 // 进程数量
-));
+$worker3 = new Worker("udp://0.0.0.0:8080");
 $worker3->onMessage = function ($connection, $data) {
 	var_dump("udp:" . $data);
 	$connection->send("hello world");

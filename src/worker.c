@@ -561,6 +561,12 @@ void checkEnv() {
 	}
 	zend_string_free(_php_sapi);
 
+	//检查workers的数量
+	if (_workers->size == 0) {
+		wmError("There is no worker to run \n");
+		return;
+	}
+
 	//获取启动文件
 	const char* executed_filename = zend_get_executed_filename();
 	_startFile = wmString_dup(executed_filename, sizeof(char) * strlen(executed_filename));
