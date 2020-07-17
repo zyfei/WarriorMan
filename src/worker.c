@@ -35,9 +35,9 @@ static FILE* _stdout = NULL; //重设之后的标准输出
 static FILE* _stderr = NULL; //重设之后的标准错误输出
 static wmString* _statisticsFile = NULL; //服务状态文件地址
 
-static int _maxUserNameLength = 0; //用户名字的最大长度
-static int _maxWorkerNameLength = 0; //名字的最大长度
-static int _maxSocketNameLength = 0; //listen的最大长度
+static int _maxUserNameLength = 4; //用户名字的最大长度
+static int _maxWorkerNameLength = 6; //名字的最大长度
+static int _maxSocketNameLength = 6; //listen的最大长度
 static long _start_timestamp = 0; //服务启动时间戳
 
 static void acceptConnectionTcp(wmWorker* worker);
@@ -579,13 +579,18 @@ void checkEnv() {
 	zval* _zval = wm_zend_read_static_property_not_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), 0);
 	if (!_zval) {
 		_pidFile = wmString_dup2(_runDir);
-		wmString_append_ptr(_pidFile, ZEND_STRL("worker.pid"));
-
+		int pid_file_lem = _pidFile->length;
+		wmString_append(_pidFile, _startFile);
+		wmString_append_ptr(_pidFile, ZEND_STRL(".pid"));
+		for (int i = pid_file_lem; i < _pidFile->length; i++) {
+			if (_pidFile->str[i] == '/') {
+				_pidFile->str[i] = '_';
+			}
+		}
 		zend_update_static_property_stringl(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), _pidFile->str, _pidFile->length);
 	} else {
 		_pidFile = wmString_dup(_zval->value.str->val, _zval->value.str->len);
 	}
-	//
 
 	// State.
 	_status = WM_WORKER_STATUS_STARTING;
@@ -1210,7 +1215,7 @@ void displayUI() {
 		count_space_num = worker->count > 99 ? 3 : count_space_num;
 		count_space_num = worker->count > 999 ? 4 : count_space_num;
 
-		echoWin("%-*s%-*s%-*s %d%-*s <g> [OK] </g>\n", //
+		echoWin("%-*s%-*s%-*s%d%-*s<g>[OK]</g>\n", //
 			_maxUserNameLength + 2, worker->user, //
 			_maxWorkerNameLength + 2, worker->name->str, //
 			_maxSocketNameLength + 2, worker->socketName->str, //
