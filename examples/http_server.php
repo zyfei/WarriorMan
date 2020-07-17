@@ -6,8 +6,10 @@ require_once 'Workerman/Autoloader.php';
 Warriorman\Worker::rename(); // 将Workerman改为Workerman
 Warriorman\Runtime::enableCoroutine(); // hook相关函数
                                        
+class App extends Worker{}
+
 // 创建一个Worker监听2345端口，使用http协议通讯
-$http_worker = new Worker("tcp://0.0.0.0:2345");
+$http_worker = new App("tcp://0.0.0.0:2345");
 
 // 启动4个进程对外提供服务
 $http_worker->count = 4;
