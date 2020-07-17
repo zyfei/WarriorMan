@@ -80,7 +80,6 @@ Worker::runAll();
 
 ## 文档
 WarriorMan:[https://www.kancloud.cn/wwwoooshizha/warriorman/content](https://www.kancloud.cn/wwwoooshizha/warriorman/content)  
-WorkerMan:[http://doc.workerman.net](http://doc.workerman.net/)
 
 ## 交流
 WarriorMan 交流QQ群: 1098698769
