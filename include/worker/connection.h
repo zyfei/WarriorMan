@@ -55,6 +55,8 @@ void wmConnection_recvfrom(wmConnection* connection, wmSocket* socket);
 bool wmConnection_send(wmConnection *connection, const void *buf, size_t len);
 int wmConnection_close(wmConnection *connection);
 void wmConnection_free(wmConnection *socket);
-void wmConnection_close_connections();
+void wmConnection_closeConnections();
+long wmConnection_getConnectionsNum();
+unsigned long wmConnection_getTotalRequestNum();
 
 #endif

@@ -33,10 +33,12 @@ static wmString* _logFile = NULL; //记录启动停止等信息
 static wmString* _stdoutFile = NULL; //当守护模式运行的时候，所有输出会重定向到这里
 static FILE* _stdout = NULL; //重设之后的标准输出
 static FILE* _stderr = NULL; //重设之后的标准错误输出
+static wmString* _statisticsFile = NULL; //服务状态文件地址
 
 static int _maxUserNameLength = 0; //用户名字的最大长度
 static int _maxWorkerNameLength = 0; //名字的最大长度
 static int _maxSocketNameLength = 0; //listen的最大长度
+static long _start_timestamp = 0; //服务启动时间戳
 
 static void acceptConnectionTcp(wmWorker* worker);
 static void acceptConnectionUdp(wmWorker* worker);
@@ -67,6 +69,7 @@ static void _log(const char *format, ...);
 static void setUserAndGroup(wmWorker * worker);
 static void resetStd(); //重设默认输出到文件
 static void reload(); //平滑重启
+static void writeStatisticsToStatusFile(); //写入status信息
 
 //初始化一下参数
 void wmWorker_init() {
@@ -543,7 +546,7 @@ bool wmWorker_stop(wmWorker* worker) {
 		fclose(_stderr);
 	}
 	//关闭所有连接
-	wmConnection_close_connections();
+	wmConnection_closeConnections();
 	return true;
 }
 
@@ -638,6 +641,19 @@ void checkEnv() {
 		utimes(_stdoutFile->str, &tv);
 		chmod(_stdoutFile->str, 0622);
 	}
+
+	//设置status文件位置
+	_statisticsFile = wmString_dup("/tmp", 4);
+	wmString_append(_statisticsFile, _startFile);
+	for (int i = 4; i < _statisticsFile->length; i++) {
+		if (_statisticsFile->str[i] == '/') {
+			_statisticsFile->str[i] = '_';
+		}
+	}
+
+	//设置启动时间戳
+	wmGetMilliTime(&_start_timestamp);
+	_start_timestamp = _start_timestamp / 1000;
 }
 
 //初始化idMap
@@ -771,6 +787,28 @@ void parseCommand() {
 		return;
 	case 4: //reload
 		kill(_masterPid, SIGUSR1); //给主进程平滑重启信号
+		exit(0);
+		return;
+	case 5: //status
+		while (1) {
+			if (access(_statisticsFile->str, F_OK) == 0) {
+				remove(_statisticsFile->str); //删除之前的状态文件
+			}
+			kill(_masterPid, SIGUSR2); //给主进程平滑重启信号
+			sleep(1); //睡一秒
+			if (_daemonize) {
+				fputs("\33[H\33[2J\33(B\33[m", stdout);
+				fflush(stdout); //刷新缓冲区
+			}
+			//读取statusFile信息
+			wmString* _status_buffer = wm_file_get_contents(_statisticsFile->str);
+			echoWin(_status_buffer->str);
+			wmString_free(_status_buffer);
+			if (!_daemonize) {
+				exit(0);
+			}
+			echoWin("\nPress Ctrl+C to quit.\n\n");
+		}
 		exit(0);
 		return;
 	default:
@@ -1099,8 +1137,7 @@ void signalHandler(int signal) {
 		reload();
 		break;
 	case SIGUSR2:		// Show status.
-		printf("Status haven't started to do\n");
-		//static::writeStatisticsToStatusFile();
+		writeStatisticsToStatusFile();
 		break;
 		// Show connection status.
 	}
@@ -1190,48 +1227,116 @@ void displayUI() {
 }
 
 /**
+ * 存入status信息
+ */
+void writeStatisticsToStatusFile() {
+	/**
+	 * 主进程处理
+	 */
+	if (_masterPid == getpid()) {
+		int ret = wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size,
+			"---------------------------------------<w>GLOBAL STATUS</w>--------------------------------------------\n");
+		wm_file_put_contents(_statisticsFile->str, WorkerG.buffer_stack->str, ret, true); //写入PID文件
+		ret = wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "WarriorMan version:%s          PHP version:%s\n", PHP_WORKERMAN_VERSION,
+		PHP_VERSION);
+		wm_file_put_contents(_statisticsFile->str, WorkerG.buffer_stack->str, ret, true); //写入PID文件
+
+		struct tm * timeinfo = localtime(&_start_timestamp);
+		strftime(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%Y-%m-%d %H:%M:%S", timeinfo);
+		ret = wm_snprintf(WorkerG.buffer_stack_large->str, WorkerG.buffer_stack_large->size, "start time:%s   run %d days %d hours\n",
+			WorkerG.buffer_stack->str, 0, 0);
+		wm_file_put_contents(_statisticsFile->str, WorkerG.buffer_stack_large->str, ret, true); //写入PID文件
+
+		// Workers
+		getAllWorkerPids();
+		ret = wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%d workers %d processes\n", _workers->size, _pid_array_tmp->offset);
+		wm_file_put_contents(_statisticsFile->str, WorkerG.buffer_stack->str, ret, true); //写入PID文件
+
+		// Process
+		ret = wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size,
+			"---------------------------------------<w>PROCESS STATUS</w>-------------------------------------------\n");
+		wm_file_put_contents(_statisticsFile->str, WorkerG.buffer_stack->str, ret, true); //写入PID文件
+
+		ret = wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%-*s%-*s%-*s%-*s%-*s%-*s\n", //
+			8, "pid", 12, "php_memory", //
+			((int) (_maxSocketNameLength - strlen("listening"))) > 0 ? _maxSocketNameLength + 2 : (strlen("listening") + 2), "listening",  //
+			((int) (_maxWorkerNameLength - strlen("worker_name"))) > 0 ? _maxWorkerNameLength + 2 : (strlen("worker_name") + 2), "worker_name", //
+			13, "connections", 15, "total_request" //
+			);//
+		wm_file_put_contents(_statisticsFile->str, WorkerG.buffer_stack->str, ret, true); //写入PID文件
+		chmod(_statisticsFile->str, 0722);
+		getAllWorkerPids();
+		for (int i = 0; i < _pid_array_tmp->offset; i++) {
+			int* pid = wmArray_find(_pid_array_tmp, i);
+			kill(*pid, SIGUSR2);
+		}
+		return;
+	}
+	/**
+	 * 子进程处理
+	 */
+	char _pid[10];
+	wm_itoa(_pid, getpid());
+	char _memory[10];
+	double _mem = ((double) zend_memory_usage(true)) / (1024 * 1024);
+	wm_snprintf(_memory, 10, "%.2f", _mem);
+	char _conn_num[10];
+	wm_itoa(_conn_num, wmConnection_getConnectionsNum());
+	char _total_request_num[10];
+	wm_itoa(_total_request_num, wmConnection_getTotalRequestNum());
+
+	int ret = wm_snprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, "%-*s%-*s%-*s%-*s%-*s%-*s\n", //
+		8, _pid, 12, _memory, //
+		((int) (_maxSocketNameLength - strlen("listening"))) > 0 ? _maxSocketNameLength + 2 : (strlen("listening") + 2), _main_worker->socketName->str,  //
+		((int) (_maxWorkerNameLength - strlen("worker_name"))) > 0 ? _maxWorkerNameLength + 2 : (strlen("worker_name") + 2), _main_worker->name->str, //
+		13, _conn_num, 15, _total_request_num //
+		);//
+	wm_file_put_contents(_statisticsFile->str, WorkerG.buffer_stack->str, ret, true); //写入PID文件
+}
+
+/**
  * 只向窗口输出
  */
 void echoWin(const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	int retval = vsnprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, format, args);
+	int retval = vsnprintf(WorkerG.buffer_stack_large->str, WorkerG.buffer_stack_large->size, format, args);
 	va_end(args);
 	if (retval < 0) {
 		retval = 0;
-		WorkerG.buffer_stack->str[0] = '\0';
-	} else if (retval >= WorkerG.buffer_stack->size) {
-		retval = WorkerG.buffer_stack->size - 1;
-		WorkerG.buffer_stack->str[retval] = '\0';
+		WorkerG.buffer_stack_large->str[0] = '\0';
+	} else if (retval >= WorkerG.buffer_stack_large->size) {
+		retval = WorkerG.buffer_stack_large->size - 1;
+		WorkerG.buffer_stack_large->str[retval] = '\0';
 	}
-	WorkerG.buffer_stack->length = retval;
-	wmString_replace(WorkerG.buffer_stack, "<n>", "\033[1A\n\033[K");
-	wmString_replace(WorkerG.buffer_stack, "<w>", "\033[47;30m");
-	wmString_replace(WorkerG.buffer_stack, "<g>", "\033[32;40m");
-	wmString_replace(WorkerG.buffer_stack, "</n>", "\033[0m");
-	wmString_replace(WorkerG.buffer_stack, "</w>", "\033[0m");
-	wmString_replace(WorkerG.buffer_stack, "</g>", "\033[0m");
+	WorkerG.buffer_stack_large->length = retval;
+	wmString_replace(WorkerG.buffer_stack_large, "<n>", "\033[1A\n\033[K");
+	wmString_replace(WorkerG.buffer_stack_large, "<w>", "\033[47;30m");
+	wmString_replace(WorkerG.buffer_stack_large, "<g>", "\033[32;40m");
+	wmString_replace(WorkerG.buffer_stack_large, "</n>", "\033[0m");
+	wmString_replace(WorkerG.buffer_stack_large, "</w>", "\033[0m");
+	wmString_replace(WorkerG.buffer_stack_large, "</g>", "\033[0m");
 
 	//标准输出
-	fputs(WorkerG.buffer_stack->str, stdout);
+	fputs(WorkerG.buffer_stack_large->str, stdout);
 	fflush(stdout); //刷新缓冲区
 }
 
 void _log(const char *format, ...) {
 	va_list args;
 	va_start(args, format);
-	int ret = vsnprintf(WorkerG.buffer_stack->str, WorkerG.buffer_stack->size, format, args);
+	int ret = vsnprintf(WorkerG.buffer_stack_large->str, WorkerG.buffer_stack_large->size, format, args);
 	va_end(args);
-	WorkerG.buffer_stack->length = ret;
-	wmString_append_ptr(WorkerG.buffer_stack, "\n", 2);
+	WorkerG.buffer_stack_large->length = ret;
+	wmString_append_ptr(WorkerG.buffer_stack_large, "\n", 2);
 
 	if (!_daemonize) {
-		echoWin("%s", WorkerG.buffer_stack->str);
+		echoWin("%s", WorkerG.buffer_stack_large->str);
 	}
 	char date[128];
 	wm_get_date(date, sizeof(date));
 
-	ret = wm_snprintf(WorkerG.buffer_stack_large->str, WorkerG.buffer_stack_large->size, "%s pid:%d %s", date, getpid(), WorkerG.buffer_stack->str);
+	ret = wm_snprintf(WorkerG.buffer_stack_large->str, WorkerG.buffer_stack_large->size, "%s pid:%d %s", date, getpid(), WorkerG.buffer_stack_large->str);
 	wm_file_put_contents(_logFile->str, WorkerG.buffer_stack_large->str, ret, true); //写入PID文件
 }
 
@@ -1316,7 +1421,7 @@ void wmWorker_free(wmWorker* worker) {
 		wmSocket_free(worker->socket);
 	}
 	//删除并且释放所有连接
-	wmConnection_close_connections();
+	wmConnection_closeConnections();
 
 	//从workers中删除
 	WM_HASH_DEL(WM_HASH_INT_STR, _workers, worker->id);

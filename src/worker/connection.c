@@ -5,6 +5,7 @@
 static long wm_coroutine_socket_last_id = 0;
 static wmHash_INT_PTR *wm_connections = NULL; //记录着正在连接状态的conn
 static wmString* _read_buffer_tmp = NULL; //每次read都从这里中转
+static unsigned long total_request = 0; //处理消息总数
 
 //检查是否发送缓存区慢
 static void bufferWillFull(void *_connection);
@@ -141,6 +142,7 @@ void wmConnection_read(wmConnection* connection) {
 		wmWorker* worker = connection->worker;
 		if (!worker->protocol) {
 			//创建一个单独协程处理
+			total_request++;
 			if (connection->onMessage) {
 				//构建zval，默认的引用计数是1，在php方法调用完毕释放
 				zval* _mess_data = (zval*) emalloc(sizeof(zval) * 2);
@@ -190,6 +192,7 @@ void wmConnection_read(wmConnection* connection) {
 					break;
 				}
 				//创建一个单独协程处理包
+				total_request++;
 				if (connection->onMessage) {
 					//解码
 					ZVAL_STR(&z1, zend_string_init((read_packet_buffer->str + read_packet_buffer->offset), packet_len, 0));
@@ -242,6 +245,7 @@ void wmConnection_recvfrom(wmConnection* connection, wmSocket* socket) {
 		return;
 	}
 	//创建一个单独协程处理
+	total_request++;
 	if (connection->onMessage) {
 		//构建zval，默认的引用计数是1，在php方法调用完毕释放
 		zval* _mess_data = (zval*) emalloc(sizeof(zval) * 2);
@@ -327,7 +331,7 @@ int wmConnection_close(wmConnection *connection) {
 /**
  * 关闭&删除所有的连接
  */
-void wmConnection_close_connections() {
+void wmConnection_closeConnections() {
 	for (int k = wmHash_begin(wm_connections); k != wmHash_end(wm_connections); k++) {
 		if (!wmHash_exist(wm_connections, k)) {
 			continue;
@@ -336,6 +340,20 @@ void wmConnection_close_connections() {
 		wmHash_del(WM_HASH_INT_STR, wm_connections, k);
 		onClose(conn);
 	}
+}
+
+/**
+ * 获取wm_connections的数量
+ */
+long wmConnection_getConnectionsNum() {
+	return wm_connections->size;
+}
+
+/**
+ * 获取total_request
+ */
+unsigned long wmConnection_getTotalRequestNum() {
+	return total_request;
 }
 
 /**
