@@ -39,6 +39,7 @@ typedef struct _wmWorker {
 	bool reloadable; //是否支持reload,默认是支持的
 
 	wmSocket* socket; //用于监听的fd封装而成
+	zval connections; //保存着当前进程所有的连接
 } wmWorker;
 
 //为了通过php对象，找到上面的c++对象 ======= start

@@ -13,7 +13,7 @@ static zend_object_handlers workerman_worker_handlers;
  * 通过这个PHP对象找到我们的wmConnectionObject对象的代码
  */
 wmWorkerObject* wm_worker_fetch_object(zend_object *obj) {
-	return (wmWorkerObject *) ((char *) obj - workerman_worker_handlers.offset);
+	return (wmWorkerObject*) ((char*) obj - workerman_worker_handlers.offset);
 }
 
 /**
@@ -21,7 +21,7 @@ wmWorkerObject* wm_worker_fetch_object(zend_object *obj) {
  * zend_class_entry是一个php类
  */
 static zend_object* wmWorker_create_object(zend_class_entry *ce) {
-	wmWorkerObject *worker_obj = (wmWorkerObject *) ecalloc(1, sizeof(wmWorkerObject) + zend_object_properties_size(ce));
+	wmWorkerObject *worker_obj = (wmWorkerObject*) ecalloc(1, sizeof(wmWorkerObject) + zend_object_properties_size(ce));
 	zend_object_std_init(&worker_obj->std, ce);
 	object_properties_init(&worker_obj->std, ce);
 	worker_obj->std.handlers = &workerman_worker_handlers;
@@ -33,7 +33,7 @@ static zend_object* wmWorker_create_object(zend_class_entry *ce) {
  * PS:针对Worker对象，程序是走不到这里的，都是通过exit(1)在合适的地方终止了，所以没有过多释放worker内存的操作
  */
 static void wmWorker_free_object(zend_object *object) {
-	wmWorkerObject *worker_obj = (wmWorkerObject *) wm_worker_fetch_object(object);
+	wmWorkerObject *worker_obj = (wmWorkerObject*) wm_worker_fetch_object(object);
 	//这里应该释放worker内存的，但是程序是走不到这里
 	wmWorker_free(worker_obj->worker);
 	zend_object_std_dtor(&worker_obj->std);
@@ -52,8 +52,8 @@ PHP_METHOD(workerman_worker, __construct) {
 	ZEND_PARSE_PARAMETERS_START(1, 1)
 				Z_PARAM_STR(socketName)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-	wmWorkerObject *worker_obj = (wmWorkerObject *) wm_worker_fetch_object(Z_OBJ_P(getThis()));
-	zval* worker_zval = wm_malloc_zval();
+	wmWorkerObject *worker_obj = (wmWorkerObject*) wm_worker_fetch_object(Z_OBJ_P(getThis()));
+	zval *worker_zval = wm_malloc_zval();
 	ZVAL_OBJ(worker_zval, &worker_obj->std);
 	//初始化worker
 	worker_obj->worker = wmWorker_create(worker_zval, socketName);
@@ -64,7 +64,7 @@ PHP_METHOD(workerman_worker, __construct) {
 
 PHP_METHOD(workerman_worker, stop) {
 	wmWorkerObject *worker_obj;
-	worker_obj = (wmWorkerObject *) wm_worker_fetch_object(Z_OBJ_P(getThis()));
+	worker_obj = (wmWorkerObject*) wm_worker_fetch_object(Z_OBJ_P(getThis()));
 
 	if (wmWorker_stop(worker_obj->worker) == false) {
 		RETURN_FALSE
@@ -86,7 +86,7 @@ PHP_METHOD(workerman_worker, runAll) {
  */
 PHP_METHOD(workerman_worker, run) {
 	wmWorkerObject *worker_obj;
-	worker_obj = (wmWorkerObject *) wm_worker_fetch_object(Z_OBJ_P(getThis()));
+	worker_obj = (wmWorkerObject*) wm_worker_fetch_object(Z_OBJ_P(getThis()));
 	wmWorker_run(worker_obj->worker);
 }
 
@@ -125,7 +125,7 @@ void workerman_worker_init() {
 	//php对象实例化已经由我们自己的代码接管了
 	workerman_worker_ce_ptr->create_object = wmWorker_create_object;
 	workerman_worker_handlers.free_obj = wmWorker_free_object;
-	workerman_worker_handlers.offset = (zend_long) (((char *) (&(((wmWorkerObject*) NULL)->std))) - ((char *) NULL));
+	workerman_worker_handlers.offset = (zend_long) (((char*) (&(((wmWorkerObject*) NULL)->std))) - ((char*) NULL));
 
 	//注册变量和初始值
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("onWorkerStart"), ZEND_ACC_PUBLIC);
@@ -142,6 +142,7 @@ void workerman_worker_init() {
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("protocol"), ZEND_ACC_PUBLIC);
 	zend_declare_property_long(workerman_worker_ce_ptr, ZEND_STRL("count"), 1, ZEND_ACC_PUBLIC);
 	zend_declare_property_long(workerman_worker_ce_ptr, ZEND_STRL("workerId"), 0, ZEND_ACC_PUBLIC);
+	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("connections"), ZEND_ACC_PUBLIC);
 
 	//静态变量
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);
