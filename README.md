@@ -28,58 +28,18 @@ PHP7 or Higher
 ```
 ### A tcp server
 ```php
-use Workerman\Worker;
-use Workerman\Lib\Timer;
+use Warriorman\Worker;
+use Warriorman\Runtime;
 
-Warriorman\Worker::rename(); // 为了防止命名空间冲突
-Warriorman\Runtime::enableCoroutine(); // hook相关函数
+Worker::rename(); // 为了防止命名空间冲突
+Runtime::enableCoroutine(); // hook相关函数
 
-$worker = new Worker("tcp://0.0.0.0:8080", array(
-	"backlog" => 1234, // 默认102400，等待accept的连接队列长度
-	"count" => 1 // 进程数量
-));
+$worker = new Worker("tcp://0.0.0.0:8080");
 
-$worker->name = "tcpServer"; // 设置名字
-$worker->protocol = "\Workerman\Protocols\Http"; // 设置协议
-
-$worker->onWorkerStart = function ($worker) {
-	var_dump("onWorkerStart ->" . $worker->workerId);
-	$timer_id = Timer::add(0.01, function () {
- 
-		echo "Timer run \n";
-	}, false);
-};
-
-$worker->onConnect = function ($connection) {
-	$connection->set(array(
-		"maxSendBufferSize" => 102400
-	));
-	echo "new connection id {$connection->id} \n";
-};
 
 $worker->onMessage = function ($connection, $data) {
 	$responseStr = "hello world";
 	$connection->send($responseStr);
-};
-
-$worker->onBufferFull = function ($connection) {
-	echo "bufferFull and do not send again\n";
-};
-
-$worker->onError = function ($connection, $code, $msg) {
-	var_dump($code);
-	var_dump($msg);
-	echo "connection error ,id {$connection->id} \n";
-};
-
-$worker->onClose = function ($connection) {
-	echo "connection closed\n";
-};
-
-// 监听另外一个端口
-$worker3 = new Worker("udp://0.0.0.0:8080");
-$worker3->onMessage = function ($connection, $data) {
-	$connection->send("hello world");
 };
 
 Worker::runAll();
@@ -87,7 +47,7 @@ Worker::runAll();
 
 ## 文档
 WarriorMan:[https://www.kancloud.cn/wwwoooshizha/warriorman/content](https://www.kancloud.cn/wwwoooshizha/warriorman/content)  
-WorkerMan:[http://doc.workerman.net](http://doc.workerman.net/)
+文档是在Workerman文档基础上划出两者不同，和独有的一些功能。  
 
 ## 交流
 WarriorMan 交流QQ群: 1098698769
