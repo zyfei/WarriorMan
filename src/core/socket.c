@@ -48,7 +48,7 @@ int wm_socket_bind(int sock, char *host, int port) {
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(port);
 	//把socket和地址，端口绑定
-	ret = bind(sock, (struct sockaddr *) &servaddr, sizeof(servaddr));
+	ret = bind(sock, (struct sockaddr*) &servaddr, sizeof(servaddr));
 	if (ret < 0) {
 		return -1;
 	}
@@ -75,7 +75,7 @@ int wm_socket_connect(int sock, char *host, int port) {
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_port = htons(port);
 	//把socket和地址，端口绑定
-	ret = connect(sock, (struct sockaddr *) &servaddr, sizeof(servaddr));
+	ret = connect(sock, (struct sockaddr*) &servaddr, sizeof(servaddr));
 	if (ret < 0) {
 		return -1;
 	}
@@ -98,7 +98,7 @@ int wm_socket_accept(int sock) {
 	socklen_t len;
 
 	len = sizeof(sa);
-	connfd = accept(sock, (struct sockaddr *) &sa, &len);
+	connfd = accept(sock, (struct sockaddr*) &sa, &len);
 	//errno != EAGAIN  不能再读了
 	if (connfd < 0 && errno != EAGAIN) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
@@ -138,6 +138,15 @@ ssize_t wm_socket_send(int sock, const void *buf, size_t len, int flag) {
 int wm_socket_close(int fd) {
 	int ret;
 	ret = close(fd);
+	if (ret < 0) {
+		wmWarn("Error has occurred: (fd=%d,errno %d) %s", fd, errno, strerror(errno));
+	}
+	return ret;
+}
+
+int wm_socket_reuse_port(int fd) {
+	int reusePort = 1;
+	int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reusePort, sizeof(reusePort));
 	if (ret < 0) {
 		wmWarn("Error has occurred: (fd=%d,errno %d) %s", fd, errno, strerror(errno));
 	}

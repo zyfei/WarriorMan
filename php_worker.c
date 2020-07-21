@@ -62,16 +62,6 @@ PHP_METHOD(workerman_worker, __construct) {
 	zend_update_property_long(workerman_worker_ce_ptr, getThis(), ZEND_STRL("workerId"), worker_obj->worker->workerId);
 }
 
-PHP_METHOD(workerman_worker, stop) {
-	wmWorkerObject *worker_obj;
-	worker_obj = (wmWorkerObject*) wm_worker_fetch_object(Z_OBJ_P(getThis()));
-
-	if (wmWorker_stop(worker_obj->worker) == false) {
-		RETURN_FALSE
-	}
-	RETURN_TRUE
-}
-
 /**
  * 全部运行
  */
@@ -79,6 +69,36 @@ PHP_METHOD(workerman_worker, runAll) {
 	//检查环境
 	wmWorker_runAll();
 	RETURN_TRUE
+}
+
+/**
+ * 关闭
+ */
+PHP_METHOD(workerman_worker, stopAll) {
+	//检查环境
+	wmWorker_stopAll();
+}
+
+/**
+ * 实例化Worker后执行监听，用于在Worker进程内创建Worker
+ */
+PHP_METHOD(workerman_worker, listen) {
+	wmWorkerObject *worker_obj;
+	worker_obj = (wmWorkerObject*) wm_worker_fetch_object(Z_OBJ_P(getThis()));
+	//创建一个新协程
+	zend_fcall_info_cache _listen;
+	wm_get_internal_function(worker_obj->worker->_This, workerman_worker_ce_ptr, ZEND_STRL("_listen"), &_listen);
+	wmCoroutine_create(&_listen, 0, NULL);
+}
+
+/**
+ *  私有方法，扩展用
+ */
+PHP_METHOD(workerman_worker, _listen) {
+	wmWorkerObject *worker_obj;
+	worker_obj = (wmWorkerObject*) wm_worker_fetch_object(Z_OBJ_P(getThis()));
+	wmWorker_listen(worker_obj->worker);
+	wmWorker_resumeAccept(worker_obj->worker);
 }
 
 /**
@@ -106,7 +126,9 @@ PHP_METHOD(workerman_worker, rename) {
 static const zend_function_entry workerman_worker_methods[] = { //
 	PHP_ME(workerman_worker, __construct, arginfo_workerman_worker_construct, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR) // ZEND_ACC_CTOR is used to declare that this method is a constructor of this class.
 		PHP_ME(workerman_worker, runAll, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC)
-		PHP_ME(workerman_worker, stop, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC)
+		PHP_ME(workerman_worker, stopAll, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC| ZEND_ACC_STATIC)
+		PHP_ME(workerman_worker, _listen, arginfo_workerman_worker_void, ZEND_ACC_PRIVATE)
+		PHP_ME(workerman_worker, listen, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC)
 		PHP_ME(workerman_worker, run, arginfo_workerman_worker_void, ZEND_ACC_PRIVATE)
 		PHP_ME(workerman_worker, rename, arginfo_workerman_worker_void, ZEND_ACC_PUBLIC| ZEND_ACC_STATIC)
 		PHP_FE_END };
@@ -143,6 +165,7 @@ void workerman_worker_init() {
 	zend_declare_property_long(workerman_worker_ce_ptr, ZEND_STRL("count"), 1, ZEND_ACC_PUBLIC);
 	zend_declare_property_long(workerman_worker_ce_ptr, ZEND_STRL("workerId"), 0, ZEND_ACC_PUBLIC);
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("connections"), ZEND_ACC_PUBLIC);
+	zend_declare_property_bool(workerman_worker_ce_ptr, ZEND_STRL("reusePort"), 0, ZEND_ACC_PUBLIC);
 
 	//静态变量
 	zend_declare_property_null(workerman_worker_ce_ptr, ZEND_STRL("pidFile"), ZEND_ACC_PUBLIC | ZEND_ACC_STATIC);

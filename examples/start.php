@@ -10,10 +10,9 @@ Warriorman\Worker::rename(); // 将Workerman改为Workerman
 Warriorman\Runtime::enableCoroutine(); // hook相关函数
 
 $worker = new Worker("tcp://0.0.0.0:8080");
-$worker->count = 1;
+$worker->count = 2;
 $worker->name = "tcpServer"; // 设置名字
 $worker->protocol = "\Workerman\Protocols\Http"; // 设置协议
-
 $worker->onWorkerStart = function ($worker) {
     var_dump("onWorkerStart ->" . $worker->workerId . " id=" . $worker->id);
     global $db;
@@ -22,14 +21,25 @@ $worker->onWorkerStart = function ($worker) {
     $timer_id = Timer::add(1, function () {
         echo "coro_num = " . Warriorman\Coroutine::getTotalNum() . " \n";
     }, false);
+    $inner_text_worker = new Worker('tcp://0.0.0.0:5678');
+    $inner_text_worker->reusePort = true;
+    $inner_text_worker->protocol = "\Workerman\Protocols\Http"; // 设置协议
+    $inner_text_worker->onWorkerStart = function ($worker) {
+        var_dump("inner_text_worker");
+    };
+    $inner_text_worker->onMessage = function ($connection, $buffer) {
+        $connection->send("inner_text_worker");
+    };
+    
+    // ## 执行监听 ##
+    $inner_text_worker->listen();
 };
 
 $worker->onWorkerReload = function ($worker) {
     var_dump("onWorkerReload ->" . $worker->id);
 };
 
-$worker->onConnect = function ($connection) use($worker){
-    var_dump($worker->connections);
+$worker->onConnect = function ($connection) use ($worker) {
     $connection->set(array(
         "maxSendBufferSize" => 102400
     ));

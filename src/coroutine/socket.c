@@ -4,13 +4,13 @@
 
 static bool bufferIsFull(wmSocket *socket);
 static void checkBufferWillFull(wmSocket *socket);
-static bool event_wait(wmSocket* socket, int event);
+static bool event_wait(wmSocket *socket, int event);
 static int total_num = 0;
 
 /**
  * 设置socket的各种错误
  */
-static inline void set_err(wmSocket* socket, int e) {
+static inline void set_err(wmSocket *socket, int e) {
 	socket->errCode = errno = e;
 	socket->errMsg = e ? wmCode_str(e) : "";
 }
@@ -18,7 +18,7 @@ static inline void set_err(wmSocket* socket, int e) {
 /**
  * 获取socket执行某个类型的协程
  */
-static inline wmCoroutine* get_bound_co(wmSocket* socket, const enum wmEvent_type event) {
+static inline wmCoroutine* get_bound_co(wmSocket *socket, const enum wmEvent_type event) {
 	if (event & WM_EVENT_READ) {
 		if (socket->read_co) {
 			return socket->read_co;
@@ -35,10 +35,10 @@ static inline wmCoroutine* get_bound_co(wmSocket* socket, const enum wmEvent_typ
 /**
  * 如果读写某个协程正在被使用，不允许再被使用s
  */
-static inline void check_bound_co(wmSocket* socket, const enum wmEvent_type event) {
-	wmCoroutine* co = get_bound_co(socket, event);
+static inline void check_bound_co(wmSocket *socket, const enum wmEvent_type event) {
+	wmCoroutine *co = get_bound_co(socket, event);
 	if (co) {
-		wmCoroutine* curr_co = wmCoroutine_get_current();
+		wmCoroutine *curr_co = wmCoroutine_get_current();
 		wmError("Socket#%d has already been bound to another coroutine#%ld,%s of the same socket in coroutine#%ld at the same time is not allowed", socket->fd,
 			co->cid,
 			(event == WM_EVENT_READ ?
@@ -51,7 +51,7 @@ static inline void check_bound_co(wmSocket* socket, const enum wmEvent_type even
 /**
  * 是否运行执行
  */
-static inline bool is_available(wmSocket* socket, const enum wmEvent_type event) {
+static inline bool is_available(wmSocket *socket, const enum wmEvent_type event) {
 	if (event != WM_EVENT_NULL) {
 		check_bound_co(socket, event);
 	}
@@ -99,7 +99,7 @@ static inline int check_error(int err) {
  * 读超时处理
  */
 void timer_read_callback(void *_socket) {
-	wmSocket* socket = (wmSocket*) _socket;
+	wmSocket *socket = (wmSocket*) _socket;
 	set_err(socket, ETIMEDOUT);
 	socket->read_timer = NULL;
 	loop_callback_func_t fn = wmWorkerLoop_get_handler(EPOLLIN, socket->loop_type);
@@ -110,7 +110,7 @@ void timer_read_callback(void *_socket) {
  * 写超时处理
  */
 void timer_write_callback(void *_socket) {
-	wmSocket* socket = (wmSocket*) _socket;
+	wmSocket *socket = (wmSocket*) _socket;
 	socket->write_timer = NULL;
 	loop_callback_func_t fn = wmWorkerLoop_get_handler(EPOLLOUT, socket->loop_type);
 	fn(socket, EPOLLOUT);
@@ -183,7 +183,7 @@ bool timer_used(wmSocket *socket, int event) {
 /**
  * 创建一个socket对象
  */
-wmSocket * wmSocket_create(int transport, int loop_type) {
+wmSocket* wmSocket_create(int transport, int loop_type) {
 	int fd = -1;
 	switch (transport) {
 	case WM_SOCK_TCP:
@@ -204,8 +204,8 @@ wmSocket * wmSocket_create(int transport, int loop_type) {
 /**
  * 包装一个socket对象
  */
-wmSocket * wmSocket_pack(int fd, int transport, int loop_type) {
-	wmSocket *socket = (wmSocket *) wm_malloc(sizeof(wmSocket));
+wmSocket* wmSocket_pack(int fd, int transport, int loop_type) {
+	wmSocket *socket = (wmSocket*) wm_malloc(sizeof(wmSocket));
 	socket->fd = fd;
 
 	socket->write_buffer = NULL;
@@ -241,7 +241,7 @@ wmSocket * wmSocket_pack(int fd, int transport, int loop_type) {
 /**
  * 等待连接
  */
-wmSocket * wmSocket_accept(wmSocket* socket, int new_socket_loop_type, uint32_t timeout) {
+wmSocket* wmSocket_accept(wmSocket *socket, int new_socket_loop_type, uint32_t timeout) {
 	if (!is_available(socket, WM_EVENT_READ)) {
 		return NULL;
 	}
@@ -250,12 +250,14 @@ wmSocket * wmSocket_accept(wmSocket* socket, int new_socket_loop_type, uint32_t 
 		do {
 			connfd = wm_socket_accept(socket->fd);
 		} while (connfd < 0 && errno == EINTR);
+
 		if (connfd < 0) {
 			//添加一个读定时器,如果读成功了，就不加了
 			timer_add(socket, WM_EVENT_READ, timeout);
 			if (errno == EAGAIN && event_wait(socket, WM_EVENT_READ) && !timer_used(socket, WM_EVENT_READ)) {
 				continue;
 			}
+
 			set_err(socket, errno);
 			wmWarn("wmSocket_accept fail. %s", socket->errMsg);
 			timer_del(socket, WM_EVENT_READ);
@@ -273,7 +275,7 @@ wmSocket * wmSocket_accept(wmSocket* socket, int new_socket_loop_type, uint32_t 
 /**
  * 主动连接
  */
-bool wmSocket_connect(wmSocket *socket, char* _host, int _port, uint32_t timeout) {
+bool wmSocket_connect(wmSocket *socket, char *_host, int _port, uint32_t timeout) {
 	if (!is_available(socket, WM_EVENT_WRITE) || !is_available(socket, WM_EVENT_READ)) {
 		return false;
 	}
@@ -319,7 +321,7 @@ bool wmSocket_connect(wmSocket *socket, char* _host, int _port, uint32_t timeout
  * 偷看一下之前读取的数据
  * 暂时只有runtime用
  */
-ssize_t wmSocket_peek(wmSocket* socket, void *__buf, size_t __n) {
+ssize_t wmSocket_peek(wmSocket *socket, void *__buf, size_t __n) {
 	ssize_t retval;
 	int __flags = MSG_PEEK;
 	do {
@@ -335,7 +337,7 @@ ssize_t wmSocket_peek(wmSocket* socket, void *__buf, size_t __n) {
  * 读数据
  * 暂时只有runtime用
  */
-ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sockaddr* _addr, socklen_t *_socklen, uint32_t timeout) {
+ssize_t wmSocket_recvfrom(wmSocket *socket, void *__buf, size_t __n, struct sockaddr *_addr, socklen_t *_socklen, uint32_t timeout) {
 	if (!is_available(socket, WM_EVENT_READ)) {
 		return WM_SOCKET_CLOSE;
 	}
@@ -367,7 +369,7 @@ ssize_t wmSocket_recvfrom(wmSocket* socket, void *__buf, size_t __n, struct sock
 /**
  * 读数据
  */
-int wmSocket_read(wmSocket* socket, char *buf, int len, uint32_t timeout) {
+int wmSocket_read(wmSocket *socket, char *buf, int len, uint32_t timeout) {
 	if (!is_available(socket, WM_EVENT_READ)) {
 		return WM_SOCKET_CLOSE;
 	}
@@ -492,7 +494,7 @@ int wmSocket_write(wmSocket *socket, const void *buf, size_t len) {
 /**
  * 不同的loop_type操作是不同的
  */
-bool event_wait(wmSocket* socket, int event) {
+bool event_wait(wmSocket *socket, int event) {
 	//如果没有事件监听,就加上
 	if (!(socket->events & event)) {
 		if (!wmWorkerLoop_add(socket, event)) {

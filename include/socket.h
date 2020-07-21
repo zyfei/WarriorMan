@@ -29,4 +29,9 @@ ssize_t wm_socket_send(int sock, const void *buf, size_t len, int flag);
  */
 int wm_socket_close(int fd);
 
+/**
+ * 设置端口复用
+ */
+int wm_socket_reuse_port(int fd);
+
 #endif

@@ -39,6 +39,7 @@ static int _maxUserNameLength = 4; //用户名字的最大长度
 static int _maxWorkerNameLength = 6; //名字的最大长度
 static int _maxSocketNameLength = 6; //listen的最大长度
 static long _start_timestamp = 0; //服务启动时间戳
+static int reload_coro_num = 2; //reload Worker的时候，框架占用的协程数
 
 static void acceptConnectionTcp(wmWorker *worker);
 static void acceptConnectionUdp(wmWorker *worker);
@@ -49,8 +50,8 @@ static void parseCommand();
 static void initWorkerPids();
 static void daemonize();
 static void saveMasterPid();
+static void initWorker(wmWorker *worker);
 static void initWorkers();
-static void _listen(wmWorker *worker);
 static void forkWorkers();
 static void forkOneWorker(wmWorker *worker, int key);
 static int getKey_by_pid(wmWorker *worker, int pid);
@@ -58,7 +59,6 @@ static void _unlisten(wmWorker *worker);
 static void installSignal(); //装载信号
 static void reinstallSignal(); //针对子进程，使用epoll重新装载信号
 static void getAllWorkerPids(); //获取所有子进程pid
-static void stopAll(); //停止服务
 static void signalHandler(int signal);
 static void monitorWorkers();
 static void alarm_wait();
@@ -70,6 +70,7 @@ static void setUserAndGroup(wmWorker *worker);
 static void resetStd(); //重设默认输出到文件
 static void reload(); //平滑重启
 static void writeStatisticsToStatusFile(); //写入status信息
+static bool worker_stop(wmWorker *worker);
 
 //初始化一下参数
 void wmWorker_init() {
@@ -114,7 +115,15 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	worker->protocol = NULL;
 	worker->protocol_ce = NULL;
 	worker->reloadable = true;
+	worker->reusePort = false;
 	parseSocketAddress(worker, socketName);
+
+	//说明是在worker进程内，再创建的worker
+	if (_main_worker) {
+		reload_coro_num++;
+		//手动给这个worker加有个引用计数，省的出来就死
+		GC_ADDREF(Z_OBJ_P(_This));
+	}
 
 	//写入workers对照表
 	if (WM_HASH_ADD(WM_HASH_INT_STR, _workers, worker->workerId,worker) < 0) {
@@ -124,13 +133,22 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 }
 
 //服务器监听启动
-void _listen(wmWorker *worker) {
+void wmWorker_listen(wmWorker *worker) {
+	//初始化单个worker的资料
+	initWorker(worker);
 	if (worker->socket == NULL) {
 		worker->socket = wmSocket_create(worker->transport, WM_LOOP_SEMI_AUTO);
 		if (worker->socket == NULL) {
 			wmError("transport error");
 		}
 		worker->fd = worker->socket->fd;
+
+		//开启端口复用
+		if (worker->reusePort && wm_socket_reuse_port(worker->fd) < 0) {
+			wmSocket_close(worker->socket);
+			wmError("set reusePort error");
+		}
+
 		if (wm_socket_bind(worker->fd, worker->host, worker->port) < 0) {
 			wmWarn("Error has occurred: port=%d (errno %d) %s", worker->port, errno, strerror(errno));
 			return;
@@ -165,6 +183,13 @@ void _unlisten(wmWorker *worker) {
 
 //启动服务器
 void wmWorker_run(wmWorker *worker) {
+	//重新注册信号检测
+	reinstallSignal();
+	wmWorker_resumeAccept(worker);
+}
+
+// 开始工作
+void wmWorker_resumeAccept(wmWorker *worker) {
 	//zval zsocket;
 	worker->_status = WM_WORKER_STATUS_RUNNING;
 
@@ -178,9 +203,6 @@ void wmWorker_run(wmWorker *worker) {
 			return;
 		}
 	}
-
-	//重新注册信号检测
-	reinstallSignal();
 
 	//设置回调方法 start
 	bind_callback(worker->_This, "onWorkerReload", &worker->onWorkerReload);
@@ -405,7 +427,96 @@ int getKey_by_pid(wmWorker *worker, int pid) {
 }
 
 /**
- * 初始化进程相关资料
+ * 初始化worker相关资料
+ */
+void initWorker(wmWorker *worker) {
+	//检查worker->name
+	zval *_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), 0);
+	if (_zval) {
+		if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
+			worker->name = wmString_dup(_zval->value.str->val, _zval->value.str->len);
+		}
+	}
+	if (!worker->name) {
+		worker->name = wmString_dup("none", 4);
+		zend_update_property_stringl(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), worker->name->str, 4);
+	}
+
+	//检查count
+	_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("count"), 0);
+	if (_zval) {
+		if (Z_TYPE_INFO_P(_zval) != IS_LONG) {
+			wmError("count must be a number");
+		}
+		worker->count = Z_LVAL_P(_zval);
+	} else {
+		zend_update_property_long(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("count"), worker->count);
+	}
+
+	//检查应用级协议
+	_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("protocol"), 0);
+	if (_zval) {
+		if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
+			worker->protocol = _zval->value.str;
+			worker->protocol_ce = zend_lookup_class(worker->protocol);
+			if (!worker->protocol_ce) {
+				wmError("worker->protocol error 1");
+			}
+			if ((worker->protocol_ce->ce_flags & (ZEND_ACC_INTERFACE | ZEND_ACC_TRAIT)) != 0) {
+				wmError("worker->protocol error 2");
+			}
+		}
+	}
+
+	//检查端口复用
+	_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("reusePort"), 0);
+	if (_zval) {
+		if (Z_TYPE_INFO_P(_zval) == IS_TRUE) {
+			worker->reusePort = true;
+		}
+		zend_update_property_bool(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("reusePort"), worker->reusePort);
+	}
+
+	_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("user"), 0);
+	if (_zval) {
+		if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
+			worker->user = wm_malloc(sizeof(char) * _zval->value.str->len + 1);
+			memcpy(worker->user, _zval->value.str->val, _zval->value.str->len);
+			worker->user[_zval->value.str->len] = '\0';
+		}
+	} else {
+		worker->user = getCurrentUser();
+		zend_update_property_stringl(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("user"), worker->user, strlen(worker->user));
+	}
+
+	//检查当前用户
+	if (getuid() != 0 && strncmp(worker->user, getCurrentUser(), strlen(worker->user)) != 0) {
+		_log("You must have the root privileges to change uid and gid.");
+	}
+
+	//设置用户名字的最大长度
+	if (_maxUserNameLength < strlen(worker->user)) {
+		_maxUserNameLength = strlen(worker->user);
+	}
+
+	//设置worker->name的最大长度
+	if (_maxWorkerNameLength < worker->name->length) {
+		_maxWorkerNameLength = worker->name->length;
+	}
+
+	//设置worker->name的最大长度
+	if (_maxSocketNameLength < worker->socketName->length) {
+		_maxSocketNameLength = worker->socketName->length;
+	}
+
+	//设置connections
+	array_init(&worker->connections);
+	zend_update_property(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("connections"), &worker->connections);
+	HT_FLAGS(Z_ARRVAL_P(&worker->connections)) |= HASH_FLAG_ALLOW_COW_VIOLATION;
+}
+
+/**
+ * 初始化多个worker相关资料
  */
 void initWorkers() {
 	for (int k = wmHash_begin(_workers); k != wmHash_end(_workers); k++) {
@@ -413,83 +524,8 @@ void initWorkers() {
 			continue;
 		}
 		wmWorker *worker = wmHash_value(_workers, k);
-		//检查worker->name
-		zval *_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), 0);
-		if (_zval) {
-			if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
-				worker->name = wmString_dup(_zval->value.str->val, _zval->value.str->len);
-			}
-		}
-		if (!worker->name) {
-			worker->name = wmString_dup("none", 4);
-			zend_update_property_stringl(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("name"), worker->name->str, 4);
-		}
-
-		//检查count
-		_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("count"), 0);
-		if (_zval) {
-			if (Z_TYPE_INFO_P(_zval) != IS_LONG) {
-				wmError("count must be a number");
-			}
-			worker->count = Z_LVAL_P(_zval);
-		} else {
-			zend_update_property_long(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("count"), worker->count);
-		}
-
-		//检查应用级协议
-		_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("protocol"), 0);
-		if (_zval) {
-			if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
-				worker->protocol = _zval->value.str;
-				worker->protocol_ce = zend_lookup_class(worker->protocol);
-				if (!worker->protocol_ce) {
-					wmError("worker->protocol error 1");
-				}
-				if ((worker->protocol_ce->ce_flags & (ZEND_ACC_INTERFACE | ZEND_ACC_TRAIT)) != 0) {
-					wmError("worker->protocol error 2");
-				}
-			}
-		}
-
-		_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("user"), 0);
-		if (_zval) {
-			if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
-				worker->user = wm_malloc(sizeof(char) * _zval->value.str->len + 1);
-				memcpy(worker->user, _zval->value.str->val, _zval->value.str->len);
-				worker->user[_zval->value.str->len] = '\0';
-			}
-		} else {
-			worker->user = getCurrentUser();
-			zend_update_property_stringl(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("user"), worker->user, strlen(worker->user));
-		}
-
-		//检查当前用户
-		if (getuid() != 0 && strncmp(worker->user, getCurrentUser(), strlen(worker->user)) != 0) {
-			_log("You must have the root privileges to change uid and gid.");
-		}
-
-		//设置用户名字的最大长度
-		if (_maxUserNameLength < strlen(worker->user)) {
-			_maxUserNameLength = strlen(worker->user);
-		}
-
-		//设置worker->name的最大长度
-		if (_maxWorkerNameLength < worker->name->length) {
-			_maxWorkerNameLength = worker->name->length;
-		}
-
-		//设置worker->name的最大长度
-		if (_maxSocketNameLength < worker->socketName->length) {
-			_maxSocketNameLength = worker->socketName->length;
-		}
-
-		//设置connections
-		array_init(&worker->connections);
-		zend_update_property(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("connections"), &worker->connections);
-		HT_FLAGS(Z_ARRVAL_P(&worker->connections)) |= HASH_FLAG_ALLOW_COW_VIOLATION;
-
 		//listen
-		_listen(worker);
+		wmWorker_listen(worker);
 	}
 }
 
@@ -516,7 +552,7 @@ void alarm_wait() {
 }
 
 //停止全部
-void stopAll() {
+void wmWorker_stopAll() {
 	_status = WM_WORKER_STATUS_SHUTDOWN;
 	if (_masterPid == getpid()) { //主进程
 		_log("WarriorMan[%s] stopping ...", _startFile->str);
@@ -533,7 +569,7 @@ void stopAll() {
 	} else { //如果是子进程收到了去世信号
 		//循环workers
 		if (!_main_worker->stopping) {
-			wmWorker_stop(_main_worker);
+			worker_stop(_main_worker);
 			_main_worker->stopping = true;
 		}
 		//停止loop，也就是结束了
@@ -544,7 +580,7 @@ void stopAll() {
 }
 
 //关闭服务器
-bool wmWorker_stop(wmWorker *worker) {
+bool worker_stop(wmWorker *worker) {
 	worker->_status = WM_WORKER_STATUS_SHUTDOWN;
 	if (worker->onWorkerStop) {
 		worker->onWorkerStop->fci.param_count = 1;
@@ -870,7 +906,6 @@ void bind_callback(zval *_This, const char *fun_name, php_fci_fcc **handle_fci_f
  * 监控tcp连接
  */
 void acceptConnectionTcp(wmWorker *worker) {
-
 	//注册loop事件,半自动
 	wmWorkerLoop_add(worker->socket, WM_EVENT_EPOLLEXCLUSIVE);
 
@@ -878,13 +913,17 @@ void acceptConnectionTcp(wmWorker *worker) {
 	wmConnection *conn;
 	zval *__zval;
 	zend_fcall_info_cache call_read;
+
 	while (worker->_status == WM_WORKER_STATUS_RUNNING) {
+		/**
+		 * 找到什么问题了，因为协程模式是在这里阻塞的。所以第二个worker，会导致阻塞。需要让两个不是一个协程内
+		 */
 		wmSocket *socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO, WM_SOCKET_MAX_TIMEOUT);
 		if (socket == NULL) {
 			if (worker->_status != WM_WORKER_STATUS_RUNNING) {
 				break;
 			}
-			wmWarn("acceptConnection fail. socket = NULL");
+			wmWarn("acceptConnection fail. workerId=%d , socket = NULL errno=%d", worker->workerId, errno);
 			continue;
 		}
 		conn = wmConnection_create(socket);
@@ -1139,8 +1178,8 @@ void reload() {
 			_unlisten(_main_worker);
 			while (1) {
 				int coro_num = wmCoroutine_getTotalNum();
-				if (coro_num <= 2) {
-					stopAll();
+				if (coro_num <= reload_coro_num) {
+					wmWorker_stopAll();
 					break;
 				}
 				wmCoroutine_sleep(0.1);
@@ -1155,7 +1194,7 @@ void reload() {
 void signalHandler(int signal) {
 	switch (signal) {
 	case SIGINT: // Stop.
-		stopAll();
+		wmWorker_stopAll();
 		break;
 	case SIGUSR1: // Reload.
 		getAllWorkerPids();
