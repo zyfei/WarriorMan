@@ -65,7 +65,7 @@ PHP_METHOD(workerman_coroutine, resume) {
 				Z_PARAM_LONG(cid)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	wmCoroutine* co = wmCoroutine_get_by_cid(cid);
+	wmCoroutine *co = wmCoroutine_get_by_cid(cid);
 	if (co == NULL) {
 		php_error_docref(NULL, E_WARNING, "resume error");
 		RETURN_FALSE
@@ -79,7 +79,7 @@ PHP_METHOD(workerman_coroutine, resume) {
 
 //获取协程cid
 PHP_METHOD(workerman_coroutine, getCid) {
-	wmCoroutine* co = wmCoroutine_get_current();
+	wmCoroutine *co = wmCoroutine_get_current();
 	if (co == NULL) {
 		RETURN_LONG(-1);
 	}
@@ -99,7 +99,7 @@ PHP_METHOD(workerman_coroutine, isExist) {
 	ZEND_PARSE_PARAMETERS_START(1, 1)
 				Z_PARAM_LONG(cid)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-	wmCoroutine* co = wmCoroutine_get_by_cid(cid);
+	wmCoroutine *co = wmCoroutine_get_by_cid(cid);
 	is_exist = (co != NULL);
 	RETURN_BOOL(is_exist);
 }
@@ -107,17 +107,14 @@ PHP_METHOD(workerman_coroutine, isExist) {
 PHP_METHOD(workerman_coroutine, defer) {
 	zend_fcall_info fci = empty_fcall_info;
 	zend_fcall_info_cache fcc = empty_fcall_info_cache;
-	php_fci_fcc *defer_fci_fcc;
-
-	defer_fci_fcc = (php_fci_fcc *) emalloc(sizeof(php_fci_fcc));
-
 	ZEND_PARSE_PARAMETERS_START(1, -1)
 				Z_PARAM_FUNC(fci, fcc)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-
+	php_fci_fcc *defer_fci_fcc = (php_fci_fcc*) emalloc(sizeof(php_fci_fcc));
 	defer_fci_fcc->fci = fci;
 	defer_fci_fcc->fcc = fcc;
 
+	wm_zend_fci_cache_persist(&defer_fci_fcc->fcc);
 	wmCoroutine_defer(defer_fci_fcc);
 }
 
@@ -141,6 +138,15 @@ PHP_METHOD(workerman_coroutine, sleep) {
 	RETURN_TRUE
 }
 
+//获取协程cid
+PHP_METHOD(workerman_coroutine, wait) {
+	int ret = wm_event_wait();
+	if (ret < 0) {
+		RETURN_FALSE
+	}
+	RETURN_TRUE
+}
+
 /**
  * 开始监听信号
  * 私有静态方法&扩展内部使用
@@ -160,6 +166,7 @@ const zend_function_entry workerman_coroutine_methods[] = { //
 			ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) // ZEND_FENTRY这行是新增的
 		PHP_ME(workerman_coroutine, yield, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 		PHP_ME(workerman_coroutine, resume, arginfo_workerman_coroutine_resume, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
+		PHP_ME(workerman_coroutine, wait, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 		PHP_ME(workerman_coroutine, getCid, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 		PHP_ME(workerman_coroutine, getTotalNum, arginfo_workerman_coroutine_void, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //
 		PHP_ME(workerman_coroutine, isExist, arginfo_workerman_coroutine_isExist, ZEND_ACC_PUBLIC | ZEND_ACC_STATIC) //

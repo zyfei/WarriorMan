@@ -8,10 +8,6 @@
 //创建协程接口方法声明
 PHP_FUNCTION(workerman_coroutine_create);
 
-//空的参数声明
-ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_void, 0, 0, 0) //
-ZEND_END_ARG_INFO()
-
 //创建协程接口参数声明
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_coroutine_create, 0, 0, 1) //
 ZEND_ARG_CALLABLE_INFO(0, func, 0)
@@ -80,19 +76,9 @@ PHP_MINFO_FUNCTION(workerman) {
 	php_info_print_table_end();
 }
 
-PHP_FUNCTION(worker_event_wait) {
-	int ret;
-	ret = wm_event_wait();
-	if (ret < 0) {
-		RETURN_FALSE
-	}
-	RETURN_TRUE
-}
-
 static const zend_function_entry workerman_functions[] = { //
 	PHP_FE(workerman_coroutine_create, arginfo_workerman_coroutine_create) //
-		PHP_FALIAS(worker_go, workerman_coroutine_create, arginfo_workerman_coroutine_create) //
-		PHP_FE(worker_event_wait, arginfo_workerman_void) //
+		PHP_FALIAS(work, workerman_coroutine_create, arginfo_workerman_coroutine_create) //
 		PHP_FE_END };
 
 zend_module_entry workerman_module_entry = {

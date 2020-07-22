@@ -191,6 +191,8 @@ void main_func(void *arg) {
 				php_error_docref(NULL, E_WARNING, "defer execute error");
 				return;
 			}
+			//引用计数-1
+			wm_zend_fci_cache_discard(&defer_fci_fcc->fcc);
 			efree(defer_fci_fcc);
 		}
 		wmStack_destroy(defer_tasks);

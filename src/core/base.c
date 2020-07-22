@@ -29,7 +29,7 @@ void workerman_base_shutdown() {
 int init_wmPoll() {
 	if (!WorkerG.poll) {
 		size_t size;
-		WorkerG.poll = (wmPoll_t *) wm_malloc(sizeof(wmPoll_t));
+		WorkerG.poll = (wmPoll_t*) wm_malloc(sizeof(wmPoll_t));
 		if (WorkerG.poll == NULL) {
 			wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 			return -1;
@@ -43,10 +43,10 @@ int init_wmPoll() {
 		}
 		WorkerG.poll->ncap = WM_MAXEVENTS;
 		size = sizeof(struct epoll_event) * WorkerG.poll->ncap;
-		WorkerG.poll->events = (struct epoll_event *) wm_malloc(size);
+		WorkerG.poll->events = (struct epoll_event*) wm_malloc(size);
 		memset(WorkerG.poll->events, 0, size);
 		WorkerG.poll->event_num = 0; // 事件的数量
-		WorkerG.poll->event = (struct epoll_event *) wm_malloc(sizeof(struct epoll_event));
+		WorkerG.poll->event = (struct epoll_event*) wm_malloc(sizeof(struct epoll_event));
 	}
 	return 0;
 }
@@ -68,7 +68,7 @@ int free_wmPoll() {
 	return 0;
 }
 
-//普通调度器，server的使用不用
+//普通调度器，server有自己的调度器，不用这个
 int wm_event_wait() {
 	init_wmPoll();
 	if (!WorkerG.poll) {
@@ -90,8 +90,6 @@ int wm_event_wait() {
 			int fd;
 			int id;
 			struct epoll_event *p = &events[i];
-			//if(p->events & EPOLLIN)
-
 			uint64_t u64 = p->data.u64;
 			wmCoroutine *co;
 			//解析出来fd和id
@@ -117,7 +115,7 @@ int wm_event_wait() {
 /**
  * 调用一个闭包函数
  */
-int call_closure_func(php_fci_fcc* fci_fcc) {
+int call_closure_func(php_fci_fcc *fci_fcc) {
 	//把一些核心内容提取出来，存放在其他变量里面。
 	zval _retval, *retval = &_retval;
 
@@ -139,7 +137,7 @@ int call_closure_func(php_fci_fcc* fci_fcc) {
 /**
  * 获取一个内部方法，用于创建协程
  */
-void wm_get_internal_function(zval *object, zend_class_entry* obj_ce, const char *function_name, size_t function_name_len, zend_fcall_info_cache *fcic) {
+void wm_get_internal_function(zval *object, zend_class_entry *obj_ce, const char *function_name, size_t function_name_len, zend_fcall_info_cache *fcic) {
 	fcic->function_handler = zend_hash_str_find_ptr(&obj_ce->function_table, function_name, function_name_len);
 	if (UNEXPECTED(fcic->function_handler == NULL)) {
 		/* error at c-level */
@@ -163,7 +161,7 @@ void wm_get_internal_function(zval *object, zend_class_entry* obj_ce, const char
 /**
  * 设置进程标题
  */
-bool set_process_title(char* process_title) {
+bool set_process_title(char *process_title) {
 	zval function_name;
 	zval retval_ptr;
 	zval argv;

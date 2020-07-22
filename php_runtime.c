@@ -9,7 +9,7 @@ zend_class_entry workerman_runtime_ce;
 zend_class_entry *workerman_runtime_ce_ptr;
 
 static void hook_func(const char *name, size_t name_len, zif_handler new_handler) {
-	zend_function *ori_f = (zend_function *) zend_hash_str_find_ptr(EG(function_table), name, name_len);
+	zend_function *ori_f = (zend_function*) zend_hash_str_find_ptr(EG(function_table), name, name_len);
 	ori_f->internal_function.handler = new_handler;
 }
 
@@ -19,7 +19,9 @@ ZEND_END_ARG_INFO()
 //开启协程模式,hook相关函数
 void wm_enableCoroutine() {
 	hook_func(ZEND_STRL("sleep"), zim_workerman_coroutine_sleep);
-	php_stream_xport_register("tcp", wmRuntime_socket_create); // 使用socket_create这个函数，替换原来的php_stream_generic_socket_factory
+	// 使用socket_create这个函数，替换原来的php_stream_generic_socket_factory
+	php_stream_xport_register("udp", wmRuntime_socket_create);
+	php_stream_xport_register("tcp", wmRuntime_socket_create);
 }
 
 PHP_METHOD(workerman_runtime, enableCoroutine) {

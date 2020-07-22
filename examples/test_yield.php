@@ -1,23 +1,31 @@
 <?php
+use Warriorman\Coroutine;
+
 /**
  * 展示协程切换
  */
-$arr[] = Warriorman::create(function () {
-	var_dump(Warriorman::getCid() . " start");
-	Warriorman::yield();
-	var_dump(Warriorman::getCid() . " end");
+// $arr[] = Coroutine::create(function () {
+// var_dump(Coroutine::getCid() . " start");
+// Coroutine::yield();
+// var_dump(Coroutine::getCid() . " end");
+// });
+
+// $arr[] = work(function () {
+// var_dump(Coroutine::getCid() . " start");
+// Coroutine::yield();
+// var_dump(Coroutine::getCid() . " end");
+// });
+
+// foreach ($arr as $n) {
+// Coroutine::resume($n);
+// }
+work(function () {
+    Coroutine::defer(function () {
+        var_dump(1);
+    });
+    Coroutine::defer(function () {
+        var_dump(2);
+    });
 });
 
-$arr[] = Warriorman::create(function () {
-	var_dump(Warriorman::getCid() . " start");
-	Warriorman::yield();
-	var_dump(Warriorman::getCid() . " end");
-});
-
-foreach ($arr as $n) {
-	Warriorman::resume($n);
-}
-
-if (! defined("RUN_TEST")) {
-	worker_event_wait();
-}
+Coroutine::wait();
