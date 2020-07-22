@@ -211,7 +211,6 @@ wmSocket* wmSocket_pack(int fd, int transport, int loop_type) {
 	socket->write_buffer = NULL;
 	socket->closed = false;
 	socket->maxSendBufferSize = 0; //应用层发送缓冲区
-	socket->maxPackageSize = 0; //接收的最大包包长
 	socket->loop_type = loop_type;
 	socket->transport = transport;
 	socket->removed = false;

@@ -14,7 +14,7 @@ static zend_object_handlers workerman_connection_handlers;
  * 通过这个PHP对象找到我们的wmConnectionObject对象的代码
  */
 wmConnectionObject* wm_connection_fetch_object(zend_object *obj) {
-	return (wmConnectionObject *) ((char *) obj - workerman_connection_handlers.offset);
+	return (wmConnectionObject*) ((char*) obj - workerman_connection_handlers.offset);
 }
 
 /**
@@ -22,7 +22,7 @@ wmConnectionObject* wm_connection_fetch_object(zend_object *obj) {
  * zend_class_entry是一个php类
  */
 zend_object* wm_connection_create_object(zend_class_entry *ce) {
-	wmConnectionObject *sock = (wmConnectionObject *) ecalloc(1, sizeof(wmConnectionObject) + zend_object_properties_size(ce));
+	wmConnectionObject *sock = (wmConnectionObject*) ecalloc(1, sizeof(wmConnectionObject) + zend_object_properties_size(ce));
 	zend_object_std_init(&sock->std, ce);
 	object_properties_init(&sock->std, ce);
 	sock->std.handlers = &workerman_connection_handlers;
@@ -33,7 +33,7 @@ zend_object* wm_connection_create_object(zend_class_entry *ce) {
  * 释放php对象的方法
  */
 static void wm_connection_free_object(zend_object *object) {
-	wmConnectionObject *sock = (wmConnectionObject *) wm_connection_fetch_object(object);
+	wmConnectionObject *sock = (wmConnectionObject*) wm_connection_fetch_object(object);
 	//这里需要判断，这个connection是不是被人继续用了。
 	if (sock->connection && sock->connection != NULL) {
 		//现在有这个时候，把别的正常的fd关闭的情况
@@ -71,7 +71,7 @@ PHP_METHOD(workerman_connection, set) {
 	ZEND_PARSE_PARAMETERS_START(1, 1)
 				Z_PARAM_ARRAY(options)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-	wmConnectionObject* connection_object = (wmConnectionObject *) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	wmConnectionObject *connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
 
 	//解析options
 	HashTable *vht = Z_ARRVAL_P(options);
@@ -89,7 +89,6 @@ PHP_METHOD(workerman_connection, set) {
 	if (php_workerman_array_get_value(vht, "maxPackageSize", ztmp)) {
 		zend_long v = zval_get_long(ztmp);
 		connection_object->connection->maxPackageSize = v;
-		connection_object->connection->socket->maxPackageSize = v;
 		zend_update_property_long(workerman_connection_ce_ptr, getThis(), ZEND_STRL("maxPackageSize"), v);
 	}
 }
@@ -98,7 +97,7 @@ PHP_METHOD(workerman_connection, set) {
  * 私有方法，只有扩展内部使用
  */
 PHP_METHOD(workerman_connection, read) {
-	wmConnectionObject* connection_object = (wmConnectionObject *) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	wmConnectionObject *connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
 	wmConnection *conn = connection_object->connection;
 	if (conn == NULL) {
 		php_error_docref(NULL, E_WARNING, "send error");
@@ -110,7 +109,7 @@ PHP_METHOD(workerman_connection, read) {
 
 //发送数据
 PHP_METHOD(workerman_connection, send) {
-	wmConnectionObject* connection_object;
+	wmConnectionObject *connection_object;
 	wmConnection *conn;
 
 	zend_bool raw = 0;
@@ -123,7 +122,7 @@ PHP_METHOD(workerman_connection, send) {
 				Z_PARAM_BOOL(raw)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	connection_object = (wmConnectionObject *) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
 	conn = connection_object->connection;
 	if (conn == NULL) {
 		php_error_docref(NULL, E_WARNING, "send error");
@@ -137,9 +136,9 @@ PHP_METHOD(workerman_connection, send) {
 }
 
 PHP_METHOD(workerman_connection, close) {
-	wmConnectionObject* connection_object;
+	wmConnectionObject *connection_object;
 	int ret = 0;
-	connection_object = (wmConnectionObject *) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
 	ret = wmConnection_close(connection_object->connection);
 	if (ret < 0) {
 		php_error_docref(NULL, E_WARNING, "close error");
@@ -157,7 +156,7 @@ PHP_METHOD(workerman_connection, consumeRecvBuffer) {
 	ZEND_PARSE_PARAMETERS_START(1, 1)
 				Z_PARAM_LONG(length)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
-	wmConnectionObject* connection_object = (wmConnectionObject *) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	wmConnectionObject *connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
 
 	wmConnection_consumeRecvBuffer(connection_object->connection, length);
 }
@@ -188,10 +187,12 @@ void workerman_connection_init() {
 	//php对象实例化已经由我们自己的代码接管了
 	workerman_connection_ce_ptr->create_object = wm_connection_create_object;
 	workerman_connection_handlers.free_obj = wm_connection_free_object;
-	workerman_connection_handlers.offset = (zend_long) (((char *) (&(((wmConnectionObject*) NULL)->std))) - ((char *) NULL));
+	workerman_connection_handlers.offset = (zend_long) (((char*) (&(((wmConnectionObject*) NULL)->std))) - ((char*) NULL));
 
 	//类进行初始化的时候设置变量
 	zend_declare_property_long(workerman_connection_ce_ptr, ZEND_STRL("fd"), 0, ZEND_ACC_PUBLIC);
+	//worker
+	zend_declare_property_null(workerman_connection_ce_ptr, ZEND_STRL("worker"), ZEND_ACC_PUBLIC);
 
 	//注册变量和初始值
 	zend_declare_property_long(workerman_connection_ce_ptr, ZEND_STRL("errCode"), 0, ZEND_ACC_PUBLIC);

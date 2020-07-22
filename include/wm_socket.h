@@ -15,7 +15,6 @@ typedef struct {
 	int fd; //文件描述符
 	wmString *write_buffer; //写缓冲区
 	int maxSendBufferSize; //应用层发送缓冲区
-	int maxPackageSize; //接收的最大包包长
 	int events; //loop监听了什么事件
 	bool closed; //连接是否关闭
 	bool removed; //连接是否close

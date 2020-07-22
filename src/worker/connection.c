@@ -29,17 +29,15 @@ wmConnection* wmConnection_create(wmSocket *socket) {
 		return NULL;
 	}
 	connection->transport = socket->transport;
-	connection->socket->maxPackageSize = WM_MAX_PACKAGE_SIZE;
-	connection->socket->maxSendBufferSize = WM_MAX_SEND_BUFFER_SIZE;
+	connection->maxPackageSize = WM_MAX_PACKAGE_SIZE;
+	connection->maxSendBufferSize = WM_MAX_SEND_BUFFER_SIZE;
+	connection->socket->maxSendBufferSize = connection->maxSendBufferSize;
 	connection->socket->onBufferWillFull = bufferWillFull;
 	//绑定Full回调
 
 	connection->_This = NULL;
 	connection->id = ++wm_coroutine_socket_last_id;
 	connection->_status = WM_CONNECTION_STATUS_ESTABLISHED;
-
-	connection->maxSendBufferSize = WM_MAX_SEND_BUFFER_SIZE;
-	connection->maxPackageSize = WM_MAX_PACKAGE_SIZE;
 
 	connection->onMessage = NULL;
 	connection->onClose = NULL;
@@ -191,6 +189,12 @@ void wmConnection_read(wmConnection *connection) {
 				if (packet_len == 0) {
 					break;
 				}
+				if (packet_len > connection->maxPackageSize) {
+					wmWarn("Error package. package_length=%ld", packet_len);
+					onClose(connection);
+					return;
+				}
+
 				//创建一个单独协程处理包
 				total_request++;
 				if (connection->onMessage) {
@@ -305,7 +309,8 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len, bo
 			return false;
 		}
 		return true;
-	} else if (connection->transport == WM_SOCK_UDP) {
+	}
+	if (connection->transport == WM_SOCK_UDP) {
 		int ret = sendto(connection->fd, buf, len, 0, connection->addr, connection->addr_len);
 		if (ret < 0) {
 			return false;
@@ -414,8 +419,9 @@ int onClose(wmConnection *connection) {
 	WM_HASH_DEL(WM_HASH_INT_STR, wm_connections, connection->fd);
 
 	//释放connection,摧毁这个类，如果顺利的话会触发wmConnection_free
-	zval_ptr_dtor(connection->_This);
-
+	if(connection->_This){
+		zval_ptr_dtor(connection->_This);
+	}
 	return ret;
 }
 
@@ -433,10 +439,6 @@ void wmConnection_free(wmConnection *connection) {
 	}
 	if (connection->read_packet_buffer) {
 		wmString_free(connection->read_packet_buffer);
-	}
-	//释放暂时申请指向自身php对象的zval指针
-	if (connection->_This) {
-		efree(connection->_This);
 	}
 	if (connection->addr) {
 		wm_free(connection->addr);

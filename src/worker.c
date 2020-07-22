@@ -231,12 +231,12 @@ void wmWorker_resumeAccept(wmWorker *worker) {
 //全部运行
 void wmWorker_runAll() {
 	checkEnv();
+	parseCommand(); //解析用户命令
 	//设置定时器
 	signal(SIGALRM, alarm_wait);
 	alarm(1);
 	initWorkers(); //初始化进程相关资料
 	initWorkerPids(); //根据count初始化pid数组
-	parseCommand(); //解析用户命令
 	daemonize(); //守护进程模式
 	installSignal(); //装载信号
 	saveMasterPid();
@@ -945,7 +945,7 @@ void acceptConnectionTcp(wmWorker *worker) {
 		connection_object->connection->_This = z;
 
 		//将connection放入worker->connection中
-		add_index_zval(&worker->connections, conn->id, connection_object->connection->_This);
+		add_index_zval(&worker->connections, conn->id, z);
 
 		//设置属性 start
 		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("id"), connection_object->connection->id);
@@ -959,12 +959,13 @@ void acceptConnectionTcp(wmWorker *worker) {
 		connection_object->connection->maxPackageSize = __zval->value.lval;
 		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("maxPackageSize"), connection_object->connection->maxPackageSize);
 
-		zval_ptr_dtor(__zval);
+		//设置worker
+		zend_update_property(workerman_connection_ce_ptr, z, ZEND_STRL("worker"), worker->_This);
+
 		//设置属性 end
 
 		//设置socket属性start
 		conn->socket->maxSendBufferSize = conn->maxSendBufferSize;
-		conn->socket->maxPackageSize = conn->maxPackageSize;
 		//设置socket属性end
 
 		//设置回调方法 start
