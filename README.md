@@ -1,21 +1,30 @@
 # 序言
-WarriorMan是一款php的协程高性能socket扩展，适合对 [Workerman](https://www.workerman.net/) 有一定的了解的同学使用。
+WarriorMan是一款php的协程高性能socket扩展，适合对 [Workerman](https://www.workerman.net/) 或者 [swoole](https://github.com/swoole/swoole-src) 有一定的了解的同学使用。
 
 ## WarriorMan是什么
-WarriorMan是一个完全用c语言编写的php扩展，按照 [Workerman](https://www.workerman.net/) 的 [手册](http://doc.workerman.net/) 制作，解决Workerman的一些短板，为Workerman插上协程的翅膀。
+WarriorMan是一个完全用c语言编写的php扩展，仿照 [Workerman](https://www.workerman.net/) 制作，解决Workerman的一些短板，为Workerman插上协程的翅膀。
+
+## WarriorMan与WorkerMan的不同
+### 缺点
+1 WarriorMan没有WorkerMan稳定。  
+2 WarriorMan扩展是用纯C编写，阅读调试有一定难度。
+### 优点
+1 WarriorMan提供协程调度方法，内部也才有协程调度实现。遇到IO操作可!!!!!!!!!!!!!!!!!
+1 WarriorMan因为HOOK了PHP TCP Socket 类型的 stream，所以常见的`Redis`、`PDO`、`Mysqli`以及用 PHP 的[streams](https://www.php.net/streams)系列函数操作 TCP 连接的操作，都默认支持协程调度，减少了编程复杂度。
+
+
+## WarriorMan适合什么样的人
+如果你初次接触socket长连接编程，建议使用 [Workerman](https://www.workerman.net/) 框架开发。  
+如果你的项目业务逻辑很清晰，没有频繁的IO操作，建议使用 [Workerman](https://www.workerman.net/) 框架开发。  
+如果你的项目IO操作很频繁，可以考虑使用WarriorMan  
+如果你对C语言感兴趣，对协程原理感兴趣，可以考虑使用WarriorMan  
+如果你是一个热于折腾的人，并且可以主导自己的项目，可以考虑使用WarriorMan  
+如果你对php扩展开发有经验，请一定尝试使用WarriorMan 
 
 ### 作者希望
 作者在这里希望大家可以尝试使用WarriorMan，尝试学习WarriorMan源码，源码中有大量中文注释，这对提升自己编程水平以及更好的理解Workerman和Swoole很有帮助。  
 如果在使用/学习中遇到任何问题，可以提issues或者在QQ群: 1098698769 中直接联系作者
   
-## WarriorMan与WorkerMan的不同
-### 缺点
-1 WarriorMan没有WorkerMan稳定，目前适合学习与尝试。  
-2 WarriorMan如果框架本身出现BUG，对于不懂PHP扩展调试的开发者，那么只能等待WarriorMan开发者们修复。
-### 优点
-1 Workerman是纯php实现的网络框架，WarriorMan是纯c实现的php扩展  
-2 Workerman的事件是基于异步回调的编码方式实现的，WarriorMan是协程同步的编码方式实现  
-3 Workerman的mysql客户端，redis客户端如果要实现非阻塞，依赖于基于异步回调的第三方库。而WarriorMan因为HOOK了PHP TCP Socket 类型的 stream，所以常见的`Redis`、`PDO`、`Mysqli`以及用 PHP 的[streams](https://www.php.net/streams)系列函数操作 TCP 连接的操作，都默认支持协程调度，减少了编程复杂度。
 
 ## 环境
 PHP7 or Higher
@@ -47,7 +56,7 @@ Worker::runAll();
 
 ## 文档
 WarriorMan:[https://www.kancloud.cn/wwwoooshizha/warriorman/content](https://www.kancloud.cn/wwwoooshizha/warriorman/content)  
-文档是在Workerman文档基础上划出两者不同，和独有的一些功能。  
+文档是直接用了WorkerMan和Swoole的部分文档  
 
 ## 交流
 WarriorMan 交流QQ群: 1098698769
@@ -56,3 +65,6 @@ WarriorMan 交流QQ群: 1098698769
 [Workerman](https://github.com/walkor/Workerman)  
 [Swoole](https://github.com/swoole/swoole-src)  
 [Study](https://github.com/php-extension-research/study)  
+
+## 友情链接
+[PHP爬虫-爬山虎](https://github.com/blogdaren/PHPCreeper)  
