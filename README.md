@@ -9,8 +9,10 @@ WarriorMan是一个完全用c语言编写的php扩展，仿照 [Workerman](https
 1 WarriorMan没有WorkerMan稳定。  
 2 WarriorMan扩展是用纯C编写，阅读调试有一定难度。
 ### 优点
-1 WarriorMan提供协程调度方法，内部也才有协程调度实现。遇到IO操作可!!!!!!!!!!!!!!!!!
-1 WarriorMan因为HOOK了PHP TCP Socket 类型的 stream，所以常见的`Redis`、`PDO`、`Mysqli`以及用 PHP 的[streams](https://www.php.net/streams)系列函数操作 TCP 连接的操作，都默认支持协程调度，减少了编程复杂度。
+1 WarriorMan提供协程调度方法，默认的事件回调也是通过协程调度实现，可以在IO操作方面节省大量时间。
+2 WarriorMan因为HOOK了PHP TCP Socket 类型的 stream，所以常见的`Redis`、`PDO`、`Mysqli`以及用 PHP 的[streams](https://www.php.net/streams)系列函数操作 TCP 连接的操作，都默认支持协程调度，减少了编程复杂度。  
+
+3 会逐步提供更多底层方法，为开发者提供更多的灵活度。  
 
 
 ## WarriorMan适合什么样的人
