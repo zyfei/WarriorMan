@@ -140,8 +140,6 @@ bool wmWorkerLoop_remove(wmSocket* socket, int event) {
 		return wmWorkerLoop_del(socket);
 	}
 
-	//初始化epoll
-	loop_init();
 	struct epoll_event *ev;
 	ev = WorkerG.poll->event;
 	//转换epoll能看懂的事件类型

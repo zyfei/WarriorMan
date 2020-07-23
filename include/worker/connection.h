@@ -18,7 +18,7 @@ typedef struct {
 	int maxPackageSize; //接收的最大包包长
 	//写入php属性中 end
 	wmSocket* socket; //创建的socket对象
-	zval* _This; //指向当前PHP类的指针
+	zval _This; //指向当前PHP类的指针
 	int _status; //当前连接的状态
 	int transport; //TCP还是UDP
 

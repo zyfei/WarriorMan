@@ -35,7 +35,6 @@ wmConnection* wmConnection_create(wmSocket *socket) {
 	connection->socket->onBufferWillFull = bufferWillFull;
 	//绑定Full回调
 
-	connection->_This = NULL;
 	connection->id = ++wm_coroutine_socket_last_id;
 	connection->_status = WM_CONNECTION_STATUS_ESTABLISHED;
 
@@ -67,7 +66,6 @@ wmConnection* wmConnection_create_udp(int fd) {
 	connection->fd = fd;
 	connection->socket = NULL;
 	connection->transport = WM_SOCK_UDP;
-	connection->_This = NULL;
 	connection->id = ++wm_coroutine_socket_last_id;
 	connection->_status = WM_CONNECTION_STATUS_CLOSED; //默认就是关闭的，因为udp是无连接的
 	connection->onMessage = NULL;
@@ -123,7 +121,9 @@ void wmConnection_read(wmConnection *connection) {
 	zval retval_ptr;
 	//开始读消息
 	while (connection->worker->_status == WM_WORKER_STATUS_RUNNING && connection && connection->_status == WM_CONNECTION_STATUS_ESTABLISHED) {
+		///////////////////
 		int ret = wmSocket_read(connection->socket, _read_buffer_tmp->str, _read_buffer_tmp->size, WM_SOCKET_MAX_TIMEOUT);
+
 		//触发onError
 		if (ret == WM_SOCKET_ERROR) {
 			onError(connection);
@@ -141,11 +141,11 @@ void wmConnection_read(wmConnection *connection) {
 		if (!worker->protocol) {
 			//创建一个单独协程处理
 			total_request++;
+
 			if (connection->onMessage) {
 				//构建zval，默认的引用计数是1，在php方法调用完毕释放
 				zval *_mess_data = (zval*) emalloc(sizeof(zval) * 2);
-				//_mess_data[0] = *connection->_This;
-				ZVAL_COPY_VALUE(_mess_data, connection->_This);
+				ZVAL_COPY_VALUE(_mess_data, &connection->_This);
 				zend_string *_zs = zend_string_init(_read_buffer_tmp->str, ret, 0);
 				ZVAL_STR(&_mess_data[1], _zs);
 				long _cid = wmCoroutine_create(&(connection->onMessage->fcc), 2, _mess_data); //创建新协程
@@ -175,7 +175,7 @@ void wmConnection_read(wmConnection *connection) {
 			 */
 			ZVAL_STR(&z1, zend_string_init((read_packet_buffer->str + read_packet_buffer->offset), read_packet_buffer->length - read_packet_buffer->offset, 0));
 			//调用协议的input方法
-			zend_call_method(NULL, worker->protocol_ce, NULL, ZEND_STRL("input"), &retval_ptr, 2, &z1, connection->_This);
+			zend_call_method(NULL, worker->protocol_ce, NULL, ZEND_STRL("input"), &retval_ptr, 2, &z1, &connection->_This);
 			zval_ptr_dtor(&z1);
 
 			if (UNEXPECTED(EG(exception))) {
@@ -200,12 +200,12 @@ void wmConnection_read(wmConnection *connection) {
 				if (connection->onMessage) {
 					//解码
 					ZVAL_STR(&z1, zend_string_init((read_packet_buffer->str + read_packet_buffer->offset), packet_len, 0));
-					zend_call_method(NULL, worker->protocol_ce, NULL, ZEND_STRL("decode"), &retval_ptr, 2, &z1, connection->_This);
+					zend_call_method(NULL, worker->protocol_ce, NULL, ZEND_STRL("decode"), &retval_ptr, 2, &z1, &connection->_This);
 					zval_ptr_dtor(&z1);
 
 					//构建zval，默认的引用计数是1，在php方法调用完毕释放
 					zval *_mess_data = (zval*) emalloc(sizeof(zval) * 2);
-					ZVAL_COPY_VALUE(_mess_data, connection->_This);
+					ZVAL_COPY_VALUE(_mess_data, &connection->_This);
 					ZVAL_COPY_VALUE(&_mess_data[1], &retval_ptr);
 
 					long _cid = wmCoroutine_create(&(connection->onMessage->fcc), 2, _mess_data); //创建新协程
@@ -238,24 +238,23 @@ void wmConnection_read(wmConnection *connection) {
 void wmConnection_recvfrom(wmConnection *connection, wmSocket *socket) {
 	int ret = wmSocket_recvfrom(socket, _read_buffer_tmp->str, _read_buffer_tmp->size, connection->addr, &connection->addr_len, WM_SOCKET_MAX_TIMEOUT);
 	if (ret == WM_SOCKET_CLOSE) { //关闭了，进程退出的时候触发
-		zval_ptr_dtor(connection->_This);
+		zval_ptr_dtor(&connection->_This);
 		socket->closed = true;
 		return;
 	}
 	//触发onError
 	if (ret <= 0) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
-		zval_ptr_dtor(connection->_This);
+		zval_ptr_dtor(&connection->_This);
 		return;
 	}
 	//创建一个单独协程处理
 	total_request++;
+
 	if (connection->onMessage) {
 		//构建zval，默认的引用计数是1，在php方法调用完毕释放
 		zval *_mess_data = (zval*) emalloc(sizeof(zval) * 2);
-		//_mess_data[0] = *connection->_This;
-		//_mess_data[0] = *connection->_This;
-		ZVAL_COPY_VALUE(_mess_data, connection->_This);
+		ZVAL_COPY_VALUE(_mess_data, &connection->_This);
 		zend_string *_zs = zend_string_init(_read_buffer_tmp->str, ret, 0);
 		ZVAL_STR(&_mess_data[1], _zs);
 		long _cid = wmCoroutine_create(&(connection->onMessage->fcc), 2, _mess_data); //创建新协程
@@ -278,7 +277,7 @@ bool wmConnection_send(wmConnection *connection, const void *buf, size_t len, bo
 		if (connection->worker->protocol && raw == false) {
 			ZVAL_STR(&z1, zend_string_init(buf, len, 0));
 			//调用协议的input方法
-			zend_call_method(NULL, connection->worker->protocol_ce, NULL, ZEND_STRL("encode"), &retval_ptr, 2, &z1, connection->_This);
+			zend_call_method(NULL, connection->worker->protocol_ce, NULL, ZEND_STRL("encode"), &retval_ptr, 2, &z1, &connection->_This);
 			if (UNEXPECTED(EG(exception))) {
 				zend_exception_error(EG(exception), E_ERROR);
 			}
@@ -334,7 +333,7 @@ void wmConnection_consumeRecvBuffer(wmConnection *connection, zend_long length) 
 void bufferWillFull(void *_connection) {
 	wmConnection *connection = (wmConnection*) _connection;
 	if (connection->onBufferFull) {
-		wmCoroutine_create(&(connection->onBufferFull->fcc), 1, connection->_This); //创建新协程
+		wmCoroutine_create(&(connection->onBufferFull->fcc), 1, &connection->_This); //创建新协程
 	}
 }
 
@@ -378,14 +377,14 @@ void onError(wmConnection *connection) {
 	wmWarn("onError: (fd=%d,errno %d) %s", connection->fd, connection->socket->errCode, connection->socket->errMsg);
 
 	if (connection->socket && connection->socket->errCode) {
-		zend_update_property_long(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errCode"), connection->socket->errCode);
-		zend_update_property_string(workerman_connection_ce_ptr, connection->_This, ZEND_STRL("errMsg"), connection->socket->errMsg);
+		zend_update_property_long(workerman_connection_ce_ptr, &connection->_This, ZEND_STRL("errCode"), connection->socket->errCode);
+		zend_update_property_string(workerman_connection_ce_ptr, &connection->_This, ZEND_STRL("errMsg"), connection->socket->errMsg);
 	}
 
 	if (connection->onError) {
 		//构建zval，默认的引用计数是1，在php方法调用完毕释放
 		zval *_mess_data = (zval*) emalloc(sizeof(zval) * 3);
-		ZVAL_COPY_VALUE(_mess_data, connection->_This);
+		ZVAL_COPY_VALUE(_mess_data, &connection->_This);
 		ZVAL_LONG(&_mess_data[1], connection->socket->errCode);
 		ZVAL_STR(&_mess_data[2], zend_string_init(connection->socket->errMsg, strlen(connection->socket->errMsg), 0));
 		long _cid = wmCoroutine_create(&(connection->onError->fcc), 3, _mess_data); //创建新协程
@@ -405,23 +404,17 @@ int onClose(wmConnection *connection) {
 		return 0;
 	}
 	int ret = wmSocket_close(connection->socket);
-
 	connection->_status = WM_CONNECTION_STATUS_CLOSED;
 	//触发onClose
 	if (connection->onClose) {
-		wmCoroutine_create(&(connection->onClose->fcc), 1, connection->_This); //创建新协程
+		wmCoroutine_create(&(connection->onClose->fcc), 1, &connection->_This); //创建新协程
 	}
-
 	//从connections数组中删除
 	zend_hash_index_del(Z_ARR(connection->worker->connections), connection->id);
-
 	//查找并且删除key为fd的连接
 	WM_HASH_DEL(WM_HASH_INT_STR, wm_connections, connection->fd);
-
 	//释放connection,摧毁这个类，如果顺利的话会触发wmConnection_free
-	if(connection->_This){
-		zval_ptr_dtor(connection->_This);
-	}
+	zval_ptr_dtor(&connection->_This);
 	return ret;
 }
 

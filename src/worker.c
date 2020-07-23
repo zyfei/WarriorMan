@@ -906,19 +906,15 @@ void bind_callback(zval *_This, const char *fun_name, php_fci_fcc **handle_fci_f
  * 监控tcp连接
  */
 void acceptConnectionTcp(wmWorker *worker) {
-	//注册loop事件,半自动
-	wmWorkerLoop_add(worker->socket, WM_EVENT_EPOLLEXCLUSIVE);
+	//防止惊群
+	//wmWorkerLoop_add(worker->socket, WM_EVENT_EPOLLEXCLUSIVE);
 
-	//死循环accept，遇到消息就新创建协程处理
 	wmConnection *conn;
 	zval *__zval;
 	zend_fcall_info_cache call_read;
-
 	while (worker->_status == WM_WORKER_STATUS_RUNNING) {
-		/**
-		 * 找到什么问题了，因为协程模式是在这里阻塞的。所以第二个worker，会导致阻塞。需要让两个不是一个协程内
-		 */
-		wmSocket *socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO, WM_SOCKET_MAX_TIMEOUT);
+		//wmSocket *socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO, WM_SOCKET_MAX_TIMEOUT);
+		wmSocket *socket = wmSocket_accept(worker->socket, WM_LOOP_AUTO, WM_SOCKET_MAX_TIMEOUT);
 		if (socket == NULL) {
 			if (worker->_status != WM_WORKER_STATUS_RUNNING) {
 				break;
@@ -926,6 +922,7 @@ void acceptConnectionTcp(wmWorker *worker) {
 			wmWarn("acceptConnection fail. workerId=%d , socket = NULL errno=%d", worker->workerId, errno);
 			continue;
 		}
+
 		conn = wmConnection_create(socket);
 		if (conn == NULL) {
 			wmWarn("_wmWorker_acceptConnection() -> wmConnection_create failed")
@@ -934,18 +931,18 @@ void acceptConnectionTcp(wmWorker *worker) {
 
 		//新的Connection对象
 		zend_object *obj = wm_connection_create_object(workerman_connection_ce_ptr);
-		zval *z = emalloc(sizeof(zval));
-		ZVAL_OBJ(z, obj);
-
+		ZVAL_OBJ(&conn->_This, obj);
+		zval *z = &conn->_This;
 		wmConnectionObject *connection_object = (wmConnectionObject*) wm_connection_fetch_object(obj);
 
 		//接客
 		connection_object->connection = conn;
 		connection_object->connection->worker = worker;
-		connection_object->connection->_This = z;
 
 		//将connection放入worker->connection中
 		add_index_zval(&worker->connections, conn->id, z);
+		//引用手动+1，在删除的时候会自动-1
+		GC_ADDREF(obj);
 
 		//设置属性 start
 		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("id"), connection_object->connection->id);
@@ -980,9 +977,8 @@ void acceptConnectionTcp(wmWorker *worker) {
 		if (worker->onConnect) {
 			wmCoroutine_create(&(worker->onConnect->fcc), 1, z); //创建新协程
 		}
-
 		//创建协程 conn开始读 start
-		wm_get_internal_function(conn->_This, workerman_connection_ce_ptr, ZEND_STRL("read"), &call_read);
+		wm_get_internal_function(&conn->_This, workerman_connection_ce_ptr, ZEND_STRL("read"), &call_read);
 		wmCoroutine_create(&call_read, 0, NULL);
 		//创建协程 conn开始读  end
 	}
@@ -1003,7 +999,7 @@ void acceptConnectionUdp(wmWorker *worker) {
 		conn = wmConnection_create_udp(worker->fd);
 		//新的Connection对象
 		zend_object *obj = wm_connection_create_object(workerman_connection_ce_ptr);
-		zval *z = emalloc(sizeof(zval));
+		zval *z = &conn->_This;
 		ZVAL_OBJ(z, obj);
 
 		wmConnectionObject *connection_object = (wmConnectionObject*) wm_connection_fetch_object(obj);
@@ -1011,7 +1007,6 @@ void acceptConnectionUdp(wmWorker *worker) {
 		//接客
 		connection_object->connection = conn;
 		connection_object->connection->worker = (void*) worker;
-		connection_object->connection->_This = z;
 
 		//设置属性 start
 		zend_update_property_long(workerman_connection_ce_ptr, z, ZEND_STRL("id"), connection_object->connection->id);

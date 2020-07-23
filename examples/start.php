@@ -14,56 +14,56 @@ Warriorman\Runtime::enableCoroutine(); // hook相关函数
 // $worker->name = "tcpServer"; // 设置名字
 // $worker->protocol = "\Workerman\Protocols\Http"; // 设置协议
 // $worker->onWorkerStart = function ($worker) {
-//     var_dump("onWorkerStart ->" . $worker->workerId . " id=" . $worker->id);
-//     global $db;
-//     $db = new test\MySQL("127.0.0.1", "3306", "root", "root", "test");
+// var_dump("onWorkerStart ->" . $worker->workerId . " id=" . $worker->id);
+// global $db;
+// $db = new test\MySQL("127.0.0.1", "3306", "root", "root", "test");
 
-//     $timer_id = Timer::add(1, function () {
-//         echo "coro_num = " . Warriorman\Coroutine::getTotalNum() . " \n";
-//     }, false);
-//     $inner_text_worker = new Worker('tcp://0.0.0.0:5678');
-//     $inner_text_worker->reusePort = true;
-//     $inner_text_worker->protocol = "\Workerman\Protocols\Http"; // 设置协议
-//     $inner_text_worker->onWorkerStart = function ($worker) {
-//         var_dump("inner_text_worker");
-//     };
-//     $inner_text_worker->onMessage = function ($connection, $buffer) {
-//         $connection->send("inner_text_worker");
-//     };
+// $timer_id = Timer::add(1, function () {
+// echo "coro_num = " . Warriorman\Coroutine::getTotalNum() . " \n";
+// }, false);
+// $inner_text_worker = new Worker('tcp://0.0.0.0:5678');
+// $inner_text_worker->reusePort = true;
+// $inner_text_worker->protocol = "\Workerman\Protocols\Http"; // 设置协议
+// $inner_text_worker->onWorkerStart = function ($worker) {
+// var_dump("inner_text_worker");
+// };
+// $inner_text_worker->onMessage = function ($connection, $buffer) {
+// $connection->send("inner_text_worker");
+// };
 
-//     // ## 执行监听 ##
-//     $inner_text_worker->listen();
+// // ## 执行监听 ##
+// $inner_text_worker->listen();
 // };
 
 // $worker->onWorkerReload = function ($worker) {
-//     var_dump("onWorkerReload ->" . $worker->id);
+// var_dump("onWorkerReload ->" . $worker->id);
 // };
 
 // $worker->onConnect = function ($connection) use ($worker) {
-//     $connection->set(array(
-//         "maxSendBufferSize" => 102400
-//     ));
-//     echo "new connection id {$connection->id} \n";
+// $connection->set(array(
+// "maxSendBufferSize" => 102400
+// ));
+// echo "new connection id {$connection->id} \n";
 // };
 
 // $worker->onMessage = function ($connection, $data) {
-//     // var_dump($data);
-//     $responseStr = "hello worla";
-//     $connection->send($responseStr);
+// // var_dump($data);
+// $responseStr = "hello worla";
+// $connection->send($responseStr);
 // };
 
 // $worker->onBufferFull = function ($connection) {
-//     echo "bufferFull and do not send again\n";
+// echo "bufferFull and do not send again\n";
 // };
 
 // $worker->onError = function ($connection, $code, $msg) {
-//     var_dump($code);
-//     var_dump($msg);
-//     echo "connection error ,id {$connection->id} \n";
+// var_dump($code);
+// var_dump($msg);
+// echo "connection error ,id {$connection->id} \n";
 // };
 
 // $worker->onClose = function ($connection) {
-//     echo "connection closed\n";
+// echo "connection closed\n";
 // };
 
 // 监听另外一个端口
@@ -77,8 +77,8 @@ $worker2->onMessage = function ($connection, $data) {
 // 监听另外一个端口
 // $worker3 = new Worker("udp://0.0.0.0:8080");
 // $worker3->onMessage = function ($connection, $data) {
-//     var_dump("udp:" . $data);
-//     $connection->send("hello world");
+// var_dump("udp:" . $data);
+// $connection->send("hello world");
 // };
 
 Worker::runAll();

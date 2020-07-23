@@ -11,8 +11,8 @@ static int total_num = 0;
  * 设置socket的各种错误
  */
 static inline void set_err(wmSocket *socket, int e) {
-	socket->errCode = errno = e;
-	socket->errMsg = e ? wmCode_str(e) : "";
+//	socket->errCode = errno = e;
+//	socket->errMsg = e ? wmCode_str(e) : "";
 }
 
 /**
@@ -163,20 +163,19 @@ void timer_del(wmSocket *socket, int event) {
 bool timer_used(wmSocket *socket, int event) {
 	if (event == WM_EVENT_READ) {
 		if (!socket->read_timer) { //如果使用了
+			errno = ETIMEDOUT;
 			return true;
 		}
-		errno = ETIMEDOUT;
 		return false;
 	} else if (event & WM_EVENT_WRITE) {
-		if (!socket->write_timer) { //如果没使用相应定时器，那么删除
+		if (!socket->write_timer) { //如果使用了
+			errno = ETIMEDOUT;
 			return true;
 		}
-		errno = ETIMEDOUT;
 		return false;
 	} else {
 		abort();
 	}
-	errno = ETIMEDOUT;
 	return false;
 }
 
@@ -377,6 +376,7 @@ int wmSocket_read(wmSocket *socket, char *buf, int len, uint32_t timeout) {
 		do {
 			ret = wm_socket_recv(socket->fd, buf, len, 0);
 		} while (ret < 0 && errno == EINTR);
+
 		//正常返回
 		if (ret > 0) {
 			timer_del(socket, WM_EVENT_READ);
@@ -506,6 +506,7 @@ bool event_wait(wmSocket *socket, int event) {
 	if (event & WM_EVENT_WRITE) {
 		socket->write_co = wmCoroutine_get_current();
 	}
+
 	wmCoroutine_yield();
 
 	//下面删除对应的co

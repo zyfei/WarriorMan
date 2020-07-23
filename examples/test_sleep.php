@@ -2,17 +2,17 @@
 use Warriorman\Coroutine;
 
 work(function () {
-    var_dump(Coroutine::getCid());
-    Coroutine::sleep(1);
-    work(function () {
-        var_dump(Coroutine::getCid());
-    });
-    var_dump(Coroutine::getCid());
-});
-
-Coroutine::create(function () {
-    Coroutine::sleep(1);
-    var_dump(Coroutine::getCid());
+    Coroutine::sleep(0.01);
+    while (1) {
+        for ($i = 0; $i < 100000; $i ++) {
+            work(function () {
+                $a = 1;
+                echo ".";
+            });
+        }
+        var_dump("sleep");
+        Coroutine::sleep(1);
+    }
 });
 
 Coroutine::wait();
