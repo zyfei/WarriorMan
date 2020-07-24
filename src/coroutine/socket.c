@@ -6,6 +6,7 @@ static bool bufferIsFull(wmSocket *socket);
 static void checkBufferWillFull(wmSocket *socket);
 static bool event_wait(wmSocket *socket, int event);
 static int total_num = 0;
+static socklen_t addr_len = sizeof(struct sockaddr);
 
 /**
  * 设置socket的各种错误
@@ -229,9 +230,11 @@ wmSocket* wmSocket_pack(int fd, int transport, int loop_type) {
 	socket->errMsg = NULL;
 	socket->shutdown_read = false;
 	socket->shutdown_write = false;
-
-	wm_socket_set_nonblock(socket->fd);
-
+	socket->udp_addr = NULL;
+	socket->remoteIp = NULL;
+	if (transport == WM_SOCK_TCP) {
+		wm_socket_set_nonblock(socket->fd);
+	}
 	total_num++;
 	return socket;
 }
@@ -244,9 +247,10 @@ wmSocket* wmSocket_accept(wmSocket *socket, int new_socket_loop_type, uint32_t t
 		return NULL;
 	}
 	int connfd;
+	struct sockaddr_in addr;
 	while (!socket->closed) {
 		do {
-			connfd = wm_socket_accept(socket->fd);
+			connfd = wm_socket_accept(socket->fd, &addr, &addr_len);
 		} while (connfd < 0 && errno == EINTR);
 
 		if (connfd < 0) {
@@ -263,7 +267,12 @@ wmSocket* wmSocket_accept(wmSocket *socket, int new_socket_loop_type, uint32_t t
 		}
 		set_err(socket, 0);
 		timer_del(socket, WM_EVENT_READ);
-		return wmSocket_pack(connfd, socket->transport, new_socket_loop_type); //将得到的fd，包装成socket结构体
+		wmSocket *socket2 = wmSocket_pack(connfd, socket->transport, new_socket_loop_type); //将得到的fd，包装成socket结构体
+		//设置客户端IP和端口
+		char *client_ip = inet_ntoa(addr.sin_addr);
+		socket2->remoteIp = wmString_dup(client_ip, strlen(client_ip));
+		socket2->remotePort = ntohs(addr.sin_port);
+		return socket2;
 	}
 	set_err(socket, WM_ERROR_SESSION_CLOSED);
 	timer_del(socket, WM_EVENT_READ);
@@ -332,7 +341,20 @@ ssize_t wmSocket_peek(wmSocket *socket, void *__buf, size_t __n) {
 }
 
 /**
- * 读数据
+ * udp读数据
+ */
+ssize_t wmSocket_recv(wmSocket *server, wmSocket *socket, void *__buf, size_t __n, uint32_t timeout) {
+	socket->udp_addr = wm_malloc(sizeof(struct sockaddr_in));
+	ssize_t st = wmSocket_recvfrom(server, __buf, __n, (struct sockaddr*) socket->udp_addr, &addr_len, timeout);
+	//设置客户端IP和端口
+	char *client_ip = inet_ntoa(socket->udp_addr->sin_addr);
+	socket->remoteIp = wmString_dup(client_ip, strlen(client_ip));
+	socket->remotePort = ntohs(socket->udp_addr->sin_port);
+	return st;
+}
+
+/**
+ * udp读数据
  * 暂时只有runtime用
  */
 ssize_t wmSocket_recvfrom(wmSocket *socket, void *__buf, size_t __n, struct sockaddr *_addr, socklen_t *_socklen, uint32_t timeout) {
@@ -346,6 +368,16 @@ ssize_t wmSocket_recvfrom(wmSocket *socket, void *__buf, size_t __n, struct sock
 		} while (retval < 0 && errno == EINTR);
 		//正常返回
 		if (retval >= 0) {
+
+			//设置客户端IP和端口
+			if (socket->remoteIp) {
+				wmString_free(socket->remoteIp);
+			}
+			struct sockaddr_in *addr2 = (struct sockaddr_in*) _addr;
+			char *client_ip = inet_ntoa(addr2->sin_addr);
+			socket->remoteIp = wmString_dup(client_ip, strlen(client_ip));
+			socket->remotePort = ntohs(addr2->sin_port);
+
 			set_err(socket, 0);
 			timer_del(socket, WM_EVENT_READ);
 			return retval;
@@ -584,7 +616,7 @@ int wmSocket_close(wmSocket *socket) {
 		}
 	}
 	int ret = 0;
-	if (!socket->removed) {
+	if (!socket->removed && socket->transport == WM_SOCK_TCP) {
 		socket->closed = true;
 		ret = wm_socket_close(socket->fd);
 		socket->removed = true;
@@ -604,11 +636,17 @@ void wmSocket_free(wmSocket *socket) {
 	if (socket->write_buffer) {
 		wmString_free(socket->write_buffer);
 	}
+	if (socket->remoteIp) {
+		wmString_free(socket->remoteIp);
+	}
 	if (socket->read_timer) {
 		wmTimerWheel_del(socket->read_timer);
 	}
 	if (socket->write_timer) {
 		wmTimerWheel_del(socket->write_timer);
+	}
+	if (socket->udp_addr) {
+		wm_free(socket->udp_addr);
 	}
 	wm_free(socket);	//释放socket
 	socket = NULL;

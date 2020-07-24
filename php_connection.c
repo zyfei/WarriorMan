@@ -161,12 +161,26 @@ PHP_METHOD(workerman_connection, consumeRecvBuffer) {
 	wmConnection_consumeRecvBuffer(connection_object->connection, length);
 }
 
+PHP_METHOD(workerman_connection, getRemoteIp) {
+	wmConnectionObject *connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	char *ip = wmConnection_getRemoteIp(connection_object->connection);
+	RETURN_STRING(ip);
+}
+
+PHP_METHOD(workerman_connection, getRemotePort) {
+	wmConnectionObject *connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	int port = wmConnection_getRemotePort(connection_object->connection);
+	RETURN_LONG(port);
+}
+
 static const zend_function_entry workerman_connection_methods[] = { //
 	PHP_ME(workerman_connection, set, arginfo_workerman_connection_set, ZEND_ACC_PUBLIC) //
 		//公有
 		PHP_ME(workerman_connection, send, arginfo_workerman_connection_send, ZEND_ACC_PUBLIC) //
 		PHP_ME(workerman_connection, close, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
 		PHP_ME(workerman_connection, consumeRecvBuffer, arginfo_workerman_connection_consumeRecvBuffer, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_connection, getRemoteIp, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_connection, getRemotePort, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
 
 		//私有
 		PHP_ME(workerman_connection, read, arginfo_workerman_connection_void, ZEND_ACC_PRIVATE) //

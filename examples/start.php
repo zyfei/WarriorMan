@@ -10,7 +10,7 @@ Warriorman\Worker::rename(); // 将Workerman改为Workerman
 Warriorman\Runtime::enableCoroutine(); // hook相关函数
 
 $worker = new Worker("tcp://0.0.0.0:8080");
-$worker->count = 2;
+$worker->count = 1;
 $worker->name = "tcpServer"; // 设置名字
 $worker->protocol = "\Workerman\Protocols\Http"; // 设置协议
 $worker->onWorkerStart = function ($worker) {
@@ -44,7 +44,9 @@ $worker->onConnect = function ($connection) use ($worker) {
     $connection->set(array(
         "maxSendBufferSize" => 102400
     ));
-    echo "new connection id {$connection->id} \n";
+    $ip = $connection->getRemoteIp();
+    $port = $connection->getRemotePort();
+    echo "new connection id {$connection->id} ip=$ip port=$port\n";
 };
 
 $worker->onMessage = function ($connection, $data) {
@@ -69,7 +71,7 @@ $worker->onClose = function ($connection) {
 
 // 监听另外一个端口
 $worker2 = new Worker("tcp://0.0.0.0:8081");
-$worker2->count = 4;
+$worker2->count = 1;
 $worker2->onMessage = function ($connection, $data) {
     $responseStr = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: Keep-Alive\r\nContent-Length: 11\r\n\r\nhello worlb\r\n";
     $connection->send($responseStr);
@@ -80,6 +82,9 @@ $worker3 = new Worker("udp://0.0.0.0:8080");
 $worker3->onMessage = function ($connection, $data) {
     var_dump("udp:" . $data);
     $connection->send("hello world");
+    $ip = $connection->getRemoteIp();
+    $port = $connection->getRemotePort();
+    echo "new connection id {$connection->id} ip=$ip port=$port\n";
 };
 
 Worker::runAll();

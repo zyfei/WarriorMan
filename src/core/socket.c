@@ -92,13 +92,9 @@ int wm_socket_listen(int sock, int backlog) {
 	return ret;
 }
 
-int wm_socket_accept(int sock) {
+int wm_socket_accept(int sock, struct sockaddr_in *sa, socklen_t *len) {
 	int connfd;
-	struct sockaddr_in sa;
-	socklen_t len;
-
-	len = sizeof(sa);
-	connfd = accept(sock, (struct sockaddr*) &sa, &len);
+	connfd = accept(sock, (struct sockaddr*) sa, len);
 	//errno != EAGAIN  不能再读了
 	if (connfd < 0 && errno != EAGAIN) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));

@@ -475,6 +475,13 @@ void initWorker(wmWorker *worker) {
 		zend_update_property_bool(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("reusePort"), worker->reusePort);
 	}
 
+	//检查backlog
+	_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("backlog"), 0);
+	if (_zval && Z_TYPE_INFO_P(_zval) == IS_LONG) {
+		worker->backlog = Z_LVAL_P(_zval);
+		zend_update_property_long(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("backlog"), worker->backlog);
+	}
+
 	_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("user"), 0);
 	if (_zval) {
 		if (Z_TYPE_INFO_P(_zval) == IS_STRING) {
@@ -1007,7 +1014,6 @@ void acceptConnectionUdp(wmWorker *worker) {
 		//设置属性 end
 		//设置回调方法 start
 		conn->onMessage = worker->onMessage;
-		//设置回调方法 end
 		wmConnection_recvfrom(conn, worker->socket);
 	}
 }

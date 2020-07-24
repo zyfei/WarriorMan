@@ -12,9 +12,9 @@ int wm_socket_bind(int sock, char *host, int port);
 int wm_socket_connect(int sock, char *host, int port);
 
 /**
- * 获取客户端连接
+ * 获取客户端连接,sa是为了获取客户端信息
  */
-int wm_socket_accept(int sock);
+int wm_socket_accept(int sock, struct sockaddr_in *sa, socklen_t *len);
 /**
  * 获取客户端数据
  */
