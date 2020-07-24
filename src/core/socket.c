@@ -146,7 +146,7 @@ int wm_socket_close(int fd) {
 
 int wm_socket_reuse_port(int fd) {
 	int reusePort = 1;
-	int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reusePort, sizeof(reusePort));
+	int ret = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &reusePort, sizeof(reusePort));
 	if (ret < 0) {
 		wmWarn("Error has occurred: (fd=%d,errno %d) %s", fd, errno, strerror(errno));
 	}

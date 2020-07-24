@@ -134,6 +134,7 @@ void wmConnection_read(wmConnection *connection) {
 			onClose(connection);
 			return;
 		}
+
 		/**
 		 * 如果只是单纯的tcp协议
 		 */

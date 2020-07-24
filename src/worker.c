@@ -115,7 +115,7 @@ wmWorker* wmWorker_create(zval *_This, zend_string *socketName) {
 	worker->protocol = NULL;
 	worker->protocol_ce = NULL;
 	worker->reloadable = true;
-	worker->reusePort = false;
+	worker->reusePort = true;
 	parseSocketAddress(worker, socketName);
 
 	//说明是在worker进程内，再创建的worker
@@ -470,10 +470,8 @@ void initWorker(wmWorker *worker) {
 
 	//检查端口复用
 	_zval = wm_zend_read_property_not_null(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("reusePort"), 0);
-	if (_zval) {
-		if (Z_TYPE_INFO_P(_zval) == IS_TRUE) {
-			worker->reusePort = true;
-		}
+	if (_zval && Z_TYPE_INFO_P(_zval) == IS_FALSE) {
+		worker->reusePort = false;
 		zend_update_property_bool(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("reusePort"), worker->reusePort);
 	}
 
@@ -906,15 +904,14 @@ void bind_callback(zval *_This, const char *fun_name, php_fci_fcc **handle_fci_f
  * 监控tcp连接
  */
 void acceptConnectionTcp(wmWorker *worker) {
-	//防止惊群
+	//防止惊群 PS 不使用这个方式了，现在使用SO_REUSEPORT的方式均匀分布。
 	//wmWorkerLoop_add(worker->socket, WM_EVENT_EPOLLEXCLUSIVE);
 
 	wmConnection *conn;
 	zval *__zval;
 	zend_fcall_info_cache call_read;
 	while (worker->_status == WM_WORKER_STATUS_RUNNING) {
-		//wmSocket *socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO, WM_SOCKET_MAX_TIMEOUT);
-		wmSocket *socket = wmSocket_accept(worker->socket, WM_LOOP_AUTO, WM_SOCKET_MAX_TIMEOUT);
+		wmSocket *socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO, WM_SOCKET_MAX_TIMEOUT);
 		if (socket == NULL) {
 			if (worker->_status != WM_WORKER_STATUS_RUNNING) {
 				break;
@@ -989,10 +986,6 @@ void acceptConnectionTcp(wmWorker *worker) {
  * 监控udp消息
  */
 void acceptConnectionUdp(wmWorker *worker) {
-
-	//注册loop事件,半自动
-	wmWorkerLoop_add(worker->socket, WM_EVENT_EPOLLEXCLUSIVE);
-
 	//死循环accept，遇到消息就新创建协程处理
 	wmConnection *conn;
 	while (!worker->socket->closed) {

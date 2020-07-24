@@ -41,7 +41,7 @@ typedef struct _wmWorker {
 	wmSocket *socket; //用于监听的fd封装而成
 	zval connections; //保存着当前进程所有的连接
 
-	bool reusePort;//端口复用，默认是false
+	bool reusePort;//端口复用，默认是true
 } wmWorker;
 
 //为了通过php对象，找到上面的c++对象 ======= start

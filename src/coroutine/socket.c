@@ -11,8 +11,8 @@ static int total_num = 0;
  * 设置socket的各种错误
  */
 static inline void set_err(wmSocket *socket, int e) {
-//	socket->errCode = errno = e;
-//	socket->errMsg = e ? wmCode_str(e) : "";
+	socket->errCode = errno = e;
+	socket->errMsg = e ? wmCode_str(e) : "";
 }
 
 /**
@@ -506,7 +506,6 @@ bool event_wait(wmSocket *socket, int event) {
 	if (event & WM_EVENT_WRITE) {
 		socket->write_co = wmCoroutine_get_current();
 	}
-
 	wmCoroutine_yield();
 
 	//下面删除对应的co

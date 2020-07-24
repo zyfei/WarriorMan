@@ -16,7 +16,12 @@ static inline int event_decode(int events) {
 		flag |= EPOLLOUT;
 	}
 	if (events & WM_EVENT_EPOLLEXCLUSIVE) { //避免惊群
+#ifndef EPOLLEXCLUSIVE
+		wmWarn("not support EPOLLEXCLUSIVE.");
+#else
 		flag |= EPOLLEXCLUSIVE;
+#endif
+
 	}
 	return flag;
 }
@@ -24,7 +29,7 @@ static inline int event_decode(int events) {
 /**
  * 恢复协程&用于loop_wait回调
  */
-bool loop_callback_coroutine_resume(wmSocket* socket, int event) {
+bool loop_callback_coroutine_resume(wmSocket *socket, int event) {
 	if (!socket) {
 		wmError("Error has occurred: loop_callback_coroutine_resume . wmCoroutine is NULL");
 		return false;
@@ -39,7 +44,7 @@ bool loop_callback_coroutine_resume(wmSocket* socket, int event) {
 	return false;
 }
 
-bool loop_callback_coroutine_resume_and_del(wmSocket* socket, int event) {
+bool loop_callback_coroutine_resume_and_del(wmSocket *socket, int event) {
 	wmWorkerLoop_del(socket);
 	bool b = loop_callback_coroutine_resume(socket, event);
 	return b;
@@ -96,7 +101,7 @@ loop_callback_func_t wmWorkerLoop_get_handler(int event, int type) {
 	return NULL;
 }
 
-bool wmWorkerLoop_add(wmSocket* socket, int event) {
+bool wmWorkerLoop_add(wmSocket *socket, int event) {
 	if (socket->events & event) { //如果socket里面有这个事件,那直接返回
 		return true;
 	}
@@ -120,13 +125,14 @@ bool wmWorkerLoop_add(wmSocket* socket, int event) {
 		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 		return false;
 	}
+
 	return true;
 }
 
 /**
  * 减去一个事件
  */
-bool wmWorkerLoop_remove(wmSocket* socket, int event) {
+bool wmWorkerLoop_remove(wmSocket *socket, int event) {
 	//如果本来就没有,那直接返回
 	if (socket->events == WM_EVENT_NULL) {
 		return true;
@@ -154,7 +160,7 @@ bool wmWorkerLoop_remove(wmSocket* socket, int event) {
 	return true;
 }
 
-bool wmWorkerLoop_del(wmSocket* socket) {
+bool wmWorkerLoop_del(wmSocket *socket) {
 	socket->events = WM_EVENT_NULL;
 	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, socket->fd, NULL) < 0) {
 		wmWarn("Error has occurred: fd=%d (errno %d) %s", socket->fd, errno, strerror(errno));
@@ -183,7 +189,7 @@ void wmWorkerLoop_loop() {
 		n = epoll_wait(WorkerG.poll->epollfd, events, WorkerG.poll->ncap, timeout);
 		//循环处理epoll请求
 		for (int i = 0; i < n; i++) {
-			wmSocket* socket = events[i].data.ptr;
+			wmSocket *socket = events[i].data.ptr;
 
 			//read
 			if (events[i].events & EPOLLIN) {
