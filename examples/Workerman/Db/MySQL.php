@@ -1,5 +1,5 @@
 <?php
-namespace test;
+namespace Workerman\Db;
 use Exception;
 use PDO;
 use PDOException;

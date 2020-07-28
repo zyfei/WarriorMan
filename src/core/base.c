@@ -116,9 +116,8 @@ int wm_event_wait() {
  * 调用一个闭包函数
  */
 int call_closure_func(php_fci_fcc *fci_fcc) {
-	//把一些核心内容提取出来，存放在其他变量里面。
+	//返回值
 	zval _retval, *retval = &_retval;
-
 	fci_fcc->fci.retval = retval;
 	int ret = zend_call_function(&fci_fcc->fci, &fci_fcc->fcc);
 	if (ret != SUCCESS) {

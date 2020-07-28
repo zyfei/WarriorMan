@@ -1,8 +1,7 @@
 <?php
-require_once 'MySQL.php';
-
 use Workerman\Worker;
 use Workerman\Lib\Timer;
+use WOrkerman\Db\MysqlPool;
 
 require_once 'Workerman/Autoloader.php';
 
@@ -13,33 +12,27 @@ $worker = new Worker("tcp://0.0.0.0:8080");
 $worker->count = 1;
 $worker->name = "tcpServer"; // 设置名字
 $worker->protocol = "\Workerman\Protocols\Http"; // 设置协议
+$worker->mysqlPoll = NULL;
 $worker->onWorkerStart = function ($worker) {
+    $config = array();
+    $config["host"] = "192.168.2.103";
+    $config["port"] = 3306;
+    $config["username"] = "www";
+    $config["password"] = "www";
+    $config["db_name"] = "test";
+
+    $config["min"] = 2;
+    $config["max"] = 100;
+    $config["spareTime"] = 1;
+
+    $worker->mysqlPoll = new MysqlPool($config);
+
     var_dump("onWorkerStart ->" . $worker->workerId . " id=" . $worker->id);
-    global $db;
-    $db = new test\MySQL("172.23.128.1", "3306", "www", "www", "test");
-
-    $timer_id = Timer::add(1, function () {
-        echo "coro_num = " . Warriorman\Coroutine::getTotalNum() . " \n";
-    }, false);
-    $inner_text_worker = new Worker('tcp://0.0.0.0:5678');
-    $inner_text_worker->reusePort = true;
-    $inner_text_worker->count = 2;
-    $inner_text_worker->protocol = "\Workerman\Protocols\Http"; // 设置协议
-    $inner_text_worker->onWorkerStart = function ($worker) {
-        var_dump("inner_text_worker");
-    };
-    $inner_text_worker->onMessage = function ($connection, $buffer) {
-        $connection->send("inner_text_worker");
-    };
-
-    // ## 执行监听 ##
-    $inner_text_worker->listen();
 };
 
 $worker->onWorkerReload = function ($worker) {
     var_dump("onWorkerReload ->" . $worker->id);
 };
-
 $worker->onConnect = function ($connection) use ($worker) {
     $connection->set(array(
         "maxSendBufferSize" => 102400
@@ -48,11 +41,11 @@ $worker->onConnect = function ($connection) use ($worker) {
     $port = $connection->getRemotePort();
     echo "new connection id {$connection->id} ip=$ip port=$port\n";
 };
-
-$worker->onMessage = function ($connection, $data) {
-    // var_dump($data);
-    $responseStr = "hello worla";
-    $connection->send($responseStr);
+$worker->onMessage = function ($connection, $data) use ($worker) {
+    $db = $worker->mysqlPoll->get();
+    $responseStr = json_encode($db->query("select now()"));
+    $worker->mysqlPoll->put($db);
+    $connection->close($responseStr);
 };
 
 $worker->onBufferFull = function ($connection) {

@@ -274,7 +274,8 @@ void monitorWorkers() {
 						if (WIFEXITED(status) == 0) { //不是正常结束的
 							int exit_code = WEXITSTATUS(status);
 							if (WIFSIGNALED(status)) {
-								_log("worker:%s pid:%d exit(%d) with status %d (WIFSIGNALED)", worker->name->str, pid, exit_code, WTERMSIG(status));
+								//因为信号重启的，就不记录了
+								//_log("worker:%s pid:%d exit(%d) with status %d (WIFSIGNALED)", worker->name->str, pid, exit_code, WTERMSIG(status));
 							} else if (WIFSTOPPED(status)) {
 								_log("worker:%s pid:%d exit(%d) with status %d (WIFSTOPPED)", worker->name->str, pid, exit_code, WSTOPSIG(status));
 							} else {
@@ -517,7 +518,7 @@ void initWorker(wmWorker *worker) {
 	//设置connections
 	array_init(&worker->connections);
 	zend_update_property(workerman_worker_ce_ptr, worker->_This, ZEND_STRL("connections"), &worker->connections);
-	HT_FLAGS(Z_ARRVAL_P(&worker->connections)) |= HASH_FLAG_ALLOW_COW_VIOLATION;
+	HT_FLAGS(Z_ARRVAL(worker->connections)) |= HASH_FLAG_ALLOW_COW_VIOLATION;
 }
 
 /**
@@ -913,14 +914,13 @@ void bind_callback(zval *_This, const char *fun_name, php_fci_fcc **handle_fci_f
 void acceptConnectionTcp(wmWorker *worker) {
 	//防止惊群 PS 不使用这个方式了，现在使用SO_REUSEPORT的方式均匀分布。
 	//wmWorkerLoop_add(worker->socket, WM_EVENT_EPOLLEXCLUSIVE);
-
 	wmConnection *conn;
 	zval *__zval;
 	zend_fcall_info_cache call_read;
 	while (worker->_status == WM_WORKER_STATUS_RUNNING) {
 		wmSocket *socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO, WM_SOCKET_MAX_TIMEOUT);
 		if (socket == NULL) {
-			if (worker->_status != WM_WORKER_STATUS_RUNNING) {
+			if (worker->_status != WM_WORKER_STATUS_RUNNING || socket->closed) {
 				break;
 			}
 			wmWarn("acceptConnection fail. workerId=%d , socket = NULL errno=%d", worker->workerId, errno);
@@ -945,6 +945,8 @@ void acceptConnectionTcp(wmWorker *worker) {
 
 		//将connection放入worker->connection中
 		add_index_zval(&worker->connections, conn->id, z);
+		//每一次add都要重新设置
+		HT_FLAGS(Z_ARRVAL(worker->connections)) |= HASH_FLAG_ALLOW_COW_VIOLATION;
 		//引用手动+1，在删除的时候会自动-1
 		GC_ADDREF(obj);
 

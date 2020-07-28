@@ -59,7 +59,7 @@ static void timer_add_callback(void* _timer) {
 	php_worker_timer* timer = (php_worker_timer*) _timer;
 	timer->timer = NULL;
 	timer->cid = wmCoroutine_create(&timer->fcc, timer->fci.param_count, timer->fci.params);
-	if (!timer->persistent || wmWorker_getCurrent()->_status == WM_WORKER_STATUS_RUNNING) {
+	if (!timer->persistent || wmWorker_getCurrent()->_status == WM_WORKER_STATUS_RELOADING) {
 		timer_free(timer);
 		return;
 	}

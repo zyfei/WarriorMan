@@ -54,6 +54,10 @@ ZEND_ARG_INFO(0, data)
 ZEND_ARG_INFO(0, raw)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_connection_close, 0, 0, 1) //
+ZEND_ARG_INFO(0, data)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_connection_set, 0, 0, 1) //
 ZEND_ARG_INFO(0, options) //
 ZEND_END_ARG_INFO()
@@ -125,21 +129,42 @@ PHP_METHOD(workerman_connection, send) {
 	connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
 	conn = connection_object->connection;
 	if (conn == NULL) {
-		php_error_docref(NULL, E_WARNING, "send error");
+		php_error_docref(NULL, E_WARNING, "send error , conn=null");
 		RETURN_FALSE
 	}
 	if (!wmConnection_send(conn, data, length, raw)) {
-		php_error_docref(NULL, E_WARNING, "send error");
+		php_error_docref(NULL, E_WARNING, "send error,errno=%d", errno);
 		RETURN_FALSE
 	}
 	RETURN_TRUE
 }
 
 PHP_METHOD(workerman_connection, close) {
-	wmConnectionObject *connection_object;
 	int ret = 0;
-	connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
-	ret = wmConnection_close(connection_object->connection);
+	char *data = NULL;
+	size_t length = 0;
+
+	ZEND_PARSE_PARAMETERS_START(0, 1)
+				Z_PARAM_OPTIONAL
+				Z_PARAM_STRING(data, length)
+			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
+
+	wmConnectionObject *connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	//如果用户想发送，就让他们发送
+	if (data != NULL && length > 0) {
+		wmConnection_send(connection_object->connection, data, length, false);
+	}
+	ret = wmConnection_destroy(connection_object->connection);
+	if (ret < 0) {
+		php_error_docref(NULL, E_WARNING, "close error");
+		RETURN_FALSE
+	}
+	RETURN_LONG(ret);
+}
+
+PHP_METHOD(workerman_connection, destroy) {
+	wmConnectionObject *connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	int ret = wmConnection_destroy(connection_object->connection);
 	if (ret < 0) {
 		php_error_docref(NULL, E_WARNING, "close error");
 		RETURN_FALSE
@@ -173,14 +198,27 @@ PHP_METHOD(workerman_connection, getRemotePort) {
 	RETURN_LONG(port);
 }
 
+PHP_METHOD(workerman_connection, pauseRecv) {
+	wmConnectionObject *connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	wmConnection_pauseRecv(connection_object->connection);
+}
+
+PHP_METHOD(workerman_connection, resumeRecv) {
+	wmConnectionObject *connection_object = (wmConnectionObject*) wm_connection_fetch_object(Z_OBJ_P(getThis()));
+	wmConnection_resumeRecv(connection_object->connection);
+}
+
 static const zend_function_entry workerman_connection_methods[] = { //
 	PHP_ME(workerman_connection, set, arginfo_workerman_connection_set, ZEND_ACC_PUBLIC) //
 		//公有
 		PHP_ME(workerman_connection, send, arginfo_workerman_connection_send, ZEND_ACC_PUBLIC) //
-		PHP_ME(workerman_connection, close, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_connection, close, arginfo_workerman_connection_close, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_connection, destroy, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
 		PHP_ME(workerman_connection, consumeRecvBuffer, arginfo_workerman_connection_consumeRecvBuffer, ZEND_ACC_PUBLIC) //
 		PHP_ME(workerman_connection, getRemoteIp, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
 		PHP_ME(workerman_connection, getRemotePort, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_connection, pauseRecv, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_connection, resumeRecv, arginfo_workerman_connection_void, ZEND_ACC_PUBLIC) //
 
 		//私有
 		PHP_ME(workerman_connection, read, arginfo_workerman_connection_void, ZEND_ACC_PRIVATE) //

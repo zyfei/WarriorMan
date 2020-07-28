@@ -54,7 +54,7 @@ enum wmConnection_status {
 	WM_CONNECTION_STATUS_INITIAL = 0, //没用上，作为客户端使用
 	WM_CONNECTION_STATUS_CONNECTING = 1, //没用上，作为客户端使用
 	WM_CONNECTION_STATUS_ESTABLISHED = 2, //刚建立
-	WM_CONNECTION_STATUS_CLOSING = 4, //正在关闭
+	WM_CONNECTION_STATUS_CLOSING = 4, //不用
 	WM_CONNECTION_STATUS_CLOSED = 8 //已关闭
 };
 
@@ -77,7 +77,6 @@ enum wmConnection_status {
 
 //array
 #define WM_ARRAY_PAGE_MAX  1024 //wmArray默认的page数是多少，每一次扩展都会申请一页的内存
-
 
 //socket
 #define WM_SOCKET_MAX_TIMEOUT 2147483647 //

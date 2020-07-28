@@ -20,7 +20,7 @@ static zend_object_handlers workerman_channel_handlers;
  * 通过这个PHP对象找到我们的wmChannelObject对象的代码
  */
 static wmChannelObject* wmChannel_fetch_object(zend_object *obj) {
-	return (wmChannelObject *) ((char *) obj - workerman_channel_handlers.offset);
+	return (wmChannelObject*) ((char*) obj - workerman_channel_handlers.offset);
 }
 
 /**
@@ -31,7 +31,7 @@ static zend_object* wmChannel_create_object(zend_class_entry *ce) {
 	//向PHP申请一块内存,大小是一个coro_chan的大小+
 	//至于为什么不根据size来直接申请内存，因为zend_object最后一个元素是一个数组下标，后面不一定申请了多少个
 	//如果我们直接分配zend_object的大小，就会把PHP对象的属性给漏掉。这是实现自定义对象需要特别关注的问题。如果还是不理解，小伙伴们可以先去学习C语言的柔性数组。
-	wmChannelObject *chan_t = (wmChannelObject *) ecalloc(1, sizeof(wmChannelObject) + zend_object_properties_size(ce));
+	wmChannelObject *chan_t = (wmChannelObject*) ecalloc(1, sizeof(wmChannelObject) + zend_object_properties_size(ce));
 	//std之前的一个指针位置，就是我们的wmChannel指针
 
 	//初始化php对象，根据ce
@@ -47,7 +47,7 @@ static zend_object* wmChannel_create_object(zend_class_entry *ce) {
  * 释放php对象的方法
  */
 static void wmChannel_free_object(zend_object *object) {
-	wmChannelObject *chan_t = (wmChannelObject *) wmChannel_fetch_object(object);
+	wmChannelObject *chan_t = (wmChannelObject*) wmChannel_fetch_object(object);
 	wmChannel *chan = chan_t->chan;
 	if (chan) {
 		wmChannel_free(chan);
@@ -57,14 +57,20 @@ static void wmChannel_free_object(zend_object *object) {
 }
 
 //构造函数
-ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_channel_construct, 0, 0, 0) ZEND_ARG_INFO(0, capacity)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_channel_construct, 0, 0, 0) //
+ZEND_ARG_INFO(0, capacity)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_channel_push, 0, 0, 1) ZEND_ARG_INFO(0, data)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_channel_push, 0, 0, 1)	//
+ZEND_ARG_INFO(0, data)
 ZEND_ARG_INFO(0, timeout)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_channel_pop, 0, 0, 0) ZEND_ARG_INFO(0, timeout)
+ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_channel_pop, 0, 0, 0) //
+ZEND_ARG_INFO(0, timeout)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_workerman_channel_void, 0, 0, 0) //
 ZEND_END_ARG_INFO()
 
 //构造函数
@@ -81,7 +87,7 @@ PHP_METHOD(workerman_channel, __construct) {
 		capacity = 1;
 	}
 
-	chan_t = (wmChannelObject *) wmChannel_fetch_object(Z_OBJ_P(getThis()));
+	chan_t = (wmChannelObject*) wmChannel_fetch_object(Z_OBJ_P(getThis()));
 	chan_t->chan = wmChannel_create(capacity);
 
 	zend_update_property_long(workerman_channel_ce_ptr, getThis(), ZEND_STRL("capacity"), capacity);
@@ -99,7 +105,7 @@ static PHP_METHOD(workerman_channel, push) {
 				Z_PARAM_DOUBLE(timeout)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	chan_t = (wmChannelObject *) wmChannel_fetch_object(Z_OBJ_P(getThis()));
+	chan_t = (wmChannelObject*) wmChannel_fetch_object(Z_OBJ_P(getThis()));
 	chan = chan_t->chan;
 
 	//引用计数+1
@@ -125,10 +131,10 @@ static PHP_METHOD(workerman_channel, pop) {
 				Z_PARAM_DOUBLE(timeout)
 			ZEND_PARSE_PARAMETERS_END_EX(RETURN_FALSE);
 
-	chan_t = (wmChannelObject *) wmChannel_fetch_object(Z_OBJ_P(getThis()));
+	chan_t = (wmChannelObject*) wmChannel_fetch_object(Z_OBJ_P(getThis()));
 	chan = chan_t->chan;
 
-	zval *zdata = (zval *) wmChannel_pop(chan, timeout);
+	zval *zdata = (zval*) wmChannel_pop(chan, timeout);
 	if (!zdata) {
 		RETURN_FALSE
 	}
@@ -136,10 +142,36 @@ static PHP_METHOD(workerman_channel, pop) {
 	efree(zdata);
 }
 
+/**
+ * 通道是否为空
+ */
+PHP_METHOD(workerman_channel, isEmpty) {
+	wmChannelObject *chan_t;
+	wmChannel *chan;
+	chan_t = (wmChannelObject*) wmChannel_fetch_object(Z_OBJ_P(getThis()));
+	chan = chan_t->chan;
+	int num = wmChannel_num(chan);
+	bool is_exist = (num > 0);
+	RETURN_BOOL(is_exist);
+}
+
+/**
+ * 当前通道剩余数量
+ */
+PHP_METHOD(workerman_channel, length) {
+	wmChannelObject *chan_t;
+	wmChannel *chan;
+	chan_t = (wmChannelObject*) wmChannel_fetch_object(Z_OBJ_P(getThis()));
+	chan = chan_t->chan;
+	RETURN_LONG(wmChannel_num(chan));
+}
+
 static const zend_function_entry workerman_channel_methods[] = { //
 	PHP_ME(workerman_channel, __construct, arginfo_workerman_channel_construct, ZEND_ACC_PUBLIC | ZEND_ACC_CTOR) //
 		PHP_ME(workerman_channel, push, arginfo_workerman_channel_push, ZEND_ACC_PUBLIC) //
 		PHP_ME(workerman_channel, pop, arginfo_workerman_channel_pop, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_channel, isEmpty, arginfo_workerman_channel_void, ZEND_ACC_PUBLIC) //
+		PHP_ME(workerman_channel, length, arginfo_workerman_channel_void, ZEND_ACC_PUBLIC) //
 		PHP_FE_END };
 
 /**
@@ -160,7 +192,7 @@ void workerman_channel_init() {
 	//上面的宏翻译一下，就是下面的
 	workerman_channel_ce_ptr->create_object = wmChannel_create_object;
 	workerman_channel_handlers.free_obj = wmChannel_free_object;
-	workerman_channel_handlers.offset = (zend_long) (((char *) (&(((wmChannelObject*) NULL)->std))) - ((char *) NULL));
+	workerman_channel_handlers.offset = (zend_long) (((char*) (&(((wmChannelObject*) NULL)->std))) - ((char*) NULL));
 
 	//类进行初始化的时候设置变量
 	zend_declare_property_long(workerman_channel_ce_ptr, ZEND_STRL("capacity"), 1, ZEND_ACC_PUBLIC);

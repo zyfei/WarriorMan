@@ -21,6 +21,8 @@ typedef struct {
 	zval _This; //指向当前PHP类的指针
 	int _status; //当前连接的状态
 	int transport; //TCP还是UDP
+	bool _isPaused; //暂停接收消息,只对tcp起作用,默认是false
+	wmCoroutine *_pausedCoro; //被暂停的协程
 
 	php_fci_fcc *onMessage;
 	php_fci_fcc *onClose;
@@ -32,6 +34,7 @@ typedef struct {
 
 	wmWorker *worker; //所属于哪一个worker对象
 
+	bool is_sending; //是否正在发送数据，如果是会将send方法保护起来，其他协程无法调用
 } wmConnection;
 
 //为了通过php对象，找到上面的c++对象
@@ -52,7 +55,7 @@ ssize_t wmConnection_recv(wmConnection *socket, int32_t length);
 void wmConnection_read(wmConnection *connection);
 void wmConnection_recvfrom(wmConnection *connection, wmSocket *socket);
 bool wmConnection_send(wmConnection *connection, const void *buf, size_t len, bool raw);
-int wmConnection_close(wmConnection *connection);
+int wmConnection_destroy(wmConnection *connection);
 void wmConnection_free(wmConnection *socket);
 void wmConnection_closeConnections();
 long wmConnection_getConnectionsNum();
@@ -60,5 +63,7 @@ unsigned long wmConnection_getTotalRequestNum();
 void wmConnection_consumeRecvBuffer(wmConnection *connection, zend_long length);
 char* wmConnection_getRemoteIp(wmConnection *connection);
 int wmConnection_getRemotePort(wmConnection *connection);
+void wmConnection_pauseRecv(wmConnection *connection);
+void wmConnection_resumeRecv(wmConnection *connection);
 
 #endif
