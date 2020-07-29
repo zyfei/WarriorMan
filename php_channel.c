@@ -7,7 +7,7 @@
 zend_class_entry workerman_channel_ce;
 zend_class_entry *workerman_channel_ce_ptr;
 
-//为了通过php对象，找到上面的c++对象
+//为了通过php对象，找到上面的c对象
 typedef struct {
 	wmChannel *chan; //c对象
 	zend_object std; //php对象
