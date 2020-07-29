@@ -38,8 +38,9 @@ bool loop_callback_coroutine_resume(wmSocket *socket, int event) {
 	} else if (event == EPOLLOUT && socket->write_co) {
 		return wmCoroutine_resume(socket->write_co);
 	}
-	//如果走到这里，那么丢弃并且从socket中del掉
-	wmWorkerLoop_del(socket);
+	//如果走到这里，直接就关闭掉
+	wmSocket_close(socket);
+	//wmWorkerLoop_del(socket);
 	return false;
 }
 
