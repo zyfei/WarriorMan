@@ -259,7 +259,6 @@ wmSocket* wmSocket_accept(wmSocket *socket, int new_socket_loop_type, uint32_t t
 			if (errno == EAGAIN && event_wait(socket, WM_EVENT_READ) && !timer_used(socket, WM_EVENT_READ)) {
 				continue;
 			}
-
 			set_err(socket, errno);
 			wmWarn("wmSocket_accept fail. %s", socket->errMsg);
 			timer_del(socket, WM_EVENT_READ);

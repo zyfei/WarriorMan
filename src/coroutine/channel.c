@@ -89,7 +89,7 @@ void* wmChannel_pop(wmChannel* channel, double timeout) {
 			wct->co = co;
 			wct->type = true;
 			//就添加到定时器中,定时器到时间，会把这个协程再唤醒
-			wmTimerWheel_add_quick(&WorkerG.timer, sleep_timeout, (void*) co, timeout * 1000);
+			wmTimerWheel_add_quick(&WorkerG.timer, sleep_timeout, (void*) wct, timeout * 1000);
 		}
 		//加入消费者等待队列中
 		wmQueue_push(channel->consumer_queue, co);

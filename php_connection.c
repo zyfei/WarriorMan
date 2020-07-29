@@ -133,7 +133,9 @@ PHP_METHOD(workerman_connection, send) {
 		RETURN_FALSE
 	}
 	if (!wmConnection_send(conn, data, length, raw)) {
-		php_error_docref(NULL, E_WARNING, "send error,errno=%d", errno);
+		if(!conn->socket->closed){
+			php_error_docref(NULL, E_WARNING, "send error,errno=%d", errno);
+		}
 		RETURN_FALSE
 	}
 	RETURN_TRUE

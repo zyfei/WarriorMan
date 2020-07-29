@@ -406,8 +406,6 @@ void wmConnection_resumeRecv(wmConnection *connection) {
  * 处理epoll失败的情况
  */
 void onError(wmConnection *connection) {
-	wmWarn("onError: (fd=%d,errno %d) %s", connection->fd, connection->socket->errCode, connection->socket->errMsg);
-
 	if (connection->socket && connection->socket->errCode) {
 		zend_update_property_long(workerman_connection_ce_ptr, &connection->_This, ZEND_STRL("errCode"), connection->socket->errCode);
 		zend_update_property_string(workerman_connection_ce_ptr, &connection->_This, ZEND_STRL("errMsg"), connection->socket->errMsg);

@@ -25,6 +25,8 @@ $worker->onWorkerStart = function ($worker) {
     $config["max"] = 30;
     $config["spareTime"] = 1;
     $worker->mysqlPoll = new MysqlPool($config);
+    
+    var_dump("onWorkerStart");
 };
 
 $worker->onMessage = function ($connection, $data) use ($worker) {

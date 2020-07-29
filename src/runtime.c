@@ -146,7 +146,6 @@ static int socket_bind(php_stream *stream, wmSocket *sock, php_stream_xport_para
  * php socket的connect方法
  */
 static int socket_connect(php_stream *stream, wmSocket *sock, php_stream_xport_param *xparam) {
-	php_printf("socket_connect\n");
 	char *host = NULL;
 	int portno = 0;
 	int ret = 0;

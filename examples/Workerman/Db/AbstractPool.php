@@ -172,6 +172,7 @@ abstract class AbstractPool
         // 大约1分钟检测一次连接
         // 回收算法，获得一分钟内被使用的连接峰值。当前count-峰值，如果大于等于2。那么释放一个连接
         \Warriorman\Lib\Timer::add($this->spareTime, function () {
+            var_dump("count=>".$this->count);
             // 如果满足这个条件，那么释放一个连接
             if ($this->count > $this->min && ($this->count - $this->max_used_con_num) >= 2) {
                 // 弹出一个资源，如果成功，那么去掉

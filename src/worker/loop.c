@@ -21,7 +21,6 @@ static inline int event_decode(int events) {
 #else
 		flag |= EPOLLEXCLUSIVE;
 #endif
-
 	}
 	return flag;
 }
@@ -39,15 +38,14 @@ bool loop_callback_coroutine_resume(wmSocket *socket, int event) {
 	} else if (event == EPOLLOUT && socket->write_co) {
 		return wmCoroutine_resume(socket->write_co);
 	}
-	wmWarn("Error has occurred: loop_callback_coroutine_resume fail. fd=%d event=%d .will del event....", socket->fd, socket->events);
+	//如果走到这里，那么丢弃并且从socket中del掉
 	wmWorkerLoop_del(socket);
 	return false;
 }
 
 bool loop_callback_coroutine_resume_and_del(wmSocket *socket, int event) {
 	wmWorkerLoop_del(socket);
-	bool b = loop_callback_coroutine_resume(socket, event);
-	return b;
+	return loop_callback_coroutine_resume(socket, event);
 }
 
 /**
@@ -161,10 +159,12 @@ bool wmWorkerLoop_remove(wmSocket *socket, int event) {
 }
 
 bool wmWorkerLoop_del(wmSocket *socket) {
-	socket->events = WM_EVENT_NULL;
-	if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, socket->fd, NULL) < 0) {
-		wmWarn("Error has occurred: fd=%d (errno %d) %s", socket->fd, errno, strerror(errno));
-		return false;
+	if (socket->events != WM_EVENT_NULL) {
+		socket->events = WM_EVENT_NULL;
+		if (epoll_ctl(WorkerG.poll->epollfd, EPOLL_CTL_DEL, socket->fd, NULL) < 0) {
+			wmWarn("Error has occurred: fd=%d (errno %d) %s", socket->fd, errno, strerror(errno));
+			return false;
+		}
 	}
 	return true;
 }

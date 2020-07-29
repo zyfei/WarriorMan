@@ -920,7 +920,7 @@ void acceptConnectionTcp(wmWorker *worker) {
 	while (worker->_status == WM_WORKER_STATUS_RUNNING) {
 		wmSocket *socket = wmSocket_accept(worker->socket, WM_LOOP_SEMI_AUTO, WM_SOCKET_MAX_TIMEOUT);
 		if (socket == NULL) {
-			if (worker->_status != WM_WORKER_STATUS_RUNNING || socket->closed) {
+			if (worker->_status != WM_WORKER_STATUS_RUNNING || worker->socket->closed) {
 				break;
 			}
 			wmWarn("acceptConnection fail. workerId=%d , socket = NULL errno=%d", worker->workerId, errno);

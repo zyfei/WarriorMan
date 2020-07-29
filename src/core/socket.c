@@ -116,7 +116,7 @@ ssize_t wm_socket_recv(int sock, void *buf, size_t len, int flag) {
 	 */
 	ret = recv(sock, buf, len, flag);
 	if (ret < 0 && errno != EAGAIN) {
-		wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
+		//wmWarn("Error has occurred: (errno %d) %s", errno, strerror(errno));
 	}
 	return ret;
 }
@@ -126,7 +126,7 @@ ssize_t wm_socket_send(int sock, const void *buf, size_t len, int flag) {
 
 	ret = send(sock, buf, len, flag);
 	if (ret < 0 && errno != EAGAIN) {
-		wmWarn("Error has occurred: (fd=%d,errno %d) %s", sock, errno, strerror(errno));
+		//wmWarn("Error has occurred: (fd=%d,errno %d) %s", sock, errno, strerror(errno));
 	}
 	return ret;
 }
@@ -135,7 +135,7 @@ int wm_socket_close(int fd) {
 	int ret;
 	ret = close(fd);
 	if (ret < 0) {
-		wmWarn("Error has occurred: (fd=%d,errno %d) %s", fd, errno, strerror(errno));
+		//wmWarn("Error has occurred: (fd=%d,errno %d) %s", fd, errno, strerror(errno));
 	}
 	return ret;
 }
