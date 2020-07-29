@@ -14,7 +14,6 @@ WarriorMan是一个完全用c语言编写的php扩展，仿照 [Workerman](https
 
 3 会逐步提供更多底层方法，为开发者提供更多的灵活度。  
 
-
 ## WarriorMan适合什么样的人
 如果你初次接触socket长连接编程，建议使用 [Workerman](https://www.workerman.net/) 框架开发。  
 如果你的项目业务逻辑很清晰，没有频繁的IO操作，建议使用 [Workerman](https://www.workerman.net/) 框架开发。  
@@ -22,6 +21,10 @@ WarriorMan是一个完全用c语言编写的php扩展，仿照 [Workerman](https
 如果你对C语言感兴趣，对协程原理感兴趣，可以考虑使用WarriorMan  
 如果你是一个热于折腾的人，并且可以主导自己的项目，可以考虑使用WarriorMan  
 如果你对php扩展开发有经验，请一定尝试使用WarriorMan 
+
+## 压力测试
+[压力测试](https://www.kancloud.cn/wwwoooshizha/warriorman/1839724)  
+[压力测试-数据库](https://www.kancloud.cn/wwwoooshizha/warriorman/1839725)
 
 ### 作者希望
 作者在这里希望大家可以尝试使用WarriorMan，尝试学习WarriorMan源码，源码中有大量中文注释，这对提升自己编程水平以及更好的理解Workerman和Swoole很有帮助。  
@@ -67,6 +70,3 @@ WarriorMan 交流QQ群: 1098698769
 [Workerman](https://github.com/walkor/Workerman)  
 [Swoole](https://github.com/swoole/swoole-src)  
 [Study](https://github.com/php-extension-research/study)  
-
-## 友情链接
-[PHP爬虫-爬山虎](https://github.com/blogdaren/PHPCreeper)  

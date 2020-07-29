@@ -24,7 +24,6 @@ class MysqlPool extends AbstractPool
     
     protected function closeDb($db)
     {
-        var_dump("closeDb");
         $db->closeConnection();
         // return $db->connected;
     }
