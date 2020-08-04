@@ -28,8 +28,8 @@ WarriorMan是一个完全用c语言编写的php扩展，仿照 [Workerman](https
 
 ### 作者希望
 作者在这里希望大家可以尝试使用WarriorMan，尝试学习WarriorMan源码，源码中有大量中文注释，这对提升自己编程水平以及更好的理解Workerman和Swoole很有帮助。  
-如果在使用/学习中遇到任何问题，可以提issues或者在QQ群: 1098698769 中直接联系作者
-  
+如果在使用/学习中遇到任何问题，可以提issues或者在QQ群: 1098698769 中直接联系作者  
+目前第二版学习制作中，作者目前正在学习Rust，预计融合Rust的思想。或者是使用Rust制作php容器
 
 ## 环境
 PHP7 or Higher
