@@ -6,9 +6,9 @@ static wmHash_INT_PTR *coroutines = NULL; //保存所有协程
 static wmHash_INT_PTR *user_yield_coros = NULL; //被yield的协程
 
 static wmCoroutine main_task = { 0 }; //主协程
-static wmCoroutine* current_task = NULL; //当前协程
+static wmCoroutine *current_task = NULL; //当前协程
 
-static long run(wmCoroutine* task);
+static long run(wmCoroutine *task);
 static void main_func(void *arg);
 static void vm_stack_init();
 static void save_vm_stack(wmCoroutine *task);
@@ -16,7 +16,7 @@ static void close_coro(wmCoroutine *task);
 static wmCoroutine* get_origin_task(wmCoroutine *task);
 static wmCoroutine* get_task();
 static void restore_vm_stack(wmCoroutine *task);
-static void sleep_callback(void* co);
+static void sleep_callback(void *co);
 
 /**
  * 请求初始化的时候调用
@@ -41,7 +41,7 @@ long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc, zval *a
 	}
 
 	//创建协程,注意 这个时候当前的task还没有php协程栈，是在main_func中初始化的
-	wmCoroutine* task = (wmCoroutine *) wm_malloc(sizeof(wmCoroutine));
+	wmCoroutine *task = (wmCoroutine*) wm_malloc(sizeof(wmCoroutine));
 	bzero(task, sizeof(wmCoroutine));
 	task->cid = ++last_cid;
 	if (task->cid < 0) {
@@ -67,7 +67,7 @@ long wmCoroutine_create(zend_fcall_info_cache *fci_cache, uint32_t argc, zval *a
 	return run(task);
 }
 
-long run(wmCoroutine* task) {
+long run(wmCoroutine *task) {
 	long cid = task->cid;
 	//唤起协程 = 记录的上一个协程
 	task->origin = current_task;
@@ -95,7 +95,7 @@ long run(wmCoroutine* task) {
 void main_func(void *arg) {
 	//把一些核心内容提取出来，存放在其他变量里面。
 	int i;
-	php_coro_args *php_arg = (php_coro_args *) arg;
+	php_coro_args *php_arg = (php_coro_args*) arg;
 	zend_fcall_info_cache fci_cache = *php_arg->fci_cache;
 	zend_function *func = fci_cache.function_handler;
 	zval *argv = php_arg->argv;
@@ -124,7 +124,7 @@ void main_func(void *arg) {
 			call_info = ZEND_CALL_TOP_FUNCTION | ZEND_CALL_DYNAMIC | ZEND_CALL_HAS_THIS;
 		}
 		call = zend_vm_stack_push_call_frame(call_info, func, argc, object_or_called_scope);
-	}while (0);
+	} while (0);
 #endif
 
 	for (i = 0; i < argc; ++i) {
@@ -143,6 +143,15 @@ void main_func(void *arg) {
 
 	call->symbol_table = NULL;
 
+	/**
+	 * BUG报告
+	 * https://github.com/zyfei/WarriorMan/issues/2
+	 */
+	if (func->op_array.fn_flags & ZEND_ACC_CLOSURE) {
+		GC_ADDREF(ZEND_CLOSURE_OBJECT(func));
+		ZEND_ADD_CALL_FLAG(call, ZEND_CALL_CLOSURE);
+	}
+
 	//执行区域设置为call
 	EG(current_execute_data) = call;
 	EG(error_handling) = 0;
@@ -150,7 +159,7 @@ void main_func(void *arg) {
 	EG(exception) = NULL;
 
 	//当前协程
-	wmCoroutine* _task = current_task;
+	wmCoroutine *_task = current_task;
 
 	//保存php栈信息
 	save_vm_stack(_task);
@@ -216,7 +225,7 @@ void main_func(void *arg) {
  * 获取当前协程任务
  */
 void wmCoroutine_set_callback(long cid, coroutine_func_t _defer, void *_defer_data) {
-	wmCoroutine* task = wmCoroutine_get_by_cid(cid);
+	wmCoroutine *task = wmCoroutine_get_by_cid(cid);
 	if (task == NULL) {
 		_defer(_defer_data);
 		return;
@@ -276,7 +285,7 @@ void save_vm_stack(wmCoroutine *task) {
  * 切换协程
  */
 void wmCoroutine_yield() {
-	wmCoroutine* task = wmCoroutine_get_current();
+	wmCoroutine *task = wmCoroutine_get_current();
 	assert(current_task == task); //是否具备切换资格
 	//放入协程切换队列
 	if (WM_HASH_ADD(WM_HASH_INT_STR, user_yield_coros, task->cid, task) < 0) {
@@ -286,8 +295,8 @@ void wmCoroutine_yield() {
 
 	wmCoroutine *origin_task = task->origin;
 
-	save_vm_stack((wmCoroutine *) task);
-	restore_vm_stack((wmCoroutine *) origin_task);
+	save_vm_stack((wmCoroutine*) task);
+	restore_vm_stack((wmCoroutine*) origin_task);
 
 	current_task = origin_task;
 
@@ -302,7 +311,7 @@ bool wmCoroutine_resume(wmCoroutine *task) {
 	assert(current_task != task);
 
 	//判断是否之前yield过
-	wmCoroutine* yield_co = WM_HASH_GET(WM_HASH_INT_STR, user_yield_coros, task->cid);
+	wmCoroutine *yield_co = WM_HASH_GET(WM_HASH_INT_STR, user_yield_coros, task->cid);
 	if (yield_co == NULL) {
 		return false;
 	}
@@ -413,12 +422,12 @@ void wmCoroutine_sleep(double seconds) {
 	if (seconds < 0.001) {
 		seconds = 0.001;
 	}
-	wmCoroutine* co = wmCoroutine_get_current();
+	wmCoroutine *co = wmCoroutine_get_current();
 	wmTimerWheel_add_quick(&WorkerG.timer, sleep_callback, (void*) co, seconds * 1000);
 	wmCoroutine_yield();
 }
 
 //sleep回调
-void sleep_callback(void* co) {
+void sleep_callback(void *co) {
 	wmCoroutine_resume((wmCoroutine*) co);
 }
