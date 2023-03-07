@@ -64,7 +64,7 @@ WarriorMan:[https://www.kancloud.cn/wwwoooshizha/warriorman/content](https://www
 文档是直接用了WorkerMan和Swoole的部分文档  
 
 ## 交流
-WarriorMan 交流QQ群: 1098698769
+:> 
 
 ## 特别鸣谢
 [Workerman](https://github.com/walkor/Workerman)  
